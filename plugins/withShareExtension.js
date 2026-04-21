@@ -121,7 +121,7 @@ function withShareExtensionTarget(config, props) {
     const groupKey = project.pbxCreateGroup(targetName, targetName);
     project.addToPbxGroup(groupKey, project.getFirstProject().firstProject.mainGroup);
     project.addSourceFile(
-      `${targetName}/ShareViewController.swift`,
+      'ShareViewController.swift',
       { target: targetUuid },
       groupKey,
     );

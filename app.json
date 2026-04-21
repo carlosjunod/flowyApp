@@ -16,16 +16,23 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.tryflowy.client",
-      "associatedDomains": ["applinks:tryflowy.app"],
+      "associatedDomains": [
+        "applinks:tryflowy.app"
+      ],
       "entitlements": {
-        "com.apple.security.application-groups": ["group.app.tryflowy"],
-        "keychain-access-groups": ["$(AppIdentifierPrefix)group.app.tryflowy"]
+        "com.apple.security.application-groups": [
+          "group.app.tryflowy"
+        ],
+        "keychain-access-groups": [
+          "$(AppIdentifierPrefix)group.app.tryflowy"
+        ]
       },
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         }
-      }
+      },
+      "appleTeamId": "T3WJGX85DZ"
     },
     "android": {
       "package": "app.tryflowy.client",
