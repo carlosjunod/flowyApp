@@ -1,8 +1,10 @@
 import { router } from 'expo-router';
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { Badge } from '@/components/ui/Badge';
+import { Shimmer } from '@/components/ui/Shimmer';
 import { Spinner } from '@/components/ui/Spinner';
 import { Thumbnail } from '@/components/ui/Thumbnail';
 import { relativeDate } from '@/lib/relativeDate';
@@ -17,37 +19,49 @@ export const ItemCard: React.FC<Props> = ({ item }) => {
   const pending = isPending(item);
   const errored = item.status === 'error';
   return (
-    <Pressable
-      disabled={pending}
-      onPress={() => {
-        if (errored) return;
-        router.push(`/item/${item.id}`);
-      }}
-      className={`bg-card rounded-xl overflow-hidden border ${
-        errored ? 'border-danger' : 'border-border'
-      } ${pending ? 'opacity-60' : ''}`}
-      style={{ height: 176 }}
-    >
-      <View className="flex-1 relative">
-        <Thumbnail item={item} className="flex-1" rounded="sm" />
-        {pending ? (
-          <View className="absolute inset-0 items-center justify-center bg-black/20">
-            <Spinner />
-          </View>
-        ) : null}
-      </View>
-      <View className="px-3 py-2 gap-1">
-        <Text className="text-sm font-semibold text-fg" numberOfLines={1}>
-          {item.title ?? 'Untitled'}
-        </Text>
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center gap-1 flex-1 pr-2">
-            <Text className="text-xs text-muted">{typeGlyph[item.type]}</Text>
-            {item.category ? <Badge label={item.category} /> : null}
-          </View>
-          <Text className="text-xs text-muted">{relativeDate(item.created)}</Text>
+    <Animated.View entering={FadeIn.duration(220)}>
+      <Pressable
+        disabled={pending}
+        onPress={() => {
+          if (errored) return;
+          router.push(`/item/${item.id}`);
+        }}
+        style={({ pressed }) => [
+          { height: 176, elevation: 2 },
+          pressed && !pending && { transform: [{ scale: 0.98 }], opacity: 0.97 },
+        ]}
+        className={`bg-card rounded-2xl overflow-hidden border shadow-card ${
+          errored ? 'border-danger' : 'border-border'
+        } ${pending ? 'opacity-80' : ''}`}
+      >
+        <View className="flex-1 relative">
+          <Thumbnail item={item} className="flex-1" rounded="sm" />
+          {pending ? (
+            <>
+              <Shimmer />
+              <View className="absolute inset-0 items-center justify-center">
+                <Spinner tint="muted" />
+              </View>
+            </>
+          ) : null}
         </View>
-      </View>
-    </Pressable>
+        <View className="px-3 py-2 gap-1">
+          <Text
+            className="text-sm font-semibold text-fg"
+            style={{ fontFamily: 'Inter_600SemiBold' }}
+            numberOfLines={1}
+          >
+            {item.title ?? 'Untitled'}
+          </Text>
+          <View className="flex-row items-center justify-between">
+            <View className="flex-row items-center gap-1 flex-1 pr-2">
+              <Text className="text-xs text-muted">{typeGlyph[item.type]}</Text>
+              {item.category ? <Badge label={item.category} palette={item.category} /> : null}
+            </View>
+            <Text className="text-xs text-muted">{relativeDate(item.created)}</Text>
+          </View>
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 };

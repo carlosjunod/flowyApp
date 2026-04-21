@@ -1,3 +1,36 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Flowy design tokens. Warm Paper (light) + Dark Graphite (dark).
+ * Values are RGB triplets so Tailwind's <alpha-value> works.
+ * NativeWind 4 processes these CSS variables through the metro transformer.
+ * Dark theme is activated by setting class="dark" on the root View via
+ * nativewind's colorScheme.set() — see src/lib/theme.tsx.
+ */
+:root {
+  --color-bg: 248 244 234;
+  --color-surface: 240 232 212;
+  --color-card: 255 255 255;
+  --color-fg: 28 24 21;
+  --color-primary: 28 24 21;
+  --color-muted: 107 98 88;
+  --color-accent: 219 102 60;
+  --color-border: 223 213 194;
+  --color-danger: 220 38 38;
+  --color-success: 16 185 129;
+}
+
+.dark {
+  --color-bg: 26 28 32;
+  --color-surface: 32 35 42;
+  --color-card: 39 42 49;
+  --color-fg: 238 234 224;
+  --color-primary: 238 234 224;
+  --color-muted: 157 161 170;
+  --color-accent: 235 124 76;
+  --color-border: 58 61 68;
+  --color-danger: 248 113 113;
+  --color-success: 52 211 153;
+}

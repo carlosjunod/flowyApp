@@ -20,6 +20,7 @@ import { Thumbnail } from '@/components/ui/Thumbnail';
 import { useDeleteItem, useItemById, usePatchItem } from '@/hooks/useItems';
 import { useItemStatus } from '@/hooks/useItemStatus';
 import { relativeDate } from '@/lib/relativeDate';
+import { useResolvedColors } from '@/lib/theme';
 import type { Item } from '@/types';
 
 export default function ItemDetailScreen() {
@@ -64,7 +65,12 @@ export default function ItemDetailScreen() {
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
         <Thumbnail item={item} className="w-full h-56" rounded="lg" />
         <View className="gap-2">
-          <Text className="text-2xl font-bold text-fg">{item.title ?? 'Untitled'}</Text>
+          <Text
+            className="text-3xl text-fg"
+            style={{ fontFamily: 'InstrumentSerif_400Regular', letterSpacing: -0.5 }}
+          >
+            {item.title ?? 'Untitled'}
+          </Text>
           <View className="flex-row flex-wrap items-center gap-2">
             {item.category ? <Badge label={item.category} tone="accent" /> : null}
             <Text className="text-sm text-muted">{relativeDate(item.created)}</Text>
@@ -158,6 +164,7 @@ const EditModal: React.FC<EditProps> = ({ item, onClose }) => {
   const [tags, setTags] = useState((item.tags ?? []).join(', '));
   const patch = usePatchItem();
   const [error, setError] = useState<string | null>(null);
+  const colors = useResolvedColors();
 
   useEffect(() => {
     setTitle(item.title ?? '');
@@ -196,14 +203,14 @@ const EditModal: React.FC<EditProps> = ({ item, onClose }) => {
             value={title}
             onChangeText={setTitle}
             placeholder="Title"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.muted}
             className="h-11 rounded-xl border border-border bg-card px-3 text-fg"
           />
           <TextInput
             value={summary}
             onChangeText={setSummary}
             placeholder="Summary"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.muted}
             multiline
             className="min-h-[88px] rounded-xl border border-border bg-card px-3 py-2 text-fg"
           />
@@ -211,14 +218,14 @@ const EditModal: React.FC<EditProps> = ({ item, onClose }) => {
             value={category}
             onChangeText={setCategory}
             placeholder="Category"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.muted}
             className="h-11 rounded-xl border border-border bg-card px-3 text-fg"
           />
           <TextInput
             value={tags}
             onChangeText={setTags}
             placeholder="Tags (comma separated)"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.muted}
             autoCapitalize="none"
             className="h-11 rounded-xl border border-border bg-card px-3 text-fg"
           />

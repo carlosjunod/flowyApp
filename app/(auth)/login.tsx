@@ -11,9 +11,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/lib/auth';
+import { useResolvedColors } from '@/lib/theme';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
+  const colors = useResolvedColors();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,7 +44,12 @@ export default function LoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View className="flex-1 justify-center px-6">
-          <Text className="text-3xl font-bold text-fg mb-2">Tryflowy</Text>
+          <Text
+            className="text-5xl text-fg mb-2"
+            style={{ fontFamily: 'InstrumentSerif_400Regular', letterSpacing: -1 }}
+          >
+            Flowy
+          </Text>
           <Text className="text-base text-muted mb-8">Sign in to your inbox</Text>
 
           <View className="gap-3">
@@ -50,7 +57,7 @@ export default function LoginScreen() {
               value={email}
               onChangeText={setEmail}
               placeholder="Email"
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor={colors.muted}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
@@ -61,7 +68,7 @@ export default function LoginScreen() {
               value={password}
               onChangeText={setPassword}
               placeholder="Password"
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor={colors.muted}
               secureTextEntry
               textContentType="password"
               className="h-11 rounded-xl border border-border bg-card px-4 text-fg"

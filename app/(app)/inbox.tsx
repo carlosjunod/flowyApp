@@ -15,6 +15,7 @@ import { ItemDetailRow } from '@/components/inbox/ItemDetailRow';
 import { ItemRow } from '@/components/inbox/ItemRow';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import {
   extractCategories,
   flattenPages,
@@ -97,10 +98,18 @@ export default function InboxScreen() {
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
       <View className="flex-row items-center justify-between px-4 pt-2">
-        <Text className="text-2xl font-bold text-fg">Inbox</Text>
-        <Pressable onPress={signOut}>
-          <Text className="text-accent">Sign out</Text>
-        </Pressable>
+        <Text
+          className="text-3xl text-fg"
+          style={{ fontFamily: 'InstrumentSerif_400Regular', letterSpacing: -0.5 }}
+        >
+          Inbox
+        </Text>
+        <View className="flex-row items-center gap-2">
+          <ThemeToggle />
+          <Pressable onPress={signOut} hitSlop={8}>
+            <Text className="text-accent font-medium">Sign out</Text>
+          </Pressable>
+        </View>
       </View>
       <FilterBar
         search={searchInput}

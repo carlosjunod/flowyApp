@@ -12,9 +12,14 @@ export default function ChatScreen() {
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
       <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
-        <Text className="text-xl font-semibold text-fg">Chat</Text>
-        <Pressable onPress={reset}>
-          <Text className="text-accent">New chat</Text>
+        <Text
+          className="text-2xl text-fg"
+          style={{ fontFamily: 'InstrumentSerif_400Regular', letterSpacing: -0.3 }}
+        >
+          Chat
+        </Text>
+        <Pressable onPress={reset} hitSlop={8}>
+          <Text className="text-accent font-medium">New chat</Text>
         </Pressable>
       </View>
       <KeyboardAvoidingView

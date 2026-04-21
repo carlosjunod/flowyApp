@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
+import { useResolvedColors } from '@/lib/theme';
 import type { SortDir, SortField, ViewMode } from '@/types';
 
 type Props = {
@@ -42,13 +43,14 @@ export const FilterBar: React.FC<Props> = ({
   category,
   onCategoryChange,
 }) => {
+  const colors = useResolvedColors();
   return (
     <View className="border-b border-border bg-bg px-4 pt-3 pb-2 gap-2">
       <TextInput
         value={search}
         onChangeText={onSearchChange}
         placeholder="Search"
-        placeholderTextColor="#94a3b8"
+        placeholderTextColor={colors.muted}
         className="h-10 rounded-xl border border-border bg-card px-3 text-fg"
       />
       <View className="flex-row items-center justify-between">
@@ -57,6 +59,7 @@ export const FilterBar: React.FC<Props> = ({
             <Pressable
               key={v.key}
               onPress={() => onViewModeChange(v.key)}
+              style={({ pressed }) => [pressed && { opacity: 0.7 }]}
               className={`px-3 h-9 items-center justify-center ${
                 viewMode === v.key ? 'bg-accent' : 'bg-card'
               }`}
@@ -77,15 +80,12 @@ export const FilterBar: React.FC<Props> = ({
               <Pressable
                 key={s.key}
                 onPress={() => onSortFieldChange(s.key)}
+                style={({ pressed }) => [pressed && { opacity: 0.7 }]}
                 className={`px-3 h-9 items-center justify-center ${
-                  sortField === s.key ? 'bg-fg' : 'bg-card'
+                  sortField === s.key ? 'bg-primary' : 'bg-card'
                 }`}
               >
-                <Text
-                  className={
-                    sortField === s.key ? 'text-white' : 'text-muted'
-                  }
-                >
+                <Text className={sortField === s.key ? 'text-bg' : 'text-muted'}>
                   {s.label}
                 </Text>
               </Pressable>
@@ -93,6 +93,7 @@ export const FilterBar: React.FC<Props> = ({
           </View>
           <Pressable
             onPress={() => onSortDirChange(sortDir === 'asc' ? 'desc' : 'asc')}
+            style={({ pressed }) => [pressed && { opacity: 0.7 }]}
             className="h-9 w-9 rounded-xl border border-border bg-card items-center justify-center"
           >
             <Text className="text-fg">{sortDir === 'asc' ? '↑' : '↓'}</Text>
@@ -106,6 +107,7 @@ export const FilterBar: React.FC<Props> = ({
       >
         <Pressable
           onPress={() => onCategoryChange(null)}
+          style={({ pressed }) => [pressed && { opacity: 0.7 }]}
           className={`px-3 h-8 rounded-full items-center justify-center ${
             category === null ? 'bg-accent' : 'bg-card border border-border'
           }`}
@@ -116,6 +118,7 @@ export const FilterBar: React.FC<Props> = ({
           <Pressable
             key={c}
             onPress={() => onCategoryChange(c)}
+            style={({ pressed }) => [pressed && { opacity: 0.7 }]}
             className={`px-3 h-8 rounded-full items-center justify-center ${
               category === c ? 'bg-accent' : 'bg-card border border-border'
             }`}

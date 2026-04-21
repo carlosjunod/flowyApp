@@ -5,6 +5,7 @@ import Markdown from 'react-native-markdown-display';
 
 import { Thumbnail } from '@/components/ui/Thumbnail';
 import { typeGlyph } from '@/lib/thumbnails';
+import { useResolvedColors } from '@/lib/theme';
 import type { ChatMessage as ChatMessageType, CitedItem, Item } from '@/types';
 
 type Props = { message: ChatMessageType };
@@ -53,6 +54,7 @@ const citedItemToItem = (c: CitedItem): Item => ({
 });
 
 export const ChatMessage: React.FC<Props> = ({ message }) => {
+  const colors = useResolvedColors();
   const isUser = message.role === 'user';
   const citations = message.citations ?? [];
   const segments = useMemo(
@@ -61,10 +63,34 @@ export const ChatMessage: React.FC<Props> = ({ message }) => {
   );
   const plainText = segments.every((s) => s.kind === 'text');
 
+  const markdownStyle = useMemo(
+    () => ({
+      body: { color: colors.fg, fontSize: 16, fontFamily: 'Inter_400Regular' },
+      link: { color: colors.accent },
+      code_inline: {
+        backgroundColor: colors.surface,
+        color: colors.fg,
+        borderRadius: 4,
+        paddingHorizontal: 4,
+      },
+      code_block: {
+        backgroundColor: colors.fg,
+        color: colors.bg,
+        padding: 12,
+        borderRadius: 8,
+      },
+      fence: {
+        backgroundColor: colors.fg,
+        color: colors.bg,
+        padding: 12,
+        borderRadius: 8,
+      },
+    }),
+    [colors],
+  );
+
   return (
-    <View
-      className={`px-4 py-2 ${isUser ? 'items-end' : 'items-start'}`}
-    >
+    <View className={`px-4 py-2 ${isUser ? 'items-end' : 'items-start'}`}>
       <View
         className={`max-w-[88%] rounded-2xl px-4 py-3 ${
           isUser ? 'bg-accent' : 'bg-card border border-border'
@@ -75,14 +101,17 @@ export const ChatMessage: React.FC<Props> = ({ message }) => {
             {message.content || (message.streaming ? '…' : '')}
           </Markdown>
         ) : (
-          <Text className={isUser ? 'text-white text-base' : 'text-fg text-base'}>
+          <Text
+            className={isUser ? 'text-white text-base' : 'text-fg text-base'}
+            style={{ fontFamily: 'Inter_400Regular' }}
+          >
             {segments.map((s, i) =>
               s.kind === 'text' ? (
                 <Text key={i}>{s.value}</Text>
               ) : (
                 <Text
                   key={i}
-                  className="text-accent font-semibold"
+                  className={isUser ? 'text-white font-semibold' : 'text-accent font-semibold'}
                   onPress={() => router.push(`/item/${s.itemId}`)}
                 >
                   [{s.index}]
@@ -101,16 +130,19 @@ export const ChatMessage: React.FC<Props> = ({ message }) => {
             <Pressable
               key={c.id}
               onPress={() => router.push(`/item/${c.id}`)}
+              style={({ pressed }) => [pressed && { opacity: 0.85 }]}
               className="flex-row items-center gap-3 rounded-xl border border-border bg-card px-3 py-2"
             >
               <Thumbnail item={citedItemToItem(c)} className="w-10 h-10" rounded="sm" />
               <View className="flex-1">
-                <Text className="text-sm font-medium text-fg" numberOfLines={1}>
+                <Text
+                  className="text-sm font-medium text-fg"
+                  style={{ fontFamily: 'Inter_500Medium' }}
+                  numberOfLines={1}
+                >
                   [{i + 1}] {c.title ?? typeGlyph[c.type]} {c.title ? '' : c.type}
                 </Text>
-                {c.category ? (
-                  <Text className="text-xs text-muted">{c.category}</Text>
-                ) : null}
+                {c.category ? <Text className="text-xs text-muted">{c.category}</Text> : null}
               </View>
             </Pressable>
           ))}
@@ -119,15 +151,3 @@ export const ChatMessage: React.FC<Props> = ({ message }) => {
     </View>
   );
 };
-
-const markdownStyle = {
-  body: { color: '#0f172a', fontSize: 16 },
-  link: { color: '#6366f1' },
-  code_inline: { backgroundColor: '#e2e8f0', borderRadius: 4, paddingHorizontal: 4 },
-  code_block: {
-    backgroundColor: '#0f172a',
-    color: '#f8fafc',
-    padding: 12,
-    borderRadius: 8,
-  },
-} as const;

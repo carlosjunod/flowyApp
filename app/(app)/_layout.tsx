@@ -4,11 +4,13 @@ import { Text, View, useWindowDimensions } from 'react-native';
 
 import { Spinner } from '@/components/ui/Spinner';
 import { useAuth } from '@/lib/auth';
+import { useResolvedColors } from '@/lib/theme';
 
 export default function AppLayout() {
   const { user, ready } = useAuth();
   const { width } = useWindowDimensions();
   const isWide = width >= 768;
+  const colors = useResolvedColors();
 
   if (!ready) {
     return (
@@ -23,11 +25,11 @@ export default function AppLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#6366f1',
-        tabBarInactiveTintColor: '#64748b',
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.muted,
         tabBarStyle: isWide
           ? { display: 'none' }
-          : { borderTopColor: '#e2e8f0', backgroundColor: '#ffffff' },
+          : { borderTopColor: colors.border, backgroundColor: colors.bg },
       }}
     >
       <Tabs.Screen

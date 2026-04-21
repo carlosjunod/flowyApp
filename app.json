@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Tryflowy",
+    "name": "Flowy",
     "slug": "tryflowy",
     "scheme": "tryflowy",
     "version": "1.0.0",
@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#F8F4EA"
     },
     "ios": {
       "supportsTablet": true,
