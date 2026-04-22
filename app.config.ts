@@ -3,7 +3,7 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
 const BUNDLE_ID = 'app.tryflowy.client';
 const APP_GROUP = 'group.app.tryflowy';
 const ASSOCIATED_DOMAIN = 'applinks:tryflowy.app';
-const APPLE_TEAM_ID = 'T3WJGX85DZ';
+const APPLE_TEAM_ID = '8C72ST495F';
 const EAS_PROJECT_ID = '8e5e98ee-1773-456a-8ba6-4e552a350368';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({

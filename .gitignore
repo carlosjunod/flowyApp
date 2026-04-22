@@ -18,6 +18,10 @@ web-build/
 *.key
 *.mobileprovision
 
+# EAS local credentials (contains plaintext passwords referencing cert files)
+credentials.json
+credentials/
+
 # Metro
 .metro-health-check*
 
