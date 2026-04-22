@@ -17,20 +17,24 @@
       "supportsTablet": true,
       "bundleIdentifier": "app.tryflowy.client",
       "associatedDomains": [
+        "applinks:tryflowy.app",
         "applinks:tryflowy.app"
       ],
       "entitlements": {
         "com.apple.security.application-groups": [
+          "group.app.tryflowy",
           "group.app.tryflowy"
         ],
         "keychain-access-groups": [
+          "$(AppIdentifierPrefix)group.app.tryflowy",
           "$(AppIdentifierPrefix)group.app.tryflowy"
         ]
       },
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
-        }
+        },
+        "ITSAppUsesNonExemptEncryption": false
       },
       "appleTeamId": "T3WJGX85DZ"
     },
@@ -54,6 +58,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8e5e98ee-1773-456a-8ba6-4e552a350368"
+      }
     }
   }
 }
