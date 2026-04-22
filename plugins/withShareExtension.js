@@ -103,6 +103,7 @@ function withShareExtensionTarget(config, props) {
     const project = cfg.modResults;
     enableMacCatalystOnMainTarget(project);
     const targetName = props.extensionName;
+    const teamId = cfg.ios && cfg.ios.appleTeamId;
     if (project.findTargetKey(targetName)) return cfg;
 
     const mainBundleId =
@@ -140,6 +141,10 @@ function withShareExtensionTarget(config, props) {
         c.buildSettings.SUPPORTS_MACCATALYST = 'YES';
         c.buildSettings.DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = 'YES';
         c.buildSettings.TARGETED_DEVICE_FAMILY = '"1,2"';
+        if (teamId) {
+          c.buildSettings.DEVELOPMENT_TEAM = teamId;
+          c.buildSettings.CODE_SIGN_STYLE = 'Manual';
+        }
       }
     }
 
