@@ -4,25 +4,32 @@ import SwiftUI
 import UniformTypeIdentifiers
 import Security
 
-// Tryflowy share extension.
+// Flowy share extension.
 // Reads iOS/macOS share sheet payload → classifies → POSTs to /api/ingest
 // Token read from shared Keychain (App Group: group.app.tryflowy, key: pb_auth)
 
 private let APP_GROUP = (Bundle.main.infoDictionary?["APP_GROUP"] as? String) ?? "group.app.tryflowy"
 private let API_BASE_URL = (Bundle.main.infoDictionary?["API_BASE_URL"] as? String) ?? "http://localhost:4000"
 private let AUTH_KEY = "pb_auth"
+private let MAX_IMAGES = 10
 
 private enum IngestType: String {
   case url
   case screenshot
   case youtube
   case video
+  case screen_recording
+  case reddit
+  case instagram
 }
 
 private struct IngestPayload: Codable {
   let type: String
   let raw_url: String?
   let raw_image: String?
+  let raw_images: [String]?
+  let raw_video: String?
+  let video_mime: String?
 }
 
 // MARK: - Keychain
@@ -57,8 +64,13 @@ private enum Keychain {
 
 private func classify(url: URL) -> IngestType {
   let host = (url.host ?? "").lowercased()
+  let path = url.path.lowercased()
   if host.hasSuffix("youtube.com") || host == "youtu.be" { return .youtube }
-  if host.hasSuffix("tiktok.com") || host.hasSuffix("instagram.com") { return .video }
+  if host.hasSuffix("reddit.com") || host == "redd.it" { return .reddit }
+  if host.hasSuffix("instagram.com") && (path.contains("/p/") || path.contains("/reel/") || path.contains("/tv/")) {
+    return .instagram
+  }
+  if host.hasSuffix("tiktok.com") { return .video }
   return .url
 }
 
@@ -94,7 +106,7 @@ final class ShareViewController: UIViewController {
 
   private func finish(cancelled: Bool = false) {
     if cancelled {
-      extensionContext?.cancelRequest(withError: NSError(domain: "tryflowy.share", code: -1))
+      extensionContext?.cancelRequest(withError: NSError(domain: "flowy.share", code: -1))
     } else {
       extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
     }
@@ -102,14 +114,14 @@ final class ShareViewController: UIViewController {
 
   private func process() async {
     guard let token = Keychain.readToken() else {
-      await MainActor.run { state.update(.failure("Sign in on the Tryflowy app first")) }
-      await Task.sleep(1_200_000_000)
+      await MainActor.run { state.update(.failure("Sign in on the Flowy app first")) }
+      try? await Task.sleep(nanoseconds: 1_200_000_000)
       finish(cancelled: true)
       return
     }
     guard let payload = await extractPayload() else {
       await MainActor.run { state.update(.failure("Nothing to share")) }
-      await Task.sleep(1_200_000_000)
+      try? await Task.sleep(nanoseconds: 1_200_000_000)
       finish(cancelled: true)
       return
     }
@@ -119,43 +131,141 @@ final class ShareViewController: UIViewController {
     } catch {
       await MainActor.run { state.update(.failure(error.localizedDescription)) }
     }
-    await Task.sleep(1_200_000_000)
+    try? await Task.sleep(nanoseconds: 1_200_000_000)
     finish()
   }
 
   private func extractPayload() async -> IngestPayload? {
     guard let items = extensionContext?.inputItems as? [NSExtensionItem] else { return nil }
+
+    // Pass 1: prefer a video (screen_recording) if present
+    for item in items {
+      guard let attachments = item.attachments else { continue }
+      for provider in attachments {
+        if provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+          if let payload = await loadVideoPayload(provider) { return payload }
+        }
+      }
+    }
+
+    // Pass 2: prefer a URL/text-URL (single item)
     for item in items {
       guard let attachments = item.attachments else { continue }
       for provider in attachments {
         if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
-          if let obj = try? await provider.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil),
-             let url = obj as? URL {
-            return IngestPayload(type: classify(url: url).rawValue, raw_url: url.absoluteString, raw_image: nil)
-          }
-        }
-        if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-          if let obj = try? await provider.loadItem(forTypeIdentifier: UTType.image.identifier, options: nil) {
-            let image = coerceImage(obj)
-            if let data = image?.jpegData(compressionQuality: 0.85) {
-              return IngestPayload(
-                type: IngestType.screenshot.rawValue,
-                raw_url: nil,
-                raw_image: data.base64EncodedString()
-              )
-            }
+          if let url = await loadURL(provider) {
+            return IngestPayload(
+              type: classify(url: url).rawValue,
+              raw_url: url.absoluteString,
+              raw_image: nil,
+              raw_images: nil,
+              raw_video: nil,
+              video_mime: nil
+            )
           }
         }
         if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
-          if let obj = try? await provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil),
-             let text = obj as? String,
+          if let text = await loadText(provider),
              let url = URL(string: text), url.scheme != nil {
-            return IngestPayload(type: classify(url: url).rawValue, raw_url: url.absoluteString, raw_image: nil)
+            return IngestPayload(
+              type: classify(url: url).rawValue,
+              raw_url: url.absoluteString,
+              raw_image: nil,
+              raw_images: nil,
+              raw_video: nil,
+              video_mime: nil
+            )
           }
         }
       }
     }
+
+    // Pass 3: collect all images across all items
+    var images: [String] = []
+    for item in items {
+      guard let attachments = item.attachments else { continue }
+      for provider in attachments where images.count < MAX_IMAGES {
+        if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+          if let b64 = await loadImageBase64(provider) {
+            images.append(b64)
+          }
+        }
+      }
+    }
+
+    if images.count > 1 {
+      return IngestPayload(
+        type: IngestType.screenshot.rawValue,
+        raw_url: nil,
+        raw_image: nil,
+        raw_images: images,
+        raw_video: nil,
+        video_mime: nil
+      )
+    }
+    if let single = images.first {
+      return IngestPayload(
+        type: IngestType.screenshot.rawValue,
+        raw_url: nil,
+        raw_image: single,
+        raw_images: nil,
+        raw_video: nil,
+        video_mime: nil
+      )
+    }
+
     return nil
+  }
+
+  // MARK: - Loaders
+
+  private func loadURL(_ provider: NSItemProvider) async -> URL? {
+    if let obj = try? await provider.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) {
+      if let url = obj as? URL { return url }
+    }
+    return nil
+  }
+
+  private func loadText(_ provider: NSItemProvider) async -> String? {
+    if let obj = try? await provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) {
+      return obj as? String
+    }
+    return nil
+  }
+
+  private func loadImageBase64(_ provider: NSItemProvider) async -> String? {
+    if let obj = try? await provider.loadItem(forTypeIdentifier: UTType.image.identifier, options: nil) {
+      if let image = coerceImage(obj),
+         let data = image.jpegData(compressionQuality: 0.85) {
+        return data.base64EncodedString()
+      }
+    }
+    return nil
+  }
+
+  private func loadVideoPayload(_ provider: NSItemProvider) async -> IngestPayload? {
+    guard let obj = try? await provider.loadItem(forTypeIdentifier: UTType.movie.identifier, options: nil) else {
+      return nil
+    }
+    var data: Data?
+    var mime = "video/mp4"
+    if let url = obj as? URL {
+      data = try? Data(contentsOf: url)
+      let ext = url.pathExtension.lowercased()
+      if ext == "mov" { mime = "video/quicktime" }
+      if ext == "m4v" { mime = "video/x-m4v" }
+    } else if let raw = obj as? Data {
+      data = raw
+    }
+    guard let bytes = data else { return nil }
+    return IngestPayload(
+      type: IngestType.screen_recording.rawValue,
+      raw_url: nil,
+      raw_image: nil,
+      raw_images: nil,
+      raw_video: bytes.base64EncodedString(),
+      video_mime: mime
+    )
   }
 
   private func coerceImage(_ obj: NSSecureCoding) -> UIImage? {
@@ -167,21 +277,25 @@ final class ShareViewController: UIViewController {
 
   private func postIngest(payload: IngestPayload, token: String) async throws {
     guard let url = URL(string: "\(API_BASE_URL)/api/ingest") else {
-      throw NSError(domain: "tryflowy.share", code: -2, userInfo: [NSLocalizedDescriptionKey: "Bad API URL"])
+      throw NSError(domain: "flowy.share", code: -2, userInfo: [NSLocalizedDescriptionKey: "Bad API URL"])
     }
-    var req = URLRequest(url: url)
+    let timeout: TimeInterval = (payload.raw_video != nil) ? 120 : 60
+    var req = URLRequest(url: url, timeoutInterval: timeout)
     req.httpMethod = "POST"
     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
     req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-    req.httpBody = try JSONEncoder().encode(payload)
+
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = []
+    req.httpBody = try encoder.encode(payload)
 
     let (data, response) = try await URLSession.shared.data(for: req)
     guard let http = response as? HTTPURLResponse else {
-      throw NSError(domain: "tryflowy.share", code: -3, userInfo: [NSLocalizedDescriptionKey: "No response"])
+      throw NSError(domain: "flowy.share", code: -3, userInfo: [NSLocalizedDescriptionKey: "No response"])
     }
     if !(200...299).contains(http.statusCode) {
       let body = String(data: data, encoding: .utf8) ?? "\(http.statusCode)"
-      throw NSError(domain: "tryflowy.share", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: body])
+      throw NSError(domain: "flowy.share", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: body])
     }
   }
 }
@@ -206,7 +320,7 @@ private struct StatusView: View {
         switch state.state {
         case .loading:
           ProgressView().controlSize(.large)
-          Text("Sending to Tryflowy…").font(.headline)
+          Text("Sending to Flowy…").font(.headline)
         case .success:
           Image(systemName: "checkmark.circle.fill").resizable().frame(width: 44, height: 44).foregroundColor(.green)
           Text("Saved").font(.headline)

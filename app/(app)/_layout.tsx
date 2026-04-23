@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
 import { Text, View, useWindowDimensions } from 'react-native';
@@ -51,9 +52,20 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="settings" size={size ?? 20} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="item/[id]"
         options={{ href: null, title: 'Item' }}
       />
+      <Tabs.Screen name="digest" options={{ href: null, title: 'Digest' }} />
+      <Tabs.Screen name="digest-settings" options={{ href: null, title: 'Digest settings' }} />
     </Tabs>
   );
 }

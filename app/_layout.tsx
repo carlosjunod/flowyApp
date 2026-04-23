@@ -8,17 +8,46 @@ import {
 import { InstrumentSerif_400Regular } from '@expo-google-fonts/instrument-serif';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { usePushRegistration } from '@/hooks/usePushRegistration';
 import { AuthProvider } from '@/lib/auth';
 import { ThemeProvider, useTheme } from '@/lib/theme';
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
 function AppShell() {
   const { resolved } = useTheme();
+  usePushRegistration();
+
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as
+        | { digestId?: string; itemId?: string; url?: string }
+        | undefined;
+      if (data?.digestId) {
+        router.push(`/digest/${data.digestId}`);
+      } else if (data?.itemId) {
+        router.push(`/item/${data.itemId}`);
+      } else if (typeof data?.url === 'string') {
+        router.push(data.url as never);
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   return (
     <>
       <StatusBar style={resolved === 'dark' ? 'light' : 'dark'} />

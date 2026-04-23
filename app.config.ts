@@ -24,6 +24,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: BUNDLE_ID,
+    usesAppleSignIn: true,
     associatedDomains: [ASSOCIATED_DOMAIN],
     entitlements: {
       'com.apple.security.application-groups': [APP_GROUP],
@@ -63,6 +64,21 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     router: {},
     eas: {
       projectId: EAS_PROJECT_ID,
+      build: {
+        experimental: {
+          ios: {
+            appExtensions: [
+              {
+                targetName: 'ShareExtension',
+                bundleIdentifier: `${BUNDLE_ID}.ShareExtension`,
+                entitlements: {
+                  'com.apple.security.application-groups': [APP_GROUP],
+                },
+              },
+            ],
+          },
+        },
+      },
     },
   },
 });

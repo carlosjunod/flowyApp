@@ -2,7 +2,13 @@ import type {
   ApiError,
   ApiErrorCode,
   ApiResult,
+  AuthSession,
   CitedItem,
+  Digest,
+  DigestSettings,
+  ImportBatch,
+  IngestBulkPayload,
+  IngestBulkResponse,
   IngestPayload,
   IngestResponse,
   Item,
@@ -91,6 +97,45 @@ export const api = {
   deleteItem: (id: string) =>
     request<{ ok: true }>(`/api/items/${id}`, {
       method: 'DELETE',
+    }),
+
+  ingestBulk: (payload: IngestBulkPayload) =>
+    request<IngestBulkResponse>('/api/ingest/bulk', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getImportBatch: (id: string) =>
+    request<ImportBatch>(`/api/import-batches/${id}`),
+
+  registerEmail: (email: string, password: string, name?: string) =>
+    request<AuthSession>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, name }),
+    }),
+
+  authGoogle: (idToken: string, email?: string) =>
+    request<AuthSession>('/api/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ id_token: idToken, email }),
+    }),
+
+  authApple: (identityToken: string, email?: string) =>
+    request<AuthSession>('/api/auth/apple', {
+      method: 'POST',
+      body: JSON.stringify({ identity_token: identityToken, email }),
+    }),
+
+  listDigests: () => request<Digest[]>('/api/digest'),
+
+  getDigest: (id: string) => request<Digest>(`/api/digest/${id}`),
+
+  getDigestSettings: () => request<DigestSettings>('/api/digest/settings'),
+
+  patchDigestSettings: (patch: Partial<DigestSettings>) =>
+    request<DigestSettings>('/api/digest/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
     }),
 };
 

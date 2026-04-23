@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import type { ApiError } from '@/types';
+import type { ApiError, AuthSession } from '@/types';
 
 import { ENV } from './env';
 import { hydratePbAuth, pb } from './pb';
@@ -17,6 +17,7 @@ type AuthContextValue = {
   user: AuthUser | null;
   ready: boolean;
   signIn: (email: string, password: string) => Promise<{ error: ApiError | null }>;
+  signInWithSession: (session: AuthSession) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -68,6 +69,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const signInWithSession = useCallback<AuthContextValue['signInWithSession']>(
+    async (session) => {
+      pb.authStore.save(session.token, {
+        id: session.userId,
+        email: session.email,
+        collectionId: '_pb_users_auth_',
+        collectionName: 'users',
+      } as Parameters<typeof pb.authStore.save>[1]);
+    },
+    [],
+  );
+
   const signOut = useCallback(async () => {
     pb.authStore.clear();
     await sharedSecureStore.removeItem(ENV.AUTH_KEY);
@@ -75,8 +88,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [queryClient]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, ready, signIn, signOut }),
-    [user, ready, signIn, signOut],
+    () => ({ user, ready, signIn, signInWithSession, signOut }),
+    [user, ready, signIn, signInWithSession, signOut],
   );
 
   return React.createElement(AuthContext.Provider, { value }, children);

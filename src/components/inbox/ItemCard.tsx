@@ -36,6 +36,13 @@ export const ItemCard: React.FC<Props> = ({ item }) => {
       >
         <View className="flex-1 relative">
           <Thumbnail item={item} className="flex-1" rounded="sm" />
+          {item.media && item.media.length > 1 ? (
+            <View className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-black/60">
+              <Text className="text-white text-[10px] font-semibold">
+                1/{item.media.length}
+              </Text>
+            </View>
+          ) : null}
           {pending ? (
             <>
               <Shimmer />

@@ -9,10 +9,12 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { MediaCarousel } from '@/components/inbox/MediaCarousel';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
@@ -28,6 +30,7 @@ export default function ItemDetailScreen() {
   const id = params.id;
   const { data: item, isLoading, error } = useItemById(id);
   useItemStatus(id);
+  const { width } = useWindowDimensions();
 
   const [editing, setEditing] = useState(false);
 
@@ -63,7 +66,11 @@ export default function ItemDetailScreen() {
         </View>
       </View>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
-        <Thumbnail item={item} className="w-full h-56" rounded="lg" />
+        {item.media && item.media.length > 1 ? (
+          <MediaCarousel slides={item.media} width={width - 32} height={240} />
+        ) : (
+          <Thumbnail item={item} className="w-full h-56" rounded="lg" />
+        )}
         <View className="gap-2">
           <Text
             className="text-3xl text-fg"

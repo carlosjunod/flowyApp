@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -9,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BulkImportSheet } from '@/components/inbox/BulkImportSheet';
 import { FilterBar } from '@/components/inbox/FilterBar';
 import { ItemCard } from '@/components/inbox/ItemCard';
 import { ItemDetailRow } from '@/components/inbox/ItemDetailRow';
@@ -25,6 +27,7 @@ import {
 } from '@/hooks/useItems';
 import { useAuth } from '@/lib/auth';
 import { pb } from '@/lib/pb';
+import { useResolvedColors } from '@/lib/theme';
 import { useViewMode } from '@/lib/viewMode';
 import type { Item, SortDir, SortField } from '@/types';
 
@@ -35,10 +38,12 @@ const columnsFor = (width: number): number => {
 };
 
 export default function InboxScreen() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { width } = useWindowDimensions();
+  const colors = useResolvedColors();
   const [viewMode, setViewMode] = useViewMode();
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const [searchInput, setSearchInput] = useState('');
   const search = useDebounced(searchInput, 200);
@@ -104,13 +109,19 @@ export default function InboxScreen() {
         >
           Inbox
         </Text>
-        <View className="flex-row items-center gap-2">
-          <ThemeToggle />
-          <Pressable onPress={signOut} hitSlop={8}>
-            <Text className="text-accent font-medium">Sign out</Text>
+        <View className="flex-row items-center gap-1">
+          <Pressable
+            onPress={() => setBulkOpen(true)}
+            hitSlop={8}
+            accessibilityLabel="Bulk import links"
+            className="h-9 w-9 items-center justify-center rounded-full"
+          >
+            <Feather name="plus" size={20} color={colors.fg} />
           </Pressable>
+          <ThemeToggle />
         </View>
       </View>
+      <BulkImportSheet visible={bulkOpen} onClose={() => setBulkOpen(false)} />
       <FilterBar
         search={searchInput}
         onSearchChange={setSearchInput}
