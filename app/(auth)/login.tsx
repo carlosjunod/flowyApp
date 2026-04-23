@@ -29,9 +29,13 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
-    AppleAuthentication.isAvailableAsync()
-      .then(setAppleAvailable)
-      .catch(() => setAppleAvailable(false));
+    try {
+      AppleAuthentication.isAvailableAsync()
+        .then(setAppleAvailable)
+        .catch(() => setAppleAvailable(false));
+    } catch {
+      setAppleAvailable(false);
+    }
   }, []);
 
   const onSubmit = async () => {

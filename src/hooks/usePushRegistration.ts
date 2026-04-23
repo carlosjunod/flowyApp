@@ -1,4 +1,3 @@
-import * as Notifications from 'expo-notifications';
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
@@ -7,29 +6,33 @@ import { pb } from '@/lib/pb';
 
 const isPhysicalDevice = (): boolean => {
   if (Platform.OS === 'web') return false;
-  const Constants = require('expo-constants').default as {
-    isDevice?: boolean;
-  };
-  return Constants.isDevice ?? false;
+  try {
+    const Constants = require('expo-constants').default as { isDevice?: boolean };
+    return Constants.isDevice ?? false;
+  } catch {
+    return false;
+  }
 };
 
 const getProjectId = (): string | undefined => {
-  const Constants = require('expo-constants').default as {
-    expoConfig?: { extra?: { eas?: { projectId?: string } } };
-    easConfig?: { projectId?: string };
-  };
-  return (
-    Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId ?? undefined
-  );
+  try {
+    const Constants = require('expo-constants').default as {
+      expoConfig?: { extra?: { eas?: { projectId?: string } } };
+      easConfig?: { projectId?: string };
+    };
+    return (
+      Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId ?? undefined
+    );
+  } catch {
+    return undefined;
+  }
 };
 
 const writePushToken = async (userId: string, token: string): Promise<void> => {
   try {
     await pb.collection('users').update(userId, { push_token: token });
   } catch (err) {
-    if (__DEV__) {
-      console.warn('[push] failed to persist token:', err);
-    }
+    if (__DEV__) console.warn('[push] failed to persist token:', err);
   }
 };
 
@@ -45,6 +48,10 @@ export const usePushRegistration = (): void => {
     let cancelled = false;
     (async () => {
       try {
+        // Lazy-require so a missing native module / entitlement at app load
+        // doesn't crash module evaluation.
+        const Notifications = require('expo-notifications') as typeof import('expo-notifications');
+
         const existing = await Notifications.getPermissionsAsync();
         let status = existing.status;
         if (status !== 'granted') {
@@ -63,9 +70,7 @@ export const usePushRegistration = (): void => {
         lastTokenRef.current = token;
         await writePushToken(user.id, token);
       } catch (err) {
-        if (__DEV__) {
-          console.warn('[push] registration error:', err);
-        }
+        if (__DEV__) console.warn('[push] registration skipped:', err);
       }
     })();
 

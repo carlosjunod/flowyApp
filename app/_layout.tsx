@@ -19,33 +19,44 @@ import { usePushRegistration } from '@/hooks/usePushRegistration';
 import { AuthProvider } from '@/lib/auth';
 import { ThemeProvider, useTheme } from '@/lib/theme';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+} catch {
+  // Notifications native module not available (e.g. missing entitlement, web).
+}
 
 function AppShell() {
   const { resolved } = useTheme();
   usePushRegistration();
 
   useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as
-        | { digestId?: string; itemId?: string; url?: string }
-        | undefined;
-      if (data?.digestId) {
-        router.push(`/digest/${data.digestId}`);
-      } else if (data?.itemId) {
-        router.push(`/item/${data.itemId}`);
-      } else if (typeof data?.url === 'string') {
-        router.push(data.url as never);
-      }
-    });
-    return () => sub.remove();
+    let sub: { remove: () => void } | null = null;
+    try {
+      sub = Notifications.addNotificationResponseReceivedListener((response) => {
+        const data = response.notification.request.content.data as
+          | { digestId?: string; itemId?: string; url?: string }
+          | undefined;
+        if (data?.digestId) {
+          router.push(`/digest/${data.digestId}`);
+        } else if (data?.itemId) {
+          router.push(`/item/${data.itemId}`);
+        } else if (typeof data?.url === 'string') {
+          router.push(data.url as never);
+        }
+      });
+    } catch (err) {
+      if (__DEV__) console.warn('[notifications] listener attach failed:', err);
+    }
+    return () => {
+      sub?.remove();
+    };
   }, []);
 
   return (

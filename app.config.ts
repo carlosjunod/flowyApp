@@ -54,6 +54,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     'expo-router',
     'expo-secure-store',
+    'expo-notifications',
+    'expo-apple-authentication',
     './plugins/withShareExtension',
     './plugins/withPodfileSigningFix',
   ],
