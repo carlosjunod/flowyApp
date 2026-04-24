@@ -38,7 +38,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let mounted = true;
     (async () => {
-      await hydratePbAuth();
+      try {
+        await hydratePbAuth();
+      } catch (err) {
+        if (__DEV__) console.warn('[auth] hydrate failed, continuing unauthenticated:', err);
+      }
       if (!mounted) return;
       setUser(toUser(pb.authStore.model));
       setReady(true);

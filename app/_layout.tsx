@@ -63,7 +63,8 @@ function AppShell() {
     <>
       <StatusBar style={resolved === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)/login" />
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
         <Stack.Screen name="(app)" />
       </Stack>
     </>
