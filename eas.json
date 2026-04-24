@@ -9,10 +9,20 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://tryflowy.app",
+        "EXPO_PUBLIC_PB_URL": "https://pb.tryflowy.app",
+        "EXPO_PUBLIC_R2_PUBLIC_URL": "https://files.tryflowy.app"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://tryflowy.app",
+        "EXPO_PUBLIC_PB_URL": "https://pb.tryflowy.app",
+        "EXPO_PUBLIC_R2_PUBLIC_URL": "https://files.tryflowy.app"
+      }
     }
   },
   "submit": {
