@@ -8,7 +8,11 @@ export type ItemType =
   | 'audio'
   | 'reddit'
   | 'instagram'
-  | 'screen_recording';
+  | 'screen_recording'
+  | 'pinterest'
+  | 'dribbble'
+  | 'linkedin'
+  | 'twitter';
 
 export type ItemStatus = 'pending' | 'processing' | 'ready' | 'error';
 
@@ -19,6 +23,8 @@ export type MediaSlide = {
   source_url?: string;
   summary?: string;
   extracted_text?: string;
+  transcript?: string;
+  taken_at?: string;
 };
 
 export type ItemSource = 'bookmark_import' | 'reddit' | 'share_extension' | string;
@@ -155,3 +161,16 @@ export type DigestSettings = {
   digest_enabled: boolean;
   digest_time: string;
 };
+
+export type BulkActionFailure = {
+  id: string;
+  code: string;
+  message?: string;
+};
+
+export type BulkActionResult = {
+  succeeded: string[];
+  failed: BulkActionFailure[];
+};
+
+export type BulkActionPayload = { ids: string[] };

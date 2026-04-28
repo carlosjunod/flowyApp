@@ -11,4 +11,12 @@
 | #3945 | 4:48 PM | 🟣 | Bulk import API methods added to mobile client with type-safe request wrappers | ~489 |
 | #3940 | 4:44 PM | 🔵 | Mobile app has ThemeToggle integrated in inbox screen, ready for feature additions | ~510 |
 | #3935 | 4:41 PM | 🔵 | Web and mobile dark mode implementations differ in color format and toggle behavior | ~460 |
+
+### Apr 28, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #4319 | 11:24 AM | ⚖️ | Mobile Feature Parity Plan Created | ~867 |
+| #4316 | 11:11 AM | 🔵 | Flowy webapp-mobile feature gap analysis completed | ~647 |
+| #4315 | 11:10 AM | 🔵 | Webapp Feature Gap Analysis Complete | ~665 |
 </claude-mem-context>

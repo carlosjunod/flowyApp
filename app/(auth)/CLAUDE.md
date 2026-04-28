@@ -8,4 +8,11 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #3940 | 4:44 PM | 🔵 | Mobile app has ThemeToggle integrated in inbox screen, ready for feature additions | ~510 |
+
+### Apr 28, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #4316 | 11:11 AM | 🔵 | Flowy webapp-mobile feature gap analysis completed | ~647 |
+| #4315 | 11:10 AM | 🔵 | Webapp Feature Gap Analysis Complete | ~665 |
 </claude-mem-context>

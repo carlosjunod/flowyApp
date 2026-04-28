@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { Thumbnail } from '@/components/ui/Thumbnail';
+import { useItemActions } from '@/hooks/useItemActions';
 import { useDeleteItem, useItemById, usePatchItem } from '@/hooks/useItems';
 import { useItemStatus } from '@/hooks/useItemStatus';
 import { relativeDate } from '@/lib/relativeDate';
@@ -59,6 +60,7 @@ export default function ItemDetailScreen() {
           <Text className="text-accent text-base">← Back</Text>
         </Pressable>
         <View className="flex-row gap-4">
+          <ReloadButton item={item} />
           <Pressable onPress={() => setEditing(true)}>
             <Text className="text-accent text-base">Edit</Text>
           </Pressable>
@@ -131,6 +133,26 @@ export default function ItemDetailScreen() {
     </SafeAreaView>
   );
 }
+
+const ReloadButton: React.FC<{ item: Item }> = ({ item }) => {
+  const actions = useItemActions();
+  const disabled = item.status === 'pending' || item.status === 'processing';
+  const busy = actions.pending.has(item.id);
+  const onPress = async () => {
+    if (disabled || busy) return;
+    const res = await actions.reloadItem(item.id);
+    if (!res.ok && res.error.message !== 'Cancelled') {
+      Alert.alert('Reload failed', res.error.message);
+    }
+  };
+  return (
+    <Pressable onPress={onPress} disabled={disabled || busy}>
+      <Text className={`text-base ${disabled || busy ? 'text-muted' : 'text-accent'}`}>
+        {busy ? 'Reloading…' : 'Reload'}
+      </Text>
+    </Pressable>
+  );
+};
 
 const DeleteButton: React.FC<{ id: string }> = ({ id }) => {
   const del = useDeleteItem();

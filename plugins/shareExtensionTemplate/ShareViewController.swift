@@ -21,6 +21,10 @@ private enum IngestType: String {
   case screen_recording
   case reddit
   case instagram
+  case pinterest
+  case dribbble
+  case linkedin
+  case twitter
 }
 
 private struct IngestPayload: Codable {
@@ -36,18 +40,29 @@ private struct IngestPayload: Codable {
 
 private enum Keychain {
   static func readToken() -> String? {
+    // expo-secure-store stores kSecAttrAccount/kSecAttrGeneric as Data(key.utf8),
+    // not as a String. Query with the same encoding or Keychain won't match.
+    // It also appends ":no-auth" (or ":auth" for biometric items) to the service
+    // name so the two auth modes live in separate keychain partitions.
+    let account = Data(AUTH_KEY.utf8)
+    let service = "\(APP_GROUP):no-auth"
     let query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
-      kSecAttrService as String: APP_GROUP,
-      kSecAttrAccount as String: AUTH_KEY,
+      kSecAttrService as String: service,
+      kSecAttrAccount as String: account,
+      kSecAttrGeneric as String: account,
       kSecAttrAccessGroup as String: APP_GROUP,
       kSecReturnData as String: true,
       kSecMatchLimit as String: kSecMatchLimitOne,
     ]
     var item: CFTypeRef?
     let status = SecItemCopyMatching(query as CFDictionary, &item)
-    guard status == errSecSuccess,
-          let data = item as? Data,
+    if status != errSecSuccess {
+      NSLog("[flowy.share] keychain lookup failed: OSStatus=%d service=%@ account=%@ accessGroup=%@",
+            Int(status), APP_GROUP, AUTH_KEY, APP_GROUP)
+      return nil
+    }
+    guard let data = item as? Data,
           let raw = String(data: data, encoding: .utf8) else { return nil }
 
     // PocketBase AsyncAuthStore serializes as JSON { "token": "...", "model": {...} }
@@ -71,6 +86,10 @@ private func classify(url: URL) -> IngestType {
     return .instagram
   }
   if host.hasSuffix("tiktok.com") { return .video }
+  if host.hasSuffix("pinterest.com") || host.hasSuffix("pin.it") { return .pinterest }
+  if host.hasSuffix("dribbble.com") { return .dribbble }
+  if host.hasSuffix("linkedin.com") || host.hasSuffix("lnkd.in") { return .linkedin }
+  if host.hasSuffix("twitter.com") || host.hasSuffix("x.com") || host.hasSuffix("t.co") { return .twitter }
   return .url
 }
 

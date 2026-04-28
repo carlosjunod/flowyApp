@@ -52,12 +52,20 @@ export default function SignupScreen() {
       return;
     }
     setLoading(true);
-    const res = await api.registerEmail(email.trim().toLowerCase(), password);
+    const normalizedEmail = email.trim().toLowerCase();
+    console.log('[signup] submitting registerEmail', { email: normalizedEmail });
+    const res = await api.registerEmail(normalizedEmail, password);
     setLoading(false);
     if (res.error) {
+      console.log('[signup] registerEmail failed', {
+        code: res.error.code,
+        message: res.error.message,
+        status: res.error.status,
+      });
       setError(friendlyError(res.error.code));
       return;
     }
+    console.log('[signup] registerEmail ok', { userId: res.data?.userId });
     await signInWithSession(res.data);
     router.replace('/inbox');
   };

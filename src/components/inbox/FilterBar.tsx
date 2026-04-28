@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import React from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
@@ -16,6 +17,8 @@ type Props = {
   categories: string[];
   category: string | null;
   onCategoryChange: (category: string | null) => void;
+  selectionMode?: boolean;
+  onToggleSelectionMode?: () => void;
 };
 
 const viewModes: { key: ViewMode; label: string }[] = [
@@ -42,6 +45,8 @@ export const FilterBar: React.FC<Props> = ({
   categories,
   category,
   onCategoryChange,
+  selectionMode = false,
+  onToggleSelectionMode,
 }) => {
   const colors = useResolvedColors();
   return (
@@ -98,6 +103,27 @@ export const FilterBar: React.FC<Props> = ({
           >
             <Text className="text-fg">{sortDir === 'asc' ? '↑' : '↓'}</Text>
           </Pressable>
+          {onToggleSelectionMode ? (
+            <Pressable
+              onPress={onToggleSelectionMode}
+              accessibilityLabel={selectionMode ? 'Exit selection' : 'Enter selection'}
+              style={({ pressed }) => [pressed && { opacity: 0.7 }]}
+              className={`h-9 px-3 rounded-xl border items-center justify-center flex-row gap-1 ${
+                selectionMode ? 'bg-accent border-accent' : 'border-border bg-card'
+              }`}
+            >
+              <Feather
+                name={selectionMode ? 'x' : 'check-square'}
+                size={14}
+                color={selectionMode ? '#fff' : colors.fg}
+              />
+              <Text
+                className={`text-xs font-medium ${selectionMode ? 'text-white' : 'text-fg'}`}
+              >
+                {selectionMode ? 'Done' : 'Select'}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
       <ScrollView

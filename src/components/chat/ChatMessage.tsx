@@ -10,33 +10,22 @@ import type { ChatMessage as ChatMessageType, CitedItem, Item } from '@/types';
 
 type Props = { message: ChatMessageType };
 
-type Segment =
-  | { kind: 'text'; value: string }
-  | { kind: 'cite'; itemId: string; index: number };
-
 const CITE_RE = /\[\[([A-Za-z0-9_-]+)\]\]/g;
+const ITEM_PROTO = 'item://';
 
-const buildSegments = (text: string, citations: CitedItem[]): Segment[] => {
+const preprocessContent = (text: string, citations: CitedItem[]): string => {
+  if (!text) return '';
   const indexById = new Map<string, number>();
   citations.forEach((c, i) => indexById.set(c.id, i + 1));
-  const result: Segment[] = [];
-  let cursor = 0;
-  let match: RegExpExecArray | null;
-  CITE_RE.lastIndex = 0;
-  while ((match = CITE_RE.exec(text)) !== null) {
-    if (match.index > cursor) {
-      result.push({ kind: 'text', value: text.slice(cursor, match.index) });
+  let nextIdx = citations.length + 1;
+  return text.replace(CITE_RE, (_, id: string) => {
+    let idx = indexById.get(id);
+    if (idx === undefined) {
+      idx = nextIdx++;
+      indexById.set(id, idx);
     }
-    const id = match[1] ?? '';
-    const idx = indexById.get(id) ?? indexById.size + 1;
-    if (!indexById.has(id)) indexById.set(id, idx);
-    result.push({ kind: 'cite', itemId: id, index: idx });
-    cursor = match.index + match[0].length;
-  }
-  if (cursor < text.length) {
-    result.push({ kind: 'text', value: text.slice(cursor) });
-  }
-  return result;
+    return `[${idx}](${ITEM_PROTO}${id})`;
+  });
 };
 
 const citedItemToItem = (c: CitedItem): Item => ({
@@ -57,37 +46,88 @@ export const ChatMessage: React.FC<Props> = ({ message }) => {
   const colors = useResolvedColors();
   const isUser = message.role === 'user';
   const citations = message.citations ?? [];
-  const segments = useMemo(
-    () => buildSegments(message.content, citations),
+
+  const content = useMemo(
+    () => preprocessContent(message.content, citations),
     [message.content, citations],
   );
-  const plainText = segments.every((s) => s.kind === 'text');
 
   const markdownStyle = useMemo(
     () => ({
-      body: { color: colors.fg, fontSize: 16, fontFamily: 'Inter_400Regular' },
-      link: { color: colors.accent },
+      body: { color: isUser ? '#FFFFFF' : colors.fg, fontSize: 16, fontFamily: 'Inter_400Regular' },
+      paragraph: { marginTop: 0, marginBottom: 6 },
+      link: { color: isUser ? '#FFFFFF' : colors.accent, fontWeight: '600' as const },
+      strong: { fontWeight: '700' as const },
+      em: { fontStyle: 'italic' as const },
+      heading1: { fontSize: 22, fontWeight: '700' as const, marginTop: 4, marginBottom: 6, color: isUser ? '#FFFFFF' : colors.fg },
+      heading2: { fontSize: 19, fontWeight: '700' as const, marginTop: 4, marginBottom: 6, color: isUser ? '#FFFFFF' : colors.fg },
+      heading3: { fontSize: 17, fontWeight: '600' as const, marginTop: 4, marginBottom: 6, color: isUser ? '#FFFFFF' : colors.fg },
+      bullet_list: { marginTop: 2, marginBottom: 6 },
+      ordered_list: { marginTop: 2, marginBottom: 6 },
+      list_item: { marginBottom: 2 },
+      blockquote: {
+        borderLeftWidth: 3,
+        borderLeftColor: isUser ? '#FFFFFF80' : colors.accent,
+        paddingLeft: 10,
+        marginVertical: 4,
+        backgroundColor: 'transparent',
+      },
       code_inline: {
-        backgroundColor: colors.surface,
-        color: colors.fg,
+        backgroundColor: isUser ? '#FFFFFF26' : colors.surface,
+        color: isUser ? '#FFFFFF' : colors.fg,
         borderRadius: 4,
         paddingHorizontal: 4,
+        fontFamily: 'Menlo',
+        fontSize: 14,
       },
       code_block: {
-        backgroundColor: colors.fg,
-        color: colors.bg,
-        padding: 12,
+        backgroundColor: isUser ? '#FFFFFF14' : colors.surface,
+        color: isUser ? '#FFFFFF' : colors.fg,
+        padding: 10,
         borderRadius: 8,
+        fontFamily: 'Menlo',
+        fontSize: 13,
+        marginVertical: 4,
       },
       fence: {
-        backgroundColor: colors.fg,
-        color: colors.bg,
-        padding: 12,
+        backgroundColor: isUser ? '#FFFFFF14' : colors.surface,
+        color: isUser ? '#FFFFFF' : colors.fg,
+        padding: 10,
         borderRadius: 8,
+        fontFamily: 'Menlo',
+        fontSize: 13,
+        marginVertical: 4,
       },
+      table: {
+        borderWidth: 1,
+        borderColor: isUser ? '#FFFFFF40' : colors.border,
+        borderRadius: 6,
+        marginVertical: 6,
+      },
+      th: {
+        flex: 1,
+        padding: 6,
+        backgroundColor: isUser ? '#FFFFFF20' : colors.surface,
+      },
+      td: {
+        flex: 1,
+        padding: 6,
+        borderColor: isUser ? '#FFFFFF40' : colors.border,
+      },
+      hr: { backgroundColor: isUser ? '#FFFFFF40' : colors.border, height: 1, marginVertical: 6 },
     }),
-    [colors],
+    [colors, isUser],
   );
+
+  const onLinkPress = (url: string): boolean => {
+    if (url.startsWith(ITEM_PROTO)) {
+      router.push(`/item/${url.slice(ITEM_PROTO.length)}`);
+      return false;
+    }
+    return true;
+  };
+
+  const placeholder = !content && message.streaming ? '…' : '';
 
   return (
     <View className={`px-4 py-2 ${isUser ? 'items-end' : 'items-start'}`}>
@@ -96,33 +136,9 @@ export const ChatMessage: React.FC<Props> = ({ message }) => {
           isUser ? 'bg-accent' : 'bg-card border border-border'
         }`}
       >
-        {plainText && !isUser ? (
-          <Markdown style={markdownStyle}>
-            {message.content || (message.streaming ? '…' : '')}
-          </Markdown>
-        ) : (
-          <Text
-            className={isUser ? 'text-white text-base' : 'text-fg text-base'}
-            style={{ fontFamily: 'Inter_400Regular' }}
-          >
-            {segments.map((s, i) =>
-              s.kind === 'text' ? (
-                <Text key={i}>{s.value}</Text>
-              ) : (
-                <Text
-                  key={i}
-                  className={isUser ? 'text-white font-semibold' : 'text-accent font-semibold'}
-                  onPress={() => router.push(`/item/${s.itemId}`)}
-                >
-                  [{s.index}]
-                </Text>
-              ),
-            )}
-            {message.streaming && !message.content ? (
-              <Text className="text-muted">…</Text>
-            ) : null}
-          </Text>
-        )}
+        <Markdown style={markdownStyle} onLinkPress={onLinkPress}>
+          {content || placeholder}
+        </Markdown>
       </View>
       {!isUser && citations.length > 0 ? (
         <View className="mt-2 gap-2 w-full">

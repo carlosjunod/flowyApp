@@ -29,6 +29,10 @@ export const typeGlyph: Record<ItemType, string> = {
   reddit: '👽',
   instagram: '📸',
   screen_recording: '🎥',
+  pinterest: '📌',
+  dribbble: '🏀',
+  linkedin: '💼',
+  twitter: '🐦',
 };
 
 export type Thumb =

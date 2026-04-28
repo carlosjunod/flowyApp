@@ -5,6 +5,7 @@ import { Text, View, useWindowDimensions } from 'react-native';
 
 import { Spinner } from '@/components/ui/Spinner';
 import { useAuth } from '@/lib/auth';
+import { SelectionProvider } from '@/lib/selection';
 import { useResolvedColors } from '@/lib/theme';
 
 export default function AppLayout() {
@@ -23,6 +24,7 @@ export default function AppLayout() {
   if (!user) return <Redirect href="/login" />;
 
   return (
+    <SelectionProvider>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -67,5 +69,6 @@ export default function AppLayout() {
       <Tabs.Screen name="digest" options={{ href: null, title: 'Digest' }} />
       <Tabs.Screen name="digest-settings" options={{ href: null, title: 'Digest settings' }} />
     </Tabs>
+    </SelectionProvider>
   );
 }

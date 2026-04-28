@@ -15,9 +15,11 @@ import { FilterBar } from '@/components/inbox/FilterBar';
 import { ItemCard } from '@/components/inbox/ItemCard';
 import { ItemDetailRow } from '@/components/inbox/ItemDetailRow';
 import { ItemRow } from '@/components/inbox/ItemRow';
+import { SelectionActionBar } from '@/components/inbox/SelectionActionBar';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { useSelection } from '@/lib/selection';
 import {
   extractCategories,
   flattenPages,
@@ -42,6 +44,7 @@ export default function InboxScreen() {
   const queryClient = useQueryClient();
   const { width } = useWindowDimensions();
   const colors = useResolvedColors();
+  const selection = useSelection();
   const [viewMode, setViewMode] = useViewMode();
   const [bulkOpen, setBulkOpen] = useState(false);
 
@@ -134,6 +137,8 @@ export default function InboxScreen() {
         categories={categories}
         category={category}
         onCategoryChange={setCategory}
+        selectionMode={selection.mode}
+        onToggleSelectionMode={() => (selection.mode ? selection.exit() : selection.enter())}
       />
       <FlatList
         key={`${viewMode}-${columns}`}
@@ -176,6 +181,7 @@ export default function InboxScreen() {
           ) : null
         }
       />
+      <SelectionActionBar />
     </SafeAreaView>
   );
 }

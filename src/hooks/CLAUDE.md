@@ -8,4 +8,11 @@
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
 | #3947 | 4:49 PM | 🟣 | useBulkImport hook created with state machine orchestrating submission and 2-second polling | ~711 |
+
+### Apr 28, 2026
+
+| ID | Time | T | Title | Read |
+|----|------|---|-------|------|
+| #4316 | 11:11 AM | 🔵 | Flowy webapp-mobile feature gap analysis completed | ~647 |
+| #4315 | 11:10 AM | 🔵 | Webapp Feature Gap Analysis Complete | ~665 |
 </claude-mem-context>

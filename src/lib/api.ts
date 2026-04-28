@@ -3,6 +3,8 @@ import type {
   ApiErrorCode,
   ApiResult,
   AuthSession,
+  BulkActionPayload,
+  BulkActionResult,
   CitedItem,
   Digest,
   DigestSettings,
@@ -43,8 +45,10 @@ type ErrorBody = { error?: string; message?: string };
 const parseError = async (res: Response): Promise<ApiError> => {
   let code: ApiErrorCode = codeFromStatus(res.status);
   let message = res.statusText || 'Request failed';
+  let rawBody: string | undefined;
   try {
-    const body = (await res.json()) as ErrorBody;
+    rawBody = await res.text();
+    const body = (rawBody ? JSON.parse(rawBody) : {}) as ErrorBody;
     if (body.error) {
       code = (body.error as ApiErrorCode) ?? code;
       message = body.error;
@@ -54,12 +58,21 @@ const parseError = async (res: Response): Promise<ApiError> => {
   } catch {
     // keep defaults
   }
+  console.log('[api] error response', {
+    url: res.url,
+    status: res.status,
+    code,
+    message,
+    rawBody,
+  });
   return { code, message, status: res.status };
 };
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResult<T>> {
+  const url = `${ENV.API_BASE_URL}${path}`;
   try {
-    const res = await fetch(`${ENV.API_BASE_URL}${path}`, {
+    console.log('[api] ->', init.method ?? 'GET', url);
+    const res = await fetch(url, {
       ...init,
       headers: { ...jsonHeaders(), ...(init.headers ?? {}) },
     });
@@ -68,6 +81,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResu
     const data = (body.data ?? (body as unknown as T)) as T;
     return { data, error: null };
   } catch (err) {
+    console.log('[api] network error', {
+      url,
+      message: err instanceof Error ? err.message : String(err),
+    });
     return {
       data: null,
       error: {
@@ -97,6 +114,23 @@ export const api = {
   deleteItem: (id: string) =>
     request<{ ok: true }>(`/api/items/${id}`, {
       method: 'DELETE',
+    }),
+
+  reloadItem: (id: string) =>
+    request<Item>(`/api/items/${id}/retry`, {
+      method: 'POST',
+    }),
+
+  bulkDeleteItems: (payload: BulkActionPayload) =>
+    request<BulkActionResult>('/api/items/bulk/delete', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  bulkReloadItems: (payload: BulkActionPayload) =>
+    request<BulkActionResult>('/api/items/bulk/reload', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     }),
 
   ingestBulk: (payload: IngestBulkPayload) =>

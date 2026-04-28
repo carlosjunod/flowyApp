@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -8,6 +9,7 @@ import { Shimmer } from '@/components/ui/Shimmer';
 import { Spinner } from '@/components/ui/Spinner';
 import { Thumbnail } from '@/components/ui/Thumbnail';
 import { relativeDate } from '@/lib/relativeDate';
+import { useSelection } from '@/lib/selection';
 import { typeGlyph } from '@/lib/thumbnails';
 import type { Item } from '@/types';
 
@@ -18,20 +20,37 @@ type Props = { item: Item };
 export const ItemCard: React.FC<Props> = ({ item }) => {
   const pending = isPending(item);
   const errored = item.status === 'error';
+  const selection = useSelection();
+  const selected = selection.selectedIds.has(item.id);
+
+  const handlePress = () => {
+    if (selection.mode) {
+      selection.toggle(item.id);
+      return;
+    }
+    if (pending || errored) return;
+    router.push(`/item/${item.id}`);
+  };
+
+  const handleLongPress = () => {
+    if (pending) return;
+    if (!selection.mode) selection.enterWith(item.id);
+    else selection.toggle(item.id);
+  };
+
   return (
     <Animated.View entering={FadeIn.duration(220)}>
       <Pressable
-        disabled={pending}
-        onPress={() => {
-          if (errored) return;
-          router.push(`/item/${item.id}`);
-        }}
+        disabled={pending && !selection.mode}
+        onPress={handlePress}
+        onLongPress={handleLongPress}
+        delayLongPress={300}
         style={({ pressed }) => [
           { height: 176, elevation: 2 },
           pressed && !pending && { transform: [{ scale: 0.98 }], opacity: 0.97 },
         ]}
         className={`bg-card rounded-2xl overflow-hidden border shadow-card ${
-          errored ? 'border-danger' : 'border-border'
+          selected ? 'border-accent' : errored ? 'border-danger' : 'border-border'
         } ${pending ? 'opacity-80' : ''}`}
       >
         <View className="flex-1 relative">
@@ -41,6 +60,15 @@ export const ItemCard: React.FC<Props> = ({ item }) => {
               <Text className="text-white text-[10px] font-semibold">
                 1/{item.media.length}
               </Text>
+            </View>
+          ) : null}
+          {selection.mode ? (
+            <View
+              className={`absolute top-2 left-2 w-6 h-6 rounded-full items-center justify-center border-2 ${
+                selected ? 'bg-accent border-accent' : 'bg-black/40 border-white/80'
+              }`}
+            >
+              {selected ? <Feather name="check" size={14} color="#fff" /> : null}
             </View>
           ) : null}
           {pending ? (

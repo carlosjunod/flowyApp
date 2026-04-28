@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import React, { useCallback, useState } from 'react';
 import {
   FlatList,
+  Pressable,
   Text,
   View,
   type NativeScrollEvent,
@@ -82,6 +83,27 @@ export const MediaCarousel: React.FC<Props> = ({ slides, width, height = 240 }) 
       {active?.summary ? (
         <Text className="text-sm text-muted px-1">{active.summary}</Text>
       ) : null}
+      {active?.transcript ? <TranscriptBlock transcript={active.transcript} /> : null}
+    </View>
+  );
+};
+
+const TranscriptBlock: React.FC<{ transcript: string }> = ({ transcript }) => {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <View className="px-1 gap-1">
+      <Text className="text-xs uppercase text-muted tracking-wide">Spoken audio</Text>
+      <Text
+        className="text-sm text-fg"
+        numberOfLines={expanded ? undefined : 2}
+      >
+        {transcript}
+      </Text>
+      <Pressable onPress={() => setExpanded((v) => !v)} hitSlop={6}>
+        <Text className="text-xs text-accent font-medium">
+          {expanded ? 'Show less' : 'Show more'}
+        </Text>
+      </Pressable>
     </View>
   );
 };
