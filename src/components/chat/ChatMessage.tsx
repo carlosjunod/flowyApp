@@ -1,12 +1,12 @@
 import { router } from 'expo-router';
 import React, { useMemo } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 
-import { Thumbnail } from '@/components/ui/Thumbnail';
-import { typeGlyph } from '@/lib/thumbnails';
 import { useResolvedColors } from '@/lib/theme';
-import type { ChatMessage as ChatMessageType, CitedItem, Item } from '@/types';
+import type { ChatMessage as ChatMessageType, CitedItem } from '@/types';
+
+import { Citation } from './Citation';
 
 type Props = { message: ChatMessageType };
 
@@ -28,20 +28,6 @@ const preprocessContent = (text: string, citations: CitedItem[]): string => {
   });
 };
 
-const citedItemToItem = (c: CitedItem): Item => ({
-  id: c.id,
-  user: '',
-  type: c.type,
-  title: c.title,
-  category: c.category,
-  source_url: c.source_url,
-  r2_key: c.r2_key,
-  tags: [],
-  status: 'ready',
-  created: new Date().toISOString(),
-  updated: new Date().toISOString(),
-});
-
 export const ChatMessage: React.FC<Props> = ({ message }) => {
   const colors = useResolvedColors();
   const isUser = message.role === 'user';
@@ -52,16 +38,17 @@ export const ChatMessage: React.FC<Props> = ({ message }) => {
     [message.content, citations],
   );
 
+  const userText = colors.bg;
   const markdownStyle = useMemo(
     () => ({
-      body: { color: isUser ? '#FFFFFF' : colors.fg, fontSize: 16, fontFamily: 'Inter_400Regular' },
+      body: { color: isUser ? userText : colors.fg, fontSize: 16, fontFamily: 'Inter_400Regular' },
       paragraph: { marginTop: 0, marginBottom: 6 },
-      link: { color: isUser ? '#FFFFFF' : colors.accent, fontWeight: '600' as const },
+      link: { color: isUser ? userText : colors.accent, fontWeight: '600' as const },
       strong: { fontWeight: '700' as const },
       em: { fontStyle: 'italic' as const },
-      heading1: { fontSize: 22, fontWeight: '700' as const, marginTop: 4, marginBottom: 6, color: isUser ? '#FFFFFF' : colors.fg },
-      heading2: { fontSize: 19, fontWeight: '700' as const, marginTop: 4, marginBottom: 6, color: isUser ? '#FFFFFF' : colors.fg },
-      heading3: { fontSize: 17, fontWeight: '600' as const, marginTop: 4, marginBottom: 6, color: isUser ? '#FFFFFF' : colors.fg },
+      heading1: { fontSize: 22, fontWeight: '700' as const, marginTop: 4, marginBottom: 6, color: isUser ? userText : colors.fg },
+      heading2: { fontSize: 19, fontWeight: '700' as const, marginTop: 4, marginBottom: 6, color: isUser ? userText : colors.fg },
+      heading3: { fontSize: 17, fontWeight: '600' as const, marginTop: 4, marginBottom: 6, color: isUser ? userText : colors.fg },
       bullet_list: { marginTop: 2, marginBottom: 6 },
       ordered_list: { marginTop: 2, marginBottom: 6 },
       list_item: { marginBottom: 2 },
@@ -133,7 +120,7 @@ export const ChatMessage: React.FC<Props> = ({ message }) => {
     <View className={`px-4 py-2 ${isUser ? 'items-end' : 'items-start'}`}>
       <View
         className={`max-w-[88%] rounded-2xl px-4 py-3 ${
-          isUser ? 'bg-accent' : 'bg-card border border-border'
+          isUser ? 'bg-primary' : 'bg-card border border-border'
         }`}
       >
         <Markdown style={markdownStyle} onLinkPress={onLinkPress}>
@@ -141,26 +128,14 @@ export const ChatMessage: React.FC<Props> = ({ message }) => {
         </Markdown>
       </View>
       {!isUser && citations.length > 0 ? (
-        <View className="mt-2 gap-2 w-full">
+        <View className="mt-2 flex-row flex-wrap gap-1.5">
           {citations.map((c, i) => (
-            <Pressable
+            <Citation
               key={c.id}
-              onPress={() => router.push(`/item/${c.id}`)}
-              style={({ pressed }) => [pressed && { opacity: 0.85 }]}
-              className="flex-row items-center gap-3 rounded-xl border border-border bg-card px-3 py-2"
-            >
-              <Thumbnail item={citedItemToItem(c)} className="w-10 h-10" rounded="sm" />
-              <View className="flex-1">
-                <Text
-                  className="text-sm font-medium text-fg"
-                  style={{ fontFamily: 'Inter_500Medium' }}
-                  numberOfLines={1}
-                >
-                  [{i + 1}] {c.title ?? typeGlyph[c.type]} {c.title ? '' : c.type}
-                </Text>
-                {c.category ? <Text className="text-xs text-muted">{c.category}</Text> : null}
-              </View>
-            </Pressable>
+              index={i + 1}
+              itemId={c.id}
+              sourceUrl={c.source_url}
+            />
           ))}
         </View>
       ) : null}

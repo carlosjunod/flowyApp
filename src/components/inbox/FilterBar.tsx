@@ -3,13 +3,11 @@ import React from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { useResolvedColors } from '@/lib/theme';
-import type { SortDir, SortField, ViewMode } from '@/types';
+import type { SortDir, SortField } from '@/types';
 
 type Props = {
   search: string;
   onSearchChange: (value: string) => void;
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
   sortField: SortField;
   onSortFieldChange: (field: SortField) => void;
   sortDir: SortDir;
@@ -21,12 +19,6 @@ type Props = {
   onToggleSelectionMode?: () => void;
 };
 
-const viewModes: { key: ViewMode; label: string }[] = [
-  { key: 'grid', label: 'Grid' },
-  { key: 'list', label: 'List' },
-  { key: 'detail', label: 'Detail' },
-];
-
 const sortFields: { key: SortField; label: string }[] = [
   { key: 'created', label: 'Date' },
   { key: 'category', label: 'Category' },
@@ -36,8 +28,6 @@ const sortFields: { key: SortField; label: string }[] = [
 export const FilterBar: React.FC<Props> = ({
   search,
   onSearchChange,
-  viewMode,
-  onViewModeChange,
   sortField,
   onSortFieldChange,
   sortDir,
@@ -60,27 +50,6 @@ export const FilterBar: React.FC<Props> = ({
       />
       <View className="flex-row items-center justify-between">
         <View className="flex-row rounded-xl border border-border overflow-hidden">
-          {viewModes.map((v) => (
-            <Pressable
-              key={v.key}
-              onPress={() => onViewModeChange(v.key)}
-              style={({ pressed }) => [pressed && { opacity: 0.7 }]}
-              className={`px-3 h-9 items-center justify-center ${
-                viewMode === v.key ? 'bg-accent' : 'bg-card'
-              }`}
-            >
-              <Text
-                className={
-                  viewMode === v.key ? 'text-white font-medium' : 'text-muted font-medium'
-                }
-              >
-                {v.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <View className="flex-row gap-2">
-          <View className="flex-row rounded-xl border border-border overflow-hidden">
             {sortFields.map((s) => (
               <Pressable
                 key={s.key}
@@ -124,7 +93,6 @@ export const FilterBar: React.FC<Props> = ({
               </Text>
             </Pressable>
           ) : null}
-        </View>
       </View>
       <ScrollView
         horizontal
