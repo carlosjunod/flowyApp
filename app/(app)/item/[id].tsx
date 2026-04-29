@@ -1,3 +1,6 @@
+import { Feather } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
+import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -22,16 +25,37 @@ import { Thumbnail } from '@/components/ui/Thumbnail';
 import { useItemActions } from '@/hooks/useItemActions';
 import { useDeleteItem, useItemById, usePatchItem } from '@/hooks/useItems';
 import { useItemStatus } from '@/hooks/useItemStatus';
+import { pb } from '@/lib/pb';
 import { relativeDate } from '@/lib/relativeDate';
+import { hostOf, thumbnailFor } from '@/lib/thumbnails';
 import { useResolvedColors } from '@/lib/theme';
 import type { Item } from '@/types';
+
+const stripWww = (h: string) => h.replace(/^www\./, '');
+
+const useRelatedItems = (item: Item | undefined) =>
+  useQuery<Item[], Error>({
+    queryKey: ['related', item?.id, item?.category],
+    enabled: !!item?.id && !!item?.category,
+    queryFn: async () => {
+      if (!item?.id || !item?.category) return [];
+      const escapedCat = item.category.replace(/"/g, '\\"');
+      const res = await pb.collection('items').getList<Item>(1, 6, {
+        filter: `category = "${escapedCat}" && id != "${item.id}"`,
+        sort: '-created',
+      });
+      return res.items;
+    },
+  });
 
 export default function ItemDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const id = params.id;
   const { data: item, isLoading, error } = useItemById(id);
   useItemStatus(id);
+  const { data: relatedItems = [] } = useRelatedItems(item);
   const { width } = useWindowDimensions();
+  const colors = useResolvedColors();
 
   const [editing, setEditing] = useState(false);
 
@@ -53,36 +77,103 @@ export default function ItemDetailScreen() {
     );
   }
 
+  const url = item.source_url ?? item.raw_url;
+  const host = url ? hostOf(url) : null;
+  const domainLabel = host ? stripWww(host) : null;
+  const faviconUri = host
+    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`
+    : null;
+
+  const heroWidth = width - 32;
+
   return (
-    <SafeAreaView className="flex-1 bg-bg">
+    <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
       <View className="flex-row items-center justify-between px-4 py-3">
-        <Pressable onPress={() => router.back()}>
-          <Text className="text-accent text-base">← Back</Text>
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={8}
+          accessibilityLabel="Back"
+          className="flex-row items-center gap-1.5"
+        >
+          <Feather name="chevron-left" size={20} color={colors.fg} />
+          <Text
+            className="text-fg"
+            style={{ fontFamily: 'Inter_500Medium', fontSize: 14 }}
+          >
+            Inbox
+          </Text>
         </Pressable>
         <View className="flex-row gap-4">
           <ReloadButton item={item} />
-          <Pressable onPress={() => setEditing(true)}>
-            <Text className="text-accent text-base">Edit</Text>
+          <Pressable onPress={() => setEditing(true)} hitSlop={8}>
+            <Text className="text-fg" style={{ fontFamily: 'Inter_500Medium', fontSize: 14 }}>
+              Edit
+            </Text>
           </Pressable>
           <DeleteButton id={item.id} />
         </View>
       </View>
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
-        {item.media && item.media.length > 1 ? (
-          <MediaCarousel slides={item.media} width={width - 32} height={240} />
-        ) : (
-          <Thumbnail item={item} className="w-full h-56" rounded="lg" />
-        )}
-        <View className="gap-2">
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 96, gap: 16 }}>
+        <View className="relative">
+          {item.media && item.media.length > 1 ? (
+            <View style={{ borderRadius: 20, overflow: 'hidden' }}>
+              <MediaCarousel slides={item.media} width={heroWidth} height={heroWidth * 0.62} />
+            </View>
+          ) : (
+            <View
+              style={{
+                width: '100%',
+                height: heroWidth * 0.62,
+                borderRadius: 20,
+                overflow: 'hidden',
+              }}
+            >
+              <Thumbnail item={item} className="w-full h-full" rounded="lg" />
+            </View>
+          )}
+          {domainLabel ? (
+            <View
+              className="absolute top-3 left-3 flex-row items-center gap-1.5 rounded-full px-2.5 py-1.5"
+              style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}
+            >
+              {faviconUri ? (
+                <Image
+                  source={{ uri: faviconUri }}
+                  style={{ width: 14, height: 14, borderRadius: 3 }}
+                  contentFit="contain"
+                />
+              ) : null}
+              <Text
+                className="text-fg"
+                style={{ fontFamily: 'Inter_500Medium', fontSize: 12, color: '#1C1815' }}
+                numberOfLines={1}
+              >
+                {domainLabel}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        <View className="gap-2.5">
           <Text
-            className="text-3xl text-fg"
-            style={{ fontFamily: 'InstrumentSerif_400Regular', letterSpacing: -0.5 }}
+            className="text-fg"
+            style={{
+              fontFamily: 'InstrumentSerif_400Regular',
+              fontSize: 32,
+              lineHeight: 38,
+              letterSpacing: -0.5,
+            }}
           >
             {item.title ?? 'Untitled'}
           </Text>
           <View className="flex-row flex-wrap items-center gap-2">
             {item.category ? <Badge label={item.category} tone="accent" /> : null}
-            <Text className="text-sm text-muted">{relativeDate(item.created)}</Text>
+            <Text
+              className="text-muted"
+              style={{ fontFamily: 'Inter_400Regular', fontSize: 13 }}
+            >
+              {relativeDate(item.created)}
+            </Text>
             {item.status !== 'ready' ? (
               <Badge
                 label={item.status}
@@ -90,20 +181,100 @@ export default function ItemDetailScreen() {
               />
             ) : null}
           </View>
-          {item.source_url ? (
-            <Pressable onPress={() => Linking.openURL(item.source_url ?? '')}>
-              <Text className="text-accent" numberOfLines={1}>
-                {item.source_url}
-              </Text>
-            </Pressable>
-          ) : null}
         </View>
+
+        {item.source_url ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => Linking.openURL(item.source_url ?? '')}
+            style={({ pressed }) => [pressed && { opacity: 0.92 }]}
+            className="rounded-full bg-accent flex-row items-center justify-center gap-2"
+            hitSlop={4}
+          >
+            <View className="flex-row items-center justify-center gap-2 py-3.5 px-5">
+              <Feather name="external-link" size={16} color="#fff" />
+              <Text
+                className="text-white"
+                style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15 }}
+              >
+                Open original
+              </Text>
+            </View>
+          </Pressable>
+        ) : null}
+
         {item.summary ? (
-          <View className="gap-1">
-            <Text className="text-xs uppercase text-muted">Summary</Text>
-            <Text className="text-base text-fg">{item.summary}</Text>
+          <View
+            className="rounded-2xl border border-border bg-card px-4 py-4 gap-2"
+            style={{ borderRadius: 18 }}
+          >
+            <View className="flex-row items-center gap-2">
+              <View className="w-1.5 h-1.5 rounded-full bg-accent" />
+              <Text
+                className="text-muted"
+                style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11, letterSpacing: 1 }}
+              >
+                FLOWY AI · TAKEAWAYS
+              </Text>
+            </View>
+            <Text
+              className="text-fg"
+              style={{ fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 24 }}
+            >
+              {item.summary}
+            </Text>
           </View>
         ) : null}
+
+        {item.error_msg ? (
+          <View className="rounded-xl border border-danger bg-danger/10 p-3">
+            <Text className="text-danger font-medium mb-1">Processing error</Text>
+            <Text className="text-danger">{item.error_msg}</Text>
+          </View>
+        ) : null}
+
+        {item.content ? (
+          <View>
+            <Markdown
+              style={{
+                body: {
+                  color: colors.fg,
+                  fontSize: 16,
+                  lineHeight: 26,
+                  fontFamily: 'Inter_400Regular',
+                },
+                paragraph: { marginTop: 0, marginBottom: 12 },
+                blockquote: {
+                  borderLeftWidth: 3,
+                  borderLeftColor: colors.accent,
+                  paddingLeft: 14,
+                  paddingVertical: 4,
+                  marginVertical: 8,
+                  fontFamily: 'InstrumentSerif_400Regular',
+                  fontStyle: 'italic',
+                },
+                heading2: {
+                  fontSize: 22,
+                  marginTop: 16,
+                  marginBottom: 8,
+                  fontFamily: 'InstrumentSerif_400Regular',
+                  color: colors.fg,
+                },
+                heading3: {
+                  fontSize: 18,
+                  marginTop: 12,
+                  marginBottom: 6,
+                  fontFamily: 'Inter_600SemiBold',
+                  color: colors.fg,
+                },
+                link: { color: colors.accent, fontWeight: '600' as const },
+              }}
+            >
+              {item.content}
+            </Markdown>
+          </View>
+        ) : null}
+
         {(item.tags ?? []).length > 0 ? (
           <View className="flex-row flex-wrap gap-2">
             {(item.tags ?? []).map((tag) => (
@@ -111,16 +282,28 @@ export default function ItemDetailScreen() {
             ))}
           </View>
         ) : null}
-        {item.error_msg ? (
-          <View className="rounded-xl border border-danger bg-danger/10 p-3">
-            <Text className="text-danger font-medium mb-1">Processing error</Text>
-            <Text className="text-danger">{item.error_msg}</Text>
-          </View>
-        ) : null}
-        {item.content ? (
-          <View>
-            <Text className="text-xs uppercase text-muted mb-1">Content</Text>
-            <Markdown>{item.content}</Markdown>
+
+        {relatedItems.length > 0 ? (
+          <View className="gap-3 pt-2">
+            <Text
+              className="text-fg"
+              style={{
+                fontFamily: 'InstrumentSerif_400Regular',
+                fontSize: 22,
+                letterSpacing: -0.3,
+              }}
+            >
+              Related
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 10 }}
+            >
+              {relatedItems.map((rel) => (
+                <RelatedCard key={rel.id} item={rel} />
+              ))}
+            </ScrollView>
           </View>
         ) : null}
       </ScrollView>
@@ -134,6 +317,73 @@ export default function ItemDetailScreen() {
   );
 }
 
+const RelatedCard: React.FC<{ item: Item }> = ({ item }) => {
+  const thumb = thumbnailFor(item);
+  const url = item.source_url ?? item.raw_url;
+  const host = url ? hostOf(url) : null;
+  const domainLabel = host ? stripWww(host) : null;
+  const faviconUri = host
+    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`
+    : null;
+  return (
+    <Pressable
+      onPress={() => router.push(`/item/${item.id}`)}
+      style={({ pressed }) => [pressed && { opacity: 0.9 }]}
+      className="rounded-2xl overflow-hidden bg-card border border-border"
+    >
+      <View style={{ width: 160 }}>
+        <View style={{ height: 110 }} className="relative bg-surface">
+          {thumb.kind === 'image' ? (
+            <Image
+              source={{ uri: thumb.uri }}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="cover"
+            />
+          ) : (
+            <View className="flex-1 items-center justify-center">
+              <Text className="text-3xl">{thumb.glyph}</Text>
+            </View>
+          )}
+          {domainLabel ? (
+            <View
+              className="absolute top-1.5 left-1.5 flex-row items-center gap-1 rounded-full px-1.5 py-0.5"
+              style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}
+            >
+              {faviconUri ? (
+                <Image
+                  source={{ uri: faviconUri }}
+                  style={{ width: 10, height: 10, borderRadius: 2 }}
+                  contentFit="contain"
+                />
+              ) : null}
+              <Text
+                style={{
+                  fontFamily: 'Inter_500Medium',
+                  fontSize: 10,
+                  color: '#1C1815',
+                  maxWidth: 100,
+                }}
+                numberOfLines={1}
+              >
+                {domainLabel}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        <View className="px-2.5 py-2 gap-0.5" style={{ height: 60 }}>
+          <Text
+            className="text-fg"
+            style={{ fontFamily: 'Inter_600SemiBold', fontSize: 13, lineHeight: 16 }}
+            numberOfLines={2}
+          >
+            {item.title ?? 'Untitled'}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+};
+
 const ReloadButton: React.FC<{ item: Item }> = ({ item }) => {
   const actions = useItemActions();
   const disabled = item.status === 'pending' || item.status === 'processing';
@@ -146,8 +396,11 @@ const ReloadButton: React.FC<{ item: Item }> = ({ item }) => {
     }
   };
   return (
-    <Pressable onPress={onPress} disabled={disabled || busy}>
-      <Text className={`text-base ${disabled || busy ? 'text-muted' : 'text-accent'}`}>
+    <Pressable onPress={onPress} disabled={disabled || busy} hitSlop={8}>
+      <Text
+        className={disabled || busy ? 'text-muted' : 'text-fg'}
+        style={{ fontFamily: 'Inter_500Medium', fontSize: 14 }}
+      >
         {busy ? 'Reloading…' : 'Reload'}
       </Text>
     </Pressable>
@@ -158,6 +411,7 @@ const DeleteButton: React.FC<{ id: string }> = ({ id }) => {
   const del = useDeleteItem();
   return (
     <Pressable
+      hitSlop={8}
       onPress={() => {
         Alert.alert('Delete item?', 'This cannot be undone.', [
           { text: 'Cancel', style: 'cancel' },
@@ -176,7 +430,12 @@ const DeleteButton: React.FC<{ id: string }> = ({ id }) => {
         ]);
       }}
     >
-      <Text className="text-danger text-base">Delete</Text>
+      <Text
+        className="text-accent"
+        style={{ fontFamily: 'Inter_500Medium', fontSize: 14 }}
+      >
+        Delete
+      </Text>
     </Pressable>
   );
 };
@@ -272,4 +531,3 @@ const EditModal: React.FC<EditProps> = ({ item, onClose }) => {
     </Modal>
   );
 };
-

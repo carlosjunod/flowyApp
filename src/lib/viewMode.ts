@@ -8,7 +8,7 @@ const VIEW_MODE_KEY = 'tryflowy.viewMode';
 const DEFAULT: ViewMode = 'grid';
 
 const isViewMode = (value: unknown): value is ViewMode =>
-  value === 'grid' || value === 'list' || value === 'detail';
+  value === 'grid' || value === 'list';
 
 export const useViewMode = (): [ViewMode, (mode: ViewMode) => void] => {
   const [mode, setMode] = useState<ViewMode>(DEFAULT);

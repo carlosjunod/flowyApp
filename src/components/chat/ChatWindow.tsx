@@ -4,6 +4,7 @@ import { FlatList, Text, View } from 'react-native';
 import type { ChatMessage as ChatMessageType } from '@/types';
 
 import { ChatMessage } from './ChatMessage';
+import { ConversationItemsStrip } from './ConversationItemsStrip';
 
 type Props = {
   messages: ChatMessageType[];
@@ -31,12 +32,15 @@ export const ChatWindow: React.FC<Props> = ({ messages }) => {
   }
 
   return (
-    <FlatList
-      ref={ref}
-      data={messages}
-      keyExtractor={(m) => m.id}
-      renderItem={({ item }) => <ChatMessage message={item} />}
-      contentContainerStyle={{ paddingVertical: 8 }}
-    />
+    <View className="flex-1">
+      <ConversationItemsStrip messages={messages} />
+      <FlatList
+        ref={ref}
+        data={messages}
+        keyExtractor={(m) => m.id}
+        renderItem={({ item }) => <ChatMessage message={item} />}
+        contentContainerStyle={{ paddingVertical: 8 }}
+      />
+    </View>
   );
 };
