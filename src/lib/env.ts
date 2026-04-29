@@ -1,15 +1,21 @@
-const required = (key: string, fallback?: string): string => {
-  const value = process.env[key] ?? fallback;
-  if (!value) {
-    throw new Error(`Missing required env var: ${key}`);
-  }
-  return value;
-};
+// IMPORTANT: babel-preset-expo only inlines `process.env.EXPO_PUBLIC_*` when
+// accessed as a literal property. Dynamic access (process.env[key]) returns
+// undefined in production builds — that broke TestFlight auth on build 962.
+// Always reference these as literals here.
+
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL || 'https://tryflowy.app';
+
+const PB_URL =
+  process.env.EXPO_PUBLIC_PB_URL || 'https://pb.tryflowy.app';
+
+const R2_PUBLIC_URL =
+  process.env.EXPO_PUBLIC_R2_PUBLIC_URL || 'https://files.tryflowy.app';
 
 export const ENV = {
-  API_BASE_URL: required('EXPO_PUBLIC_API_BASE_URL', 'http://localhost:4000'),
-  PB_URL: required('EXPO_PUBLIC_PB_URL', 'http://localhost:8090'),
-  R2_PUBLIC_URL: required('EXPO_PUBLIC_R2_PUBLIC_URL', 'https://files.tryflowy.app'),
+  API_BASE_URL,
+  PB_URL,
+  R2_PUBLIC_URL,
   APP_GROUP: 'group.app.tryflowy',
   AUTH_KEY: 'pb_auth',
 } as const;

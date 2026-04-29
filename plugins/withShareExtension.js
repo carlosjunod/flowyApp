@@ -11,7 +11,7 @@ const path = require('path');
 const DEFAULTS = {
   appGroup: 'group.app.tryflowy',
   extensionName: 'ShareExtension',
-  apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:4000',
+  apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://tryflowy.app',
 };
 
 function resolveProps(props) {
