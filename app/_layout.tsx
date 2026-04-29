@@ -18,7 +18,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { usePushRegistration } from '@/hooks/usePushRegistration';
 import { AuthProvider } from '@/lib/auth';
-import { ThemeProvider, useTheme } from '@/lib/theme';
+import { ThemeProvider, useResolvedVars, useTheme } from '@/lib/theme';
 
 try {
   Notifications.setNotificationHandler({
@@ -35,6 +35,7 @@ try {
 
 function AppShell() {
   const { resolved } = useTheme();
+  const themeVars = useResolvedVars();
   usePushRegistration();
 
   useEffect(() => {
@@ -61,7 +62,7 @@ function AppShell() {
   }, []);
 
   return (
-    <View style={{ flex: 1 }} className={resolved === 'dark' ? 'dark' : ''}>
+    <View style={[{ flex: 1 }, themeVars]}>
       <StatusBar style={resolved === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />

@@ -74,11 +74,18 @@ export const ItemRow: React.FC<Props> = ({ item }) => {
         onLongPress={handleLongPress}
         delayLongPress={300}
         style={({ pressed }) => [
-          { minHeight: 64 },
-          pressed && !pending && { opacity: 0.85 },
+          {
+            minHeight: 64,
+            shadowColor: '#1C1815',
+            shadowOpacity: 0.06,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 2 },
+            elevation: 1,
+          },
+          pressed && !pending && { opacity: 0.92, transform: [{ scale: 0.995 }] },
         ]}
-        className={`flex-row items-center gap-3 px-4 py-3 border-b border-border ${
-          selected ? 'bg-accent/10' : ''
+        className={`flex-row items-center gap-3 mx-4 mb-2 px-3 py-3 rounded-2xl bg-card ${
+          selected ? 'border-2 border-accent' : ''
         }`}
       >
         {selection.mode ? (

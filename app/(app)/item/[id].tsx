@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -230,25 +231,47 @@ export default function ItemDetailScreen() {
         ) : null}
 
         {item.summary ? (
-          <View
-            className="rounded-2xl border border-border bg-card px-4 py-4 gap-2"
-            style={{ borderRadius: 18 }}
-          >
-            <View className="flex-row items-center gap-2">
-              <View className="w-1.5 h-1.5 rounded-full bg-accent" />
+          <View style={{ position: 'relative' }}>
+            <LinearGradient
+              colors={['rgba(219,102,60,0.18)', 'rgba(219,102,60,0.04)', 'transparent']}
+              start={{ x: 0.05, y: 0 }}
+              end={{ x: 0.9, y: 1 }}
+              style={{
+                position: 'absolute',
+                top: -8,
+                left: -8,
+                right: -8,
+                bottom: -8,
+                borderRadius: 28,
+              }}
+            />
+            <View
+              className="rounded-2xl bg-card px-4 py-4 gap-2"
+              style={{
+                borderRadius: 18,
+                shadowColor: '#1C1815',
+                shadowOpacity: 0.05,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 3 },
+                elevation: 2,
+              }}
+            >
+              <View className="flex-row items-center gap-2">
+                <View className="w-1.5 h-1.5 rounded-full bg-accent" />
+                <Text
+                  className="text-muted"
+                  style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11, letterSpacing: 1 }}
+                >
+                  FLOWY AI · TAKEAWAYS
+                </Text>
+              </View>
               <Text
-                className="text-muted"
-                style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11, letterSpacing: 1 }}
+                className="text-fg"
+                style={{ fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 24 }}
               >
-                FLOWY AI · TAKEAWAYS
+                {item.summary}
               </Text>
             </View>
-            <Text
-              className="text-fg"
-              style={{ fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 24 }}
-            >
-              {item.summary}
-            </Text>
           </View>
         ) : null}
 
