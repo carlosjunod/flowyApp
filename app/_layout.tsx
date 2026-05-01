@@ -15,6 +15,7 @@ import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { useItemNotifications } from '@/hooks/useItemNotifications';
 import { usePushRegistration } from '@/hooks/usePushRegistration';
 import { AuthProvider } from '@/lib/auth';
 import { ThemeProvider, useTheme } from '@/lib/theme';
@@ -35,6 +36,7 @@ try {
 function AppShell() {
   const { resolved } = useTheme();
   usePushRegistration();
+  useItemNotifications();
 
   useEffect(() => {
     let sub: { remove: () => void } | null = null;
