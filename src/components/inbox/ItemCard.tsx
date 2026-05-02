@@ -65,11 +65,17 @@ export const ItemCard: React.FC<Props> = ({ item }) => {
         onLongPress={handleLongPress}
         delayLongPress={300}
         style={({ pressed }) => [
-          { elevation: 2 },
+          {
+            elevation: 2,
+            shadowColor: '#1C1815',
+            shadowOpacity: 0.08,
+            shadowRadius: 12,
+            shadowOffset: { width: 0, height: 4 },
+          },
           pressed && !pending && { transform: [{ scale: 0.98 }], opacity: 0.97 },
         ]}
-        className={`bg-card rounded-[20px] overflow-hidden border shadow-card ${
-          selected ? 'border-accent' : errored ? 'border-danger' : 'border-border'
+        className={`bg-card rounded-[20px] overflow-hidden ${
+          selected ? 'border-2 border-accent' : ''
         } ${pending ? 'opacity-80' : ''}`}
       >
         {hasPhoto ? (

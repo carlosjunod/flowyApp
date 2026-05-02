@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { colorScheme } from 'nativewind';
+import { colorScheme, vars } from 'nativewind';
 import React, {
   createContext,
   useCallback,
@@ -98,6 +98,37 @@ export const useTheme = (): Ctx => {
   const ctx = useContext(ThemeContext);
   if (!ctx) throw new Error('useTheme must be used inside ThemeProvider');
   return ctx;
+};
+
+export const lightVars = vars({
+  '--color-bg': '248 244 234',
+  '--color-surface': '240 232 212',
+  '--color-card': '255 255 255',
+  '--color-fg': '28 24 21',
+  '--color-primary': '28 24 21',
+  '--color-muted': '107 98 88',
+  '--color-accent': '219 102 60',
+  '--color-border': '223 213 194',
+  '--color-danger': '220 38 38',
+  '--color-success': '16 185 129',
+});
+
+export const darkVars = vars({
+  '--color-bg': '26 28 32',
+  '--color-surface': '32 35 42',
+  '--color-card': '39 42 49',
+  '--color-fg': '238 234 224',
+  '--color-primary': '238 234 224',
+  '--color-muted': '157 161 170',
+  '--color-accent': '235 124 76',
+  '--color-border': '58 61 68',
+  '--color-danger': '248 113 113',
+  '--color-success': '52 211 153',
+});
+
+export const useResolvedVars = () => {
+  const { resolved } = useTheme();
+  return resolved === 'dark' ? darkVars : lightVars;
 };
 
 export const themeColors = {

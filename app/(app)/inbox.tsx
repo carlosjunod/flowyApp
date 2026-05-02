@@ -39,12 +39,12 @@ import { useAuth } from '@/lib/auth';
 import { pb } from '@/lib/pb';
 import { useResolvedColors } from '@/lib/theme';
 import { useViewMode } from '@/lib/viewMode';
-import type { Item, SortDir, SortField, ViewMode } from '@/types';
+import type { Item, ViewMode } from '@/types';
 
 const columnsFor = (width: number): number => {
-  if (width >= 1024) return 4;
-  if (width >= 640) return 3;
-  return 2;
+  if (width >= 1024) return 3;
+  if (width >= 768) return 2;
+  return 1;
 };
 
 export default function InboxScreen() {
@@ -66,14 +66,12 @@ export default function InboxScreen() {
 
   const [searchInput, setSearchInput] = useState('');
   const search = useDebounced(searchInput, 200);
-  const [sortField, setSortField] = useState<SortField>('created');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [category, setCategory] = useState<string | null>(null);
 
   const query = useItems({
     userId: user?.id ?? null,
-    sortField,
-    sortDir,
+    sortField: 'created',
+    sortDir: 'desc',
   });
 
   const items = useMemo(() => flattenPages(query.data), [query.data]);
@@ -148,15 +146,9 @@ export default function InboxScreen() {
       <FilterBar
         search={searchInput}
         onSearchChange={setSearchInput}
-        sortField={sortField}
-        onSortFieldChange={setSortField}
-        sortDir={sortDir}
-        onSortDirChange={setSortDir}
         categories={categories}
         category={category}
         onCategoryChange={setCategory}
-        selectionMode={selection.mode}
-        onToggleSelectionMode={() => (selection.mode ? selection.exit() : selection.enter())}
       />
       {viewMode === 'grid' ? (
         <FlatList
@@ -165,7 +157,11 @@ export default function InboxScreen() {
           keyExtractor={(it) => it.id}
           numColumns={columns}
           columnWrapperStyle={columns > 1 ? { gap: 12, paddingHorizontal: 16 } : undefined}
-          contentContainerStyle={{ paddingTop: 8, paddingBottom: 24, gap: 12 }}
+          contentContainerStyle={{
+            paddingTop: 8,
+            paddingBottom: 24,
+            gap: columns === 1 ? 16 : 12,
+          }}
           refreshing={query.isRefetching}
           onRefresh={onRefresh}
           ListHeaderComponent={
@@ -174,7 +170,13 @@ export default function InboxScreen() {
             ) : null
           }
           renderItem={({ item }) => (
-            <View style={{ flex: 1 / columns }}>
+            <View
+              style={
+                columns > 1
+                  ? { flex: 1 / columns }
+                  : { paddingHorizontal: 16 }
+              }
+            >
               <ItemCard item={item} />
             </View>
           )}

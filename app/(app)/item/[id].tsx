@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -21,13 +22,13 @@ import { MediaCarousel } from '@/components/inbox/MediaCarousel';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
-import { Thumbnail } from '@/components/ui/Thumbnail';
 import { useItemActions } from '@/hooks/useItemActions';
 import { useDeleteItem, useItemById, usePatchItem } from '@/hooks/useItems';
 import { useItemStatus } from '@/hooks/useItemStatus';
+import { ENV } from '@/lib/env';
 import { pb } from '@/lib/pb';
 import { relativeDate } from '@/lib/relativeDate';
-import { hostOf, thumbnailFor } from '@/lib/thumbnails';
+import { hostOf, thumbnailFor, typeGlyph } from '@/lib/thumbnails';
 import { useResolvedColors } from '@/lib/theme';
 import type { Item } from '@/types';
 
@@ -85,6 +86,14 @@ export default function ItemDetailScreen() {
     : null;
 
   const heroWidth = width - 32;
+  const heroHeight = Math.round(heroWidth * 0.62);
+  const heroThumb = thumbnailFor(item);
+  const firstSlideUri = item.media && item.media.length > 0
+    ? `${ENV.R2_PUBLIC_URL}/${item.media[0]!.r2_key}`
+    : null;
+  const heroUri = firstSlideUri
+    ?? (heroThumb.kind === 'image' ? heroThumb.uri : null);
+  const showCarousel = (item.media?.length ?? 0) > 1;
 
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
@@ -115,22 +124,38 @@ export default function ItemDetailScreen() {
       </View>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 96, gap: 16 }}>
         <View className="relative">
-          {item.media && item.media.length > 1 ? (
-            <View style={{ borderRadius: 20, overflow: 'hidden' }}>
-              <MediaCarousel slides={item.media} width={heroWidth} height={heroWidth * 0.62} />
-            </View>
-          ) : (
-            <View
-              style={{
-                width: '100%',
-                height: heroWidth * 0.62,
-                borderRadius: 20,
-                overflow: 'hidden',
-              }}
-            >
-              <Thumbnail item={item} className="w-full h-full" rounded="lg" />
-            </View>
-          )}
+          <View
+            className="bg-surface"
+            style={{
+              width: '100%',
+              height: heroHeight,
+              borderRadius: 20,
+              overflow: 'hidden',
+            }}
+          >
+            {heroUri ? (
+              <Image
+                source={{ uri: heroUri }}
+                style={{ width: '100%', height: '100%' }}
+                contentFit="cover"
+                transition={200}
+              />
+            ) : (
+              <View className="flex-1 items-center justify-center">
+                <Text className="text-6xl">{typeGlyph[item.type]}</Text>
+              </View>
+            )}
+            {showCarousel ? (
+              <View className="absolute top-3 right-3 px-2 py-1 rounded-full bg-black/60">
+                <Text
+                  className="text-white"
+                  style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11 }}
+                >
+                  1 / {item.media?.length ?? 1}
+                </Text>
+              </View>
+            ) : null}
+          </View>
           {domainLabel ? (
             <View
               className="absolute top-3 left-3 flex-row items-center gap-1.5 rounded-full px-2.5 py-1.5"
@@ -144,7 +169,6 @@ export default function ItemDetailScreen() {
                 />
               ) : null}
               <Text
-                className="text-fg"
                 style={{ fontFamily: 'Inter_500Medium', fontSize: 12, color: '#1C1815' }}
                 numberOfLines={1}
               >
@@ -153,6 +177,9 @@ export default function ItemDetailScreen() {
             </View>
           ) : null}
         </View>
+        {showCarousel && item.media ? (
+          <MediaCarousel slides={item.media} width={heroWidth} height={Math.round(heroHeight * 0.85)} />
+        ) : null}
 
         <View className="gap-2.5">
           <Text
@@ -204,25 +231,47 @@ export default function ItemDetailScreen() {
         ) : null}
 
         {item.summary ? (
-          <View
-            className="rounded-2xl border border-border bg-card px-4 py-4 gap-2"
-            style={{ borderRadius: 18 }}
-          >
-            <View className="flex-row items-center gap-2">
-              <View className="w-1.5 h-1.5 rounded-full bg-accent" />
+          <View style={{ position: 'relative' }}>
+            <LinearGradient
+              colors={['rgba(219,102,60,0.18)', 'rgba(219,102,60,0.04)', 'transparent']}
+              start={{ x: 0.05, y: 0 }}
+              end={{ x: 0.9, y: 1 }}
+              style={{
+                position: 'absolute',
+                top: -8,
+                left: -8,
+                right: -8,
+                bottom: -8,
+                borderRadius: 28,
+              }}
+            />
+            <View
+              className="rounded-2xl bg-card px-4 py-4 gap-2"
+              style={{
+                borderRadius: 18,
+                shadowColor: '#1C1815',
+                shadowOpacity: 0.05,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 3 },
+                elevation: 2,
+              }}
+            >
+              <View className="flex-row items-center gap-2">
+                <View className="w-1.5 h-1.5 rounded-full bg-accent" />
+                <Text
+                  className="text-muted"
+                  style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11, letterSpacing: 1 }}
+                >
+                  FLOWY AI · TAKEAWAYS
+                </Text>
+              </View>
               <Text
-                className="text-muted"
-                style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11, letterSpacing: 1 }}
+                className="text-fg"
+                style={{ fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 24 }}
               >
-                FLOWY AI · TAKEAWAYS
+                {item.summary}
               </Text>
             </View>
-            <Text
-              className="text-fg"
-              style={{ fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 24 }}
-            >
-              {item.summary}
-            </Text>
           </View>
         ) : null}
 

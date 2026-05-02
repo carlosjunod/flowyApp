@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
-import { Text, View, useWindowDimensions } from 'react-native';
+import { View, useWindowDimensions } from 'react-native';
 
 import { Spinner } from '@/components/ui/Spinner';
 import { useAuth } from '@/lib/auth';
@@ -39,8 +39,8 @@ export default function AppLayout() {
         name="inbox"
         options={{
           title: 'Inbox',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 20 }}>📥</Text>
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="inbox" size={size ?? 20} color={color} />
           ),
         }}
       />
@@ -48,8 +48,8 @@ export default function AppLayout() {
         name="chat"
         options={{
           title: 'Chat',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 20 }}>💬</Text>
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="message-square" size={size ?? 20} color={color} />
           ),
         }}
       />
