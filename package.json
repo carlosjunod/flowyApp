@@ -27,6 +27,7 @@
     "expo-router": "~6.0.0",
     "expo-secure-store": "~15.0.0",
     "expo-status-bar": "~3.0.9",
+    "expo-updates": "~29.0.17",
     "nativewind": "^4.2.3",
     "pocketbase": "^0.26.8",
     "react": "19.1.0",
