@@ -12,6 +12,7 @@ private let APP_GROUP = (Bundle.main.infoDictionary?["APP_GROUP"] as? String) ??
 private let API_BASE_URL = (Bundle.main.infoDictionary?["API_BASE_URL"] as? String) ?? "http://localhost:4000"
 private let AUTH_KEY = "pb_auth"
 private let MAX_IMAGES = 10
+private let MAX_FILES = 10
 
 private enum IngestType: String {
   case url
@@ -25,6 +26,14 @@ private enum IngestType: String {
   case dribbble
   case linkedin
   case twitter
+  case pdf
+  case file
+}
+
+private struct ShareFile: Codable {
+  let name: String
+  let mime: String
+  let data: String
 }
 
 private struct IngestPayload: Codable {
@@ -34,6 +43,10 @@ private struct IngestPayload: Codable {
   let raw_images: [String]?
   let raw_video: String?
   let video_mime: String?
+  let raw_pdf: ShareFile?
+  let raw_pdfs: [ShareFile]?
+  let raw_file: ShareFile?
+  let raw_files: [ShareFile]?
 }
 
 // MARK: - Keychain
@@ -171,35 +184,50 @@ final class ShareViewController: UIViewController {
     for item in items {
       guard let attachments = item.attachments else { continue }
       for provider in attachments {
-        if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
+        if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier),
+           !provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
           if let url = await loadURL(provider) {
-            return IngestPayload(
-              type: classify(url: url).rawValue,
-              raw_url: url.absoluteString,
-              raw_image: nil,
-              raw_images: nil,
-              raw_video: nil,
-              video_mime: nil
-            )
+            return makeURLPayload(url)
           }
         }
         if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
           if let text = await loadText(provider),
-             let url = URL(string: text), url.scheme != nil {
-            return IngestPayload(
-              type: classify(url: url).rawValue,
-              raw_url: url.absoluteString,
-              raw_image: nil,
-              raw_images: nil,
-              raw_video: nil,
-              video_mime: nil
-            )
+             let url = URL(string: text), url.scheme != nil, url.scheme != "file" {
+            return makeURLPayload(url)
           }
         }
       }
     }
 
-    // Pass 3: collect all images across all items
+    // Pass 3: collect PDFs across all items
+    var pdfs: [ShareFile] = []
+    for item in items {
+      guard let attachments = item.attachments else { continue }
+      for provider in attachments where pdfs.count < MAX_FILES {
+        if provider.hasItemConformingToTypeIdentifier(UTType.pdf.identifier) {
+          if let pdf = await loadFile(provider, typeIdentifier: UTType.pdf.identifier, fallbackMime: "application/pdf") {
+            pdfs.append(pdf)
+          }
+        }
+      }
+    }
+
+    if pdfs.count > 1 {
+      return IngestPayload(
+        type: IngestType.pdf.rawValue,
+        raw_url: nil, raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
+        raw_pdf: nil, raw_pdfs: pdfs, raw_file: nil, raw_files: nil
+      )
+    }
+    if let single = pdfs.first {
+      return IngestPayload(
+        type: IngestType.pdf.rawValue,
+        raw_url: nil, raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
+        raw_pdf: single, raw_pdfs: nil, raw_file: nil, raw_files: nil
+      )
+    }
+
+    // Pass 4: collect all images across all items
     var images: [String] = []
     for item in items {
       guard let attachments = item.attachments else { continue }
@@ -215,25 +243,60 @@ final class ShareViewController: UIViewController {
     if images.count > 1 {
       return IngestPayload(
         type: IngestType.screenshot.rawValue,
-        raw_url: nil,
-        raw_image: nil,
-        raw_images: images,
-        raw_video: nil,
-        video_mime: nil
+        raw_url: nil, raw_image: nil, raw_images: images, raw_video: nil, video_mime: nil,
+        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil
       )
     }
     if let single = images.first {
       return IngestPayload(
         type: IngestType.screenshot.rawValue,
-        raw_url: nil,
-        raw_image: single,
-        raw_images: nil,
-        raw_video: nil,
-        video_mime: nil
+        raw_url: nil, raw_image: single, raw_images: nil, raw_video: nil, video_mime: nil,
+        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil
+      )
+    }
+
+    // Pass 5: collect generic files (any other shared documents)
+    var files: [ShareFile] = []
+    for item in items {
+      guard let attachments = item.attachments else { continue }
+      for provider in attachments where files.count < MAX_FILES {
+        if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+          if let file = await loadFile(provider, typeIdentifier: UTType.fileURL.identifier, fallbackMime: "application/octet-stream") {
+            files.append(file)
+          }
+        } else if provider.hasItemConformingToTypeIdentifier(UTType.data.identifier) {
+          if let file = await loadFile(provider, typeIdentifier: UTType.data.identifier, fallbackMime: "application/octet-stream") {
+            files.append(file)
+          }
+        }
+      }
+    }
+
+    if files.count > 1 {
+      return IngestPayload(
+        type: IngestType.file.rawValue,
+        raw_url: nil, raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
+        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: files
+      )
+    }
+    if let single = files.first {
+      return IngestPayload(
+        type: IngestType.file.rawValue,
+        raw_url: nil, raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
+        raw_pdf: nil, raw_pdfs: nil, raw_file: single, raw_files: nil
       )
     }
 
     return nil
+  }
+
+  private func makeURLPayload(_ url: URL) -> IngestPayload {
+    IngestPayload(
+      type: classify(url: url).rawValue,
+      raw_url: url.absoluteString,
+      raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
+      raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil
+    )
   }
 
   // MARK: - Loaders
@@ -262,6 +325,29 @@ final class ShareViewController: UIViewController {
     return nil
   }
 
+  private func loadFile(_ provider: NSItemProvider, typeIdentifier: String, fallbackMime: String) async -> ShareFile? {
+    guard let obj = try? await provider.loadItem(forTypeIdentifier: typeIdentifier, options: nil) else {
+      return nil
+    }
+    var data: Data?
+    var name = provider.suggestedName ?? "file"
+    var mime = fallbackMime
+    if let url = obj as? URL {
+      data = try? Data(contentsOf: url)
+      if !url.lastPathComponent.isEmpty { name = url.lastPathComponent }
+      if let utType = UTType(filenameExtension: url.pathExtension),
+         let inferred = utType.preferredMIMEType {
+        mime = inferred
+      }
+    } else if let raw = obj as? Data {
+      data = raw
+    } else if let str = obj as? String {
+      data = str.data(using: .utf8)
+    }
+    guard let bytes = data else { return nil }
+    return ShareFile(name: name, mime: mime, data: bytes.base64EncodedString())
+  }
+
   private func loadVideoPayload(_ provider: NSItemProvider) async -> IngestPayload? {
     guard let obj = try? await provider.loadItem(forTypeIdentifier: UTType.movie.identifier, options: nil) else {
       return nil
@@ -283,7 +369,8 @@ final class ShareViewController: UIViewController {
       raw_image: nil,
       raw_images: nil,
       raw_video: bytes.base64EncodedString(),
-      video_mime: mime
+      video_mime: mime,
+      raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil
     )
   }
 

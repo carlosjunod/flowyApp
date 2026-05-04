@@ -188,7 +188,11 @@ function renderInfoPlist(props) {
         <key>NSExtensionActivationSupportsWebURLWithMaxCount</key>
         <integer>1</integer>
         <key>NSExtensionActivationSupportsImageWithMaxCount</key>
+        <integer>10</integer>
+        <key>NSExtensionActivationSupportsMovieWithMaxCount</key>
         <integer>1</integer>
+        <key>NSExtensionActivationSupportsFileWithMaxCount</key>
+        <integer>10</integer>
         <key>NSExtensionActivationSupportsText</key>
         <true/>
       </dict>
