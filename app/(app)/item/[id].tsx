@@ -18,7 +18,11 @@ import {
 import Markdown from 'react-native-markdown-display';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EnrichedSections } from '@/components/inbox/EnrichedSections';
+import { ExploreCTA } from '@/components/inbox/ExploreCTA';
 import { MediaCarousel } from '@/components/inbox/MediaCarousel';
+import { TagSuggestions } from '@/components/inbox/TagSuggestions';
+import { ReceiptContent } from '@/components/inbox/content/ReceiptContent';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
@@ -86,7 +90,7 @@ export default function ItemDetailScreen() {
     : null;
 
   const heroWidth = width - 32;
-  const heroHeight = Math.round(heroWidth * 0.62);
+  const heroHeight = Math.round(heroWidth * 1.25);
   const heroThumb = thumbnailFor(item);
   const firstSlideUri = item.media && item.media.length > 0
     ? `${ENV.R2_PUBLIC_URL}/${item.media[0]!.r2_key}`
@@ -124,38 +128,36 @@ export default function ItemDetailScreen() {
       </View>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 96, gap: 16 }}>
         <View className="relative">
-          <View
-            className="bg-surface"
-            style={{
-              width: '100%',
-              height: heroHeight,
-              borderRadius: 20,
-              overflow: 'hidden',
-            }}
-          >
-            {heroUri ? (
-              <Image
-                source={{ uri: heroUri }}
-                style={{ width: '100%', height: '100%' }}
-                contentFit="cover"
-                transition={200}
-              />
-            ) : (
-              <View className="flex-1 items-center justify-center">
-                <Text className="text-6xl">{typeGlyph[item.type]}</Text>
-              </View>
-            )}
-            {showCarousel ? (
-              <View className="absolute top-3 right-3 px-2 py-1 rounded-full bg-black/60">
-                <Text
-                  className="text-white"
-                  style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11 }}
-                >
-                  1 / {item.media?.length ?? 1}
-                </Text>
-              </View>
-            ) : null}
-          </View>
+          {showCarousel && item.media ? (
+            <MediaCarousel
+              slides={item.media}
+              width={heroWidth}
+              height={heroHeight}
+            />
+          ) : (
+            <View
+              className="bg-surface"
+              style={{
+                width: '100%',
+                height: heroHeight,
+                borderRadius: 20,
+                overflow: 'hidden',
+              }}
+            >
+              {heroUri ? (
+                <Image
+                  source={{ uri: heroUri }}
+                  style={{ width: '100%', height: '100%' }}
+                  contentFit="contain"
+                  transition={200}
+                />
+              ) : (
+                <View className="flex-1 items-center justify-center">
+                  <Text className="text-6xl">{typeGlyph[item.type]}</Text>
+                </View>
+              )}
+            </View>
+          )}
           {domainLabel ? (
             <View
               className="absolute top-3 left-3 flex-row items-center gap-1.5 rounded-full px-2.5 py-1.5"
@@ -177,9 +179,6 @@ export default function ItemDetailScreen() {
             </View>
           ) : null}
         </View>
-        {showCarousel && item.media ? (
-          <MediaCarousel slides={item.media} width={heroWidth} height={Math.round(heroHeight * 0.85)} />
-        ) : null}
 
         <View className="gap-2.5">
           <Text
@@ -230,6 +229,13 @@ export default function ItemDetailScreen() {
           </Pressable>
         ) : null}
 
+        {item.exploration ? (
+          <ExploreCTA
+            exploration={item.exploration}
+            isReceipt={item.type === 'receipt'}
+          />
+        ) : null}
+
         {item.summary ? (
           <View style={{ position: 'relative' }}>
             <LinearGradient
@@ -275,6 +281,10 @@ export default function ItemDetailScreen() {
           </View>
         ) : null}
 
+        {item.exploration ? (
+          <EnrichedSections exploration={item.exploration} />
+        ) : null}
+
         {item.error_msg ? (
           <View className="rounded-xl border border-danger bg-danger/10 p-3">
             <Text className="text-danger font-medium mb-1">Processing error</Text>
@@ -282,7 +292,9 @@ export default function ItemDetailScreen() {
           </View>
         ) : null}
 
-        {item.content ? (
+        {item.type === 'receipt' ? <ReceiptContent item={item} /> : null}
+
+        {item.type !== 'receipt' && item.content ? (
           <View>
             <Markdown
               style={{
@@ -317,6 +329,39 @@ export default function ItemDetailScreen() {
                   color: colors.fg,
                 },
                 link: { color: colors.accent, fontWeight: '600' as const },
+                code_inline: {
+                  backgroundColor: colors.surface,
+                  color: colors.fg,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                  borderRadius: 4,
+                  paddingHorizontal: 5,
+                  paddingVertical: 1,
+                  fontFamily: 'Menlo',
+                  fontSize: 13,
+                },
+                fence: {
+                  backgroundColor: colors.surface,
+                  color: colors.fg,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                  borderRadius: 10,
+                  padding: 12,
+                  marginVertical: 8,
+                  fontFamily: 'Menlo',
+                  fontSize: 13,
+                },
+                code_block: {
+                  backgroundColor: colors.surface,
+                  color: colors.fg,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                  borderRadius: 10,
+                  padding: 12,
+                  marginVertical: 8,
+                  fontFamily: 'Menlo',
+                  fontSize: 13,
+                },
               }}
             >
               {item.content}
@@ -331,6 +376,8 @@ export default function ItemDetailScreen() {
             ))}
           </View>
         ) : null}
+
+        <TagSuggestions item={item} />
 
         {relatedItems.length > 0 ? (
           <View className="gap-3 pt-2">

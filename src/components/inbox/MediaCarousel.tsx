@@ -37,7 +37,7 @@ export const MediaCarousel: React.FC<Props> = ({ slides, width, height = 240 }) 
 
   return (
     <View className="gap-2">
-      <View style={{ position: 'relative' }}>
+      <View style={{ position: 'relative', borderRadius: 20, overflow: 'hidden' }}>
         <FlatList
           horizontal
           data={slides}
@@ -53,14 +53,17 @@ export const MediaCarousel: React.FC<Props> = ({ slides, width, height = 240 }) 
               <Image
                 source={{ uri: `${ENV.R2_PUBLIC_URL}/${item.r2_key}` }}
                 style={{ width: '100%', height: '100%' }}
-                contentFit="cover"
+                contentFit="contain"
                 transition={150}
               />
             </View>
           )}
         />
-        <View className="absolute top-2 right-2 px-2 py-1 rounded-full bg-black/60">
-          <Text className="text-white text-xs font-semibold">
+        <View className="absolute top-3 right-3 px-2 py-1 rounded-full bg-black/60">
+          <Text
+            className="text-white"
+            style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11 }}
+          >
             {index + 1} / {slides.length}
           </Text>
         </View>

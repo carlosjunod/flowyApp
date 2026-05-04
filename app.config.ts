@@ -13,7 +13,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   scheme: 'tryflowy',
   version: '1.0.0',
   orientation: 'portrait',
-  icon: './assets/icon.png',
+  icon: './icons/icon-1024.png',
   userInterfaceStyle: 'automatic',
   newArchEnabled: true,
   splash: {
@@ -41,14 +41,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: BUNDLE_ID,
     adaptiveIcon: {
-      foregroundImage: './assets/adaptive-icon.png',
+      foregroundImage: './icons/adaptive-icon-1024.png',
       backgroundColor: '#ffffff',
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
   },
   web: {
-    favicon: './assets/favicon.png',
+    favicon: './icons/favicon-48.png',
     bundler: 'metro',
   },
   plugins: [

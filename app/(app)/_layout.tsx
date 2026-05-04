@@ -54,6 +54,15 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
+        name="digest"
+        options={{
+          title: 'Daily',
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="sunrise" size={size ?? 20} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
@@ -66,7 +75,6 @@ export default function AppLayout() {
         name="item/[id]"
         options={{ href: null, title: 'Item' }}
       />
-      <Tabs.Screen name="digest" options={{ href: null, title: 'Digest' }} />
       <Tabs.Screen name="digest-settings" options={{ href: null, title: 'Digest settings' }} />
     </Tabs>
     </SelectionProvider>

@@ -29,6 +29,54 @@ export type MediaSlide = {
 
 export type ItemSource = 'bookmark_import' | 'reddit' | 'share_extension' | string;
 
+export type ExplorationStatus = 'exploring' | 'enriched' | 'no_match' | 'error';
+export type ExplorationLinkKind = 'github' | 'product' | 'docs' | 'app_store' | 'other';
+
+export type ExplorationLink = {
+  url: string;
+  title: string;
+  kind: ExplorationLinkKind;
+  confidence: number;
+};
+
+export type ExplorationCandidate = {
+  name: string;
+  url?: string;
+  kind: ExplorationLinkKind;
+  confidence: number;
+  reason: string;
+};
+
+export type ExplorationVideoInsights = {
+  frames_analyzed: number;
+  on_screen_text: string;
+  visual_cues: string[];
+};
+
+export type ExplorationLinkExcerpt = {
+  url: string;
+  title: string;
+  excerpt: string;
+};
+
+export type ExplorationDeepAnalysis = {
+  synthesis: string;
+  key_findings: string[];
+  link_excerpts: ExplorationLinkExcerpt[];
+  generated_at: string;
+};
+
+export type ItemExploration = {
+  status: ExplorationStatus;
+  primary_link?: ExplorationLink;
+  candidates: ExplorationCandidate[];
+  video_insights?: ExplorationVideoInsights;
+  notes?: string;
+  last_explored_at: string;
+  error_msg?: string;
+  deep_analysis?: ExplorationDeepAnalysis;
+};
+
 export type Item = {
   id: string;
   user: string;
@@ -48,9 +96,25 @@ export type Item = {
   original_title?: string;
   bookmarked_at?: string;
   import_batch?: string;
+  /**
+   * Type-specific structured payload written by the worker (e.g. `ReceiptData`
+   * when `type === 'receipt'`). Stored as JSON in PocketBase. Renderers narrow
+   * via `type` before reading.
+   */
+  structured_content?: unknown;
+  /** R2 URLs of the original uploaded media (e.g. the receipt photo). */
+  original_media_urls?: string[];
+  /**
+   * Result of the exploration/enrichment pass. Items now arrive auto-enriched at
+   * ingest with `primary_link` + `candidates`; the deep-dive pass populates
+   * `deep_analysis` with synthesis + key findings + link excerpts.
+   */
+  exploration?: ItemExploration;
   created: string;
   updated: string;
 };
+
+export * from './receipt';
 
 export type CitedItem = {
   id: string;
