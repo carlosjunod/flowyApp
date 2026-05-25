@@ -12,7 +12,12 @@ export type ItemType =
   | 'pinterest'
   | 'dribbble'
   | 'linkedin'
-  | 'twitter';
+  | 'twitter'
+  | 'tiktok'
+  | 'facebook'
+  | 'drive'
+  | 'file'
+  | 'email';
 
 export type ItemStatus = 'pending' | 'processing' | 'ready' | 'error';
 
