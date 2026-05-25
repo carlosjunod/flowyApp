@@ -12,53 +12,26 @@ type State = {
   error: ApiError | null;
 };
 
-const POLL_MS = 2000;
+// The web app has no bulk-ingest endpoint — it loops single POST /api/ingest
+// calls with bounded concurrency (see web BulkAddBookmarksButton). We mirror
+// that here while keeping this hook's public {phase,batch,error,submit,reset}
+// contract so BulkImportSheet (which reads batch.processed/total/dead_count)
+// needs no changes.
+const CONCURRENCY = 4;
 
 export const useBulkImport = () => {
   const qc = useQueryClient();
   const [state, setState] = useState<State>({ phase: 'idle', batch: null, error: null });
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelledRef = useRef(false);
-
-  const clearTimer = () => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  };
 
   useEffect(() => {
     return () => {
       cancelledRef.current = true;
-      clearTimer();
     };
   }, []);
 
-  const poll = useCallback(
-    async (batchId: string) => {
-      if (cancelledRef.current) return;
-      const res = await api.getImportBatch(batchId);
-      if (cancelledRef.current) return;
-      if (res.error) {
-        setState({ phase: 'error', batch: null, error: res.error });
-        return;
-      }
-      const batch = res.data;
-      if (batch.status === 'done') {
-        setState({ phase: 'done', batch, error: null });
-        void qc.invalidateQueries({ queryKey: ['items'] });
-        return;
-      }
-      setState((s) => ({ ...s, batch }));
-      timerRef.current = setTimeout(() => {
-        void poll(batchId);
-      }, POLL_MS);
-    },
-    [qc],
-  );
-
   const submit = useCallback(
-    async (urls: string[], dedupeAgainst?: string[]) => {
+    async (urls: string[], _dedupeAgainst?: string[]) => {
       if (urls.length === 0) {
         setState({
           phase: 'error',
@@ -68,33 +41,55 @@ export const useBulkImport = () => {
         return;
       }
       cancelledRef.current = false;
-      clearTimer();
-      setState({ phase: 'submitting', batch: null, error: null });
-      const res = await api.ingestBulk({ urls, dedupeAgainst });
-      if (cancelledRef.current) return;
-      if (res.error) {
-        setState({ phase: 'error', batch: null, error: res.error });
-        return;
-      }
+
+      const total = urls.length;
+      let processed = 0;
+      let dead = 0;
+      const publish = (done: boolean) =>
+        setState({
+          phase: done ? 'done' : 'polling',
+          batch: {
+            id: 'local',
+            status: done ? 'done' : 'processing',
+            processed,
+            dead_count: dead,
+            total,
+          },
+          error: null,
+        });
+
       setState({
-        phase: 'polling',
-        batch: {
-          id: res.data.batch_id,
-          status: 'processing',
-          processed: 0,
-          dead_count: 0,
-          total: res.data.total,
-        },
+        phase: 'submitting',
+        batch: { id: 'local', status: 'processing', processed: 0, dead_count: 0, total },
         error: null,
       });
-      void poll(res.data.batch_id);
+
+      const queue = [...urls];
+      const worker = async () => {
+        while (queue.length > 0) {
+          if (cancelledRef.current) return;
+          const url = queue.shift();
+          if (!url) break;
+          const res = await api.ingest({ type: 'url', raw_url: url });
+          if (cancelledRef.current) return;
+          if (res.error) dead += 1;
+          processed += 1;
+          publish(false);
+        }
+      };
+
+      const workers = Array.from({ length: Math.min(CONCURRENCY, total) }, () => worker());
+      await Promise.all(workers);
+      if (cancelledRef.current) return;
+
+      publish(true);
+      void qc.invalidateQueries({ queryKey: ['items'] });
     },
-    [poll],
+    [qc],
   );
 
   const reset = useCallback(() => {
     cancelledRef.current = true;
-    clearTimer();
     cancelledRef.current = false;
     setState({ phase: 'idle', batch: null, error: null });
   }, []);
