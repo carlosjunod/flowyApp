@@ -101,6 +101,10 @@ export type Item = {
   original_title?: string;
   bookmarked_at?: string;
   import_batch?: string;
+  /** OpenGraph fields surfaced by ingest enrichment (read by detail renderers). */
+  og_image?: string;
+  og_description?: string;
+  site_name?: string;
   /**
    * Type-specific structured payload written by the worker (e.g. `ReceiptData`
    * when `type === 'receipt'`). Stored as JSON in PocketBase. Renderers narrow
