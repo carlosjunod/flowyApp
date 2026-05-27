@@ -201,12 +201,18 @@ final class ShareViewController: UIViewController {
     }
     do {
       try await postIngest(payload: payload, token: token)
+      // Success path: SuccessView's .onAppear arms a 3s auto-dismiss via
+      // viewModel.scheduleAutoDismiss(); the model's onAutoDismiss callback
+      // calls finish(). No further sleep+finish() here — that would race
+      // the model's timer and skip past the new success animation.
       await MainActor.run { viewModel.update(.success) }
     } catch {
+      // Failure path keeps a brief on-screen delay then dismisses, since
+      // we don't enter SuccessView here and there's no model-driven timer.
       await MainActor.run { viewModel.update(.failure(error.localizedDescription)) }
+      try? await Task.sleep(nanoseconds: 1_200_000_000)
+      finish()
     }
-    try? await Task.sleep(nanoseconds: 1_200_000_000)
-    finish()
   }
 
   private func extractPayload() async -> IngestPayload? {
@@ -454,28 +460,64 @@ struct StatusView: View {
   @ObservedObject var viewModel: ShareViewModel
   let onDismiss: () -> Void
 
+  /// Owned here so SuccessView (pill) and TagPickerSheet (header) can both
+  /// participate in the same matchedGeometryEffect.
+  @Namespace private var heroNS
+
   var body: some View {
-    ZStack {
-      // Success branch gets the mesh; loading/failure keep the old scrim
-      // so the visual change is contained while we verify the gradient renders.
-      if case .success = viewModel.status {
-        MeshDriftBackground()
-          .onTapGesture { onDismiss() }
-      } else {
-        Color.black.opacity(0.35).ignoresSafeArea().onTapGesture { onDismiss() }
-      }
-      VStack(spacing: 12) {
-        switch viewModel.status {
-        case .loading:
-          ProgressView().controlSize(.large)
-          Text("Sending to Flowy…").font(.headline)
-        case .success:
-          Image(systemName: "checkmark.circle.fill").resizable().frame(width: 44, height: 44).foregroundColor(.green)
-          Text("Saved").font(.headline)
-        case .failure(let message):
-          Image(systemName: "xmark.octagon.fill").resizable().frame(width: 44, height: 44).foregroundColor(.red)
-          Text(message).font(.subheadline).multilineTextAlignment(.center)
+    Group {
+      switch viewModel.status {
+      case .loading:
+        loadingView
+      case .success:
+        SuccessView(
+          viewModel: viewModel,
+          namespace: heroNS,
+          onAddTags: {
+            withAnimation(.snappy) {
+              viewModel.presentSheet()
+            }
+          },
+          onDismiss: onDismiss
+        )
+        .sheet(isPresented: $viewModel.isSheetPresented, onDismiss: {
+          viewModel.dismissSheet()
+        }) {
+          TagPickerSheet(
+            viewModel: viewModel,
+            namespace: heroNS,
+            onDone: { viewModel.isSheetPresented = false }
+          )
+          .presentationDetents([.medium, .large])
+          .presentationDragIndicator(.visible)
+          .presentationBackground(.regularMaterial)
         }
+      case .failure(let message):
+        failureView(message)
+      }
+    }
+  }
+
+  private var loadingView: some View {
+    ZStack {
+      Color.black.opacity(0.35).ignoresSafeArea().onTapGesture { onDismiss() }
+      VStack(spacing: 12) {
+        ProgressView().controlSize(.large)
+        Text("Sending to Flowy…").font(.headline)
+      }
+      .padding(24)
+      .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+      .padding(40)
+    }
+  }
+
+  private func failureView(_ message: String) -> some View {
+    ZStack {
+      Color.black.opacity(0.35).ignoresSafeArea().onTapGesture { onDismiss() }
+      VStack(spacing: 12) {
+        Image(systemName: "xmark.octagon.fill")
+          .resizable().frame(width: 44, height: 44).foregroundColor(.red)
+        Text(message).font(.subheadline).multilineTextAlignment(.center)
       }
       .padding(24)
       .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
