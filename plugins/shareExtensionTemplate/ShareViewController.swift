@@ -456,7 +456,14 @@ struct StatusView: View {
 
   var body: some View {
     ZStack {
-      Color.black.opacity(0.35).ignoresSafeArea().onTapGesture { onDismiss() }
+      // Success branch gets the mesh; loading/failure keep the old scrim
+      // so the visual change is contained while we verify the gradient renders.
+      if case .success = viewModel.status {
+        MeshDriftBackground()
+          .onTapGesture { onDismiss() }
+      } else {
+        Color.black.opacity(0.35).ignoresSafeArea().onTapGesture { onDismiss() }
+      }
       VStack(spacing: 12) {
         switch viewModel.status {
         case .loading:
