@@ -15,20 +15,19 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import Markdown from 'react-native-markdown-display';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EnrichedSections } from '@/components/inbox/EnrichedSections';
 import { ExploreCTA } from '@/components/inbox/ExploreCTA';
-import { MediaCarousel } from '@/components/inbox/MediaCarousel';
 import { TagSuggestions } from '@/components/inbox/TagSuggestions';
-import { ReceiptContent } from '@/components/inbox/content/ReceiptContent';
+import { ContentRenderer } from '@/components/inbox/content/ContentRenderer';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { useItemActions } from '@/hooks/useItemActions';
 import { useDeleteItem, useItemById, usePatchItem } from '@/hooks/useItems';
 import { useItemStatus } from '@/hooks/useItemStatus';
+import { getContentType } from '@/lib/contentType';
 import { ENV } from '@/lib/env';
 import { pb } from '@/lib/pb';
 import { relativeDate } from '@/lib/relativeDate';
@@ -89,6 +88,13 @@ export default function ItemDetailScreen() {
     ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`
     : null;
 
+  // Content type drives which renderer paints the body — and decides whether
+  // the screen owns a static hero. youtube/reel/carousel renderers paint their
+  // own primary media, so the static hero would just duplicate it. receipt
+  // and generic don't, so they keep the hero block.
+  const contentType = getContentType(item);
+  const showHero = contentType === 'receipt' || contentType === 'generic';
+
   const heroWidth = width - 32;
   const heroHeight = Math.round(heroWidth * 1.25);
   const heroThumb = thumbnailFor(item);
@@ -97,7 +103,6 @@ export default function ItemDetailScreen() {
     : null;
   const heroUri = firstSlideUri
     ?? (heroThumb.kind === 'image' ? heroThumb.uri : null);
-  const showCarousel = (item.media?.length ?? 0) > 1;
 
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
@@ -127,14 +132,8 @@ export default function ItemDetailScreen() {
         </View>
       </View>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 96, gap: 16 }}>
-        <View className="relative">
-          {showCarousel && item.media ? (
-            <MediaCarousel
-              slides={item.media}
-              width={heroWidth}
-              height={heroHeight}
-            />
-          ) : (
+        {showHero ? (
+          <View className="relative">
             <View
               className="bg-surface"
               style={{
@@ -157,28 +156,28 @@ export default function ItemDetailScreen() {
                 </View>
               )}
             </View>
-          )}
-          {domainLabel ? (
-            <View
-              className="absolute top-3 left-3 flex-row items-center gap-1.5 rounded-full px-2.5 py-1.5"
-              style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}
-            >
-              {faviconUri ? (
-                <Image
-                  source={{ uri: faviconUri }}
-                  style={{ width: 14, height: 14, borderRadius: 3 }}
-                  contentFit="contain"
-                />
-              ) : null}
-              <Text
-                style={{ fontFamily: 'Inter_500Medium', fontSize: 12, color: '#1C1815' }}
-                numberOfLines={1}
+            {domainLabel ? (
+              <View
+                className="absolute top-3 left-3 flex-row items-center gap-1.5 rounded-full px-2.5 py-1.5"
+                style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}
               >
-                {domainLabel}
-              </Text>
-            </View>
-          ) : null}
-        </View>
+                {faviconUri ? (
+                  <Image
+                    source={{ uri: faviconUri }}
+                    style={{ width: 14, height: 14, borderRadius: 3 }}
+                    contentFit="contain"
+                  />
+                ) : null}
+                <Text
+                  style={{ fontFamily: 'Inter_500Medium', fontSize: 12, color: '#1C1815' }}
+                  numberOfLines={1}
+                >
+                  {domainLabel}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
         <View className="gap-2.5">
           <Text
@@ -292,82 +291,7 @@ export default function ItemDetailScreen() {
           </View>
         ) : null}
 
-        {item.type === 'receipt' ? <ReceiptContent item={item} /> : null}
-
-        {item.type !== 'receipt' && item.content ? (
-          <View>
-            <Markdown
-              style={{
-                body: {
-                  color: colors.fg,
-                  fontSize: 16,
-                  lineHeight: 26,
-                  fontFamily: 'Inter_400Regular',
-                },
-                paragraph: { marginTop: 0, marginBottom: 12 },
-                blockquote: {
-                  borderLeftWidth: 3,
-                  borderLeftColor: colors.accent,
-                  paddingLeft: 14,
-                  paddingVertical: 4,
-                  marginVertical: 8,
-                  fontFamily: 'InstrumentSerif_400Regular',
-                  fontStyle: 'italic',
-                },
-                heading2: {
-                  fontSize: 22,
-                  marginTop: 16,
-                  marginBottom: 8,
-                  fontFamily: 'InstrumentSerif_400Regular',
-                  color: colors.fg,
-                },
-                heading3: {
-                  fontSize: 18,
-                  marginTop: 12,
-                  marginBottom: 6,
-                  fontFamily: 'Inter_600SemiBold',
-                  color: colors.fg,
-                },
-                link: { color: colors.accent, fontWeight: '600' as const },
-                code_inline: {
-                  backgroundColor: colors.surface,
-                  color: colors.fg,
-                  borderColor: colors.border,
-                  borderWidth: 1,
-                  borderRadius: 4,
-                  paddingHorizontal: 5,
-                  paddingVertical: 1,
-                  fontFamily: 'Menlo',
-                  fontSize: 13,
-                },
-                fence: {
-                  backgroundColor: colors.surface,
-                  color: colors.fg,
-                  borderColor: colors.border,
-                  borderWidth: 1,
-                  borderRadius: 10,
-                  padding: 12,
-                  marginVertical: 8,
-                  fontFamily: 'Menlo',
-                  fontSize: 13,
-                },
-                code_block: {
-                  backgroundColor: colors.surface,
-                  color: colors.fg,
-                  borderColor: colors.border,
-                  borderWidth: 1,
-                  borderRadius: 10,
-                  padding: 12,
-                  marginVertical: 8,
-                  fontFamily: 'Menlo',
-                  fontSize: 13,
-                },
-              }}
-            >
-              {item.content}
-            </Markdown>
-          </View>
-        ) : null}
+        <ContentRenderer item={item} contentType={contentType} />
 
         {(item.tags ?? []).length > 0 ? (
           <View className="flex-row flex-wrap gap-2">
