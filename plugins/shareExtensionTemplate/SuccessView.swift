@@ -67,6 +67,7 @@ struct SuccessView: View {
     .onAppear {
       appearedAt = Date()
       viewModel.scheduleAutoDismiss()
+      Haptics.success()
     }
     .onChange(of: viewModel.isSheetPresented) { _, isOpen in
       if isOpen {
@@ -78,6 +79,7 @@ struct SuccessView: View {
         // Rebase appearedAt so the remaining bar continues smoothly.
         appearedAt = Date().addingTimeInterval(-paused)
         pausedElapsed = nil
+        Haptics.sheetDismissed()
       }
     }
   }

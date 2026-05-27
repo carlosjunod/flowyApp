@@ -27,6 +27,11 @@ struct TagPickerSheet: View {
 
   @State private var activeTab: Tab = .tags
   @Namespace private var tabUnderline
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  private var tabSwitchAnimation: Animation {
+    reduceMotion ? .linear(duration: 0.12) : .snappy
+  }
 
   var body: some View {
     VStack(spacing: 16) {
@@ -66,7 +71,7 @@ struct TagPickerSheet: View {
     HStack(spacing: 0) {
       ForEach(Tab.allCases) { tab in
         Button {
-          withAnimation(.snappy) { activeTab = tab }
+          withAnimation(tabSwitchAnimation) { activeTab = tab }
         } label: {
           VStack(spacing: 6) {
             HStack(spacing: 6) {
@@ -129,8 +134,16 @@ struct TagPickerSheet: View {
 
 private struct TagsPanel: View {
   @ObservedObject var viewModel: ShareViewModel
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var input: String = ""
   @FocusState private var inputFocused: Bool
+
+  /// Springs collapse to a short linear curve when the user has reduce
+  /// motion on — same skill pattern as the SwiftUI animation skill calls
+  /// out for explicit withAnimation blocks.
+  private var interactionAnimation: Animation {
+    reduceMotion ? .linear(duration: 0.15) : .snappy
+  }
 
   var body: some View {
     VStack(spacing: 14) {
@@ -201,8 +214,12 @@ private struct TagsPanel: View {
   private func commitInput() {
     let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return }
-    withAnimation(.snappy) {
+    let wasSelected = viewModel.isSelected(trimmed)
+    withAnimation(interactionAnimation) {
       viewModel.toggleTag(trimmed)
+    }
+    if !wasSelected {
+      Haptics.tagAdded()
     }
     input = ""
   }
@@ -214,7 +231,7 @@ private struct TagsPanel: View {
       HStack(spacing: 8) {
         ForEach(viewModel.selectedTags, id: \.self) { tag in
           TagChip(label: tag) {
-            withAnimation(.snappy) {
+            withAnimation(interactionAnimation) {
               viewModel.removeSelected(tag)
             }
           }
@@ -245,8 +262,12 @@ private struct TagsPanel: View {
   private func recentRow(_ tag: String) -> some View {
     let selected = viewModel.isSelected(tag)
     return Button {
-      withAnimation(.snappy) {
+      let willSelect = !selected
+      withAnimation(interactionAnimation) {
         viewModel.toggleTag(tag)
+      }
+      if willSelect {
+        Haptics.tagAdded()
       }
     } label: {
       HStack {

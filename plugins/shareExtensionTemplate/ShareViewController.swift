@@ -463,6 +463,7 @@ struct StatusView: View {
   /// Owned here so SuccessView (pill) and TagPickerSheet (header) can both
   /// participate in the same matchedGeometryEffect.
   @Namespace private var heroNS
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     Group {
@@ -474,7 +475,7 @@ struct StatusView: View {
           viewModel: viewModel,
           namespace: heroNS,
           onAddTags: {
-            withAnimation(.snappy) {
+            withAnimation(reduceMotion ? .linear(duration: 0.15) : .snappy) {
               viewModel.presentSheet()
             }
           },
