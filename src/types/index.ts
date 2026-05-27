@@ -206,6 +206,12 @@ export type AuthSession = {
   email: string;
 };
 
+export type AliasData = {
+  alias: string;
+  email: string;
+  domain: string;
+};
+
 export type DigestSection = {
   category: string;
   summary: string;

@@ -76,6 +76,7 @@ export default function AppLayout() {
         options={{ href: null, title: 'Item' }}
       />
       <Tabs.Screen name="digest-settings" options={{ href: null, title: 'Digest settings' }} />
+      <Tabs.Screen name="inbox-alias" options={{ href: null, title: 'Email to inbox' }} />
     </Tabs>
     </SelectionProvider>
   );

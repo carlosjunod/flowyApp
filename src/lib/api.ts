@@ -1,4 +1,5 @@
 import type {
+  AliasData,
   ApiError,
   ApiErrorCode,
   ApiResult,
@@ -159,6 +160,11 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(patch),
     }),
+
+  getEmailAlias: () => request<AliasData>('/api/account/alias'),
+
+  regenerateEmailAlias: () =>
+    request<AliasData>('/api/account/alias', { method: 'POST' }),
 };
 
 export type ChatStreamEvent =
