@@ -125,13 +125,23 @@ export type Item = {
 
 export * from './receipt';
 
+/**
+ * Rich item reference carried by chat's `x-items` response header. The web
+ * names this `ChatItemRef`; mobile keeps the existing `CitedItem` symbol for
+ * compat. Extended fields (og_image / raw_url / site_name / status) power
+ * citation thumbnails + the "might be related" fallback rail.
+ */
 export type CitedItem = {
   id: string;
   type: ItemType;
   title?: string;
   category?: string;
   source_url?: string;
+  raw_url?: string;
   r2_key?: string;
+  og_image?: string;
+  site_name?: string;
+  status?: ItemStatus;
 };
 
 export type ChatRole = 'user' | 'assistant';

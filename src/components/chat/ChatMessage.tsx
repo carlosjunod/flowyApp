@@ -1,42 +1,67 @@
 import { router } from 'expo-router';
 import React, { useMemo } from 'react';
 import { Text, View } from 'react-native';
-import Markdown from 'react-native-markdown-display';
+import Markdown, { type ASTNode } from 'react-native-markdown-display';
 
 import { useResolvedColors } from '@/lib/theme';
 import type { ChatMessage as ChatMessageType, CitedItem } from '@/types';
 
-import { Citation } from './Citation';
+import { CitedItemsRail, InlineItemChip } from './ItemChip';
 
 type Props = { message: ChatMessageType };
 
 const CITE_RE = /\[\[([A-Za-z0-9_-]+)\]\]/g;
 const ITEM_PROTO = 'item://';
 
-const preprocessContent = (text: string, citations: CitedItem[]): string => {
-  if (!text) return '';
+/**
+ * Convert `[[id]]` placeholders into `[N](item://id)` markdown links, indexing
+ * by first-occurrence so the same id reuses its index. The link is then
+ * intercepted by the markdown `link` rule and rendered as an InlineItemChip.
+ */
+function preprocessContent(text: string, items: CitedItem[]): { content: string; indexById: Map<string, number> } {
+  if (!text) return { content: '', indexById: new Map() };
+  const seedIds = new Set(items.map((i) => i.id));
   const indexById = new Map<string, number>();
-  citations.forEach((c, i) => indexById.set(c.id, i + 1));
-  let nextIdx = citations.length + 1;
-  return text.replace(CITE_RE, (_, id: string) => {
+  let nextIdx = 1;
+  const content = text.replace(CITE_RE, (_match, id: string) => {
     let idx = indexById.get(id);
     if (idx === undefined) {
       idx = nextIdx++;
       indexById.set(id, idx);
     }
+    // Even if the id wasn't in the items list, we still render a chip; it'll
+    // route to /item/:id which can show its own "not found" state.
+    void seedIds; // keep seedIds reference for future use (status badges)
     return `[${idx}](${ITEM_PROTO}${id})`;
   });
-};
+  return { content, indexById };
+}
 
 export const ChatMessage: React.FC<Props> = ({ message }) => {
   const colors = useResolvedColors();
   const isUser = message.role === 'user';
-  const citations = message.citations ?? [];
+  const items = message.citations ?? [];
+  const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 
-  const content = useMemo(
-    () => preprocessContent(message.content, citations),
-    [message.content, citations],
+  const { content, indexById } = useMemo(
+    () => (isUser ? { content: message.content, indexById: new Map() } : preprocessContent(message.content, items)),
+    [isUser, message.content, items],
   );
+
+  // Items that actually got cited in the message body. Used to label the rail
+  // and to pick the right fallback strategy.
+  const citedItems = useMemo(
+    () =>
+      Array.from(indexById.keys())
+        .map((id) => byId.get(id))
+        .filter((x): x is CitedItem => Boolean(x)),
+    [indexById, byId],
+  );
+
+  // Web parity: if no citations were emitted, surface up to 3 of the items the
+  // LLM had context on as a "might be related" rail.
+  const railItems = citedItems.length > 0 ? citedItems : items.slice(0, 3);
+  const railLabel = citedItems.length > 0 ? 'Items in this conversation' : 'Might be related';
 
   const userText = colors.bg;
   const markdownStyle = useMemo(
@@ -91,19 +116,36 @@ export const ChatMessage: React.FC<Props> = ({ message }) => {
         borderRadius: 6,
         marginVertical: 6,
       },
-      th: {
-        flex: 1,
-        padding: 6,
-        backgroundColor: isUser ? '#FFFFFF20' : colors.surface,
-      },
-      td: {
-        flex: 1,
-        padding: 6,
-        borderColor: isUser ? '#FFFFFF40' : colors.border,
-      },
+      th: { flex: 1, padding: 6, backgroundColor: isUser ? '#FFFFFF20' : colors.surface },
+      td: { flex: 1, padding: 6, borderColor: isUser ? '#FFFFFF40' : colors.border },
       hr: { backgroundColor: isUser ? '#FFFFFF40' : colors.border, height: 1, marginVertical: 6 },
     }),
-    [colors, isUser],
+    [colors, isUser, userText],
+  );
+
+  // Override the `link` rule so `item://` links become InlineItemChip pills
+  // with thumbnail + index + domain — same idiom as the web ChatMessage's
+  // `<a>` override. All other links get default behavior.
+  const rules = useMemo(
+    () => ({
+      link: (node: ASTNode) => {
+        const href = (node.attributes?.href as string | undefined) ?? '';
+        if (href.startsWith(ITEM_PROTO)) {
+          const id = href.slice(ITEM_PROTO.length);
+          return (
+            <InlineItemChip
+              key={node.key}
+              id={id}
+              ref={byId.get(id)}
+              index={indexById.get(id)}
+            />
+          );
+        }
+        // Returning undefined lets default rendering handle it.
+        return undefined;
+      },
+    }),
+    [byId, indexById],
   );
 
   const onLinkPress = (url: string): boolean => {
@@ -123,21 +165,12 @@ export const ChatMessage: React.FC<Props> = ({ message }) => {
           isUser ? 'bg-primary' : 'bg-card border border-border'
         }`}
       >
-        <Markdown style={markdownStyle} onLinkPress={onLinkPress}>
+        <Markdown style={markdownStyle} rules={rules} onLinkPress={onLinkPress}>
           {content || placeholder}
         </Markdown>
       </View>
-      {!isUser && citations.length > 0 ? (
-        <View className="mt-2 flex-row flex-wrap gap-1.5">
-          {citations.map((c, i) => (
-            <Citation
-              key={c.id}
-              index={i + 1}
-              itemId={c.id}
-              sourceUrl={c.source_url}
-            />
-          ))}
-        </View>
+      {!isUser && !message.streaming ? (
+        <CitedItemsRail items={railItems} label={railLabel} />
       ) : null}
     </View>
   );
