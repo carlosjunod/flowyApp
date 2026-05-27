@@ -12,6 +12,12 @@ const DEFAULTS = {
   appGroup: 'group.app.tryflowy',
   extensionName: 'ShareExtension',
   apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://tryflowy.app',
+  // PocketBase URL the extension PATCHes to commit picker-selected tags
+  // onto the new item (option (b) of the tag-attach flow). Defaults to the
+  // same localhost:8090 the web app uses; prod deployments should set
+  // EXPO_PUBLIC_PB_URL (or pass pbUrl in the plugin props) to whatever
+  // public PB endpoint they expose.
+  pbUrl: process.env.EXPO_PUBLIC_PB_URL || 'http://localhost:8090',
 };
 
 function resolveProps(props) {
@@ -20,6 +26,7 @@ function resolveProps(props) {
     appGroup: p.appGroup || DEFAULTS.appGroup,
     extensionName: p.extensionName || DEFAULTS.extensionName,
     apiBaseUrl: p.apiBaseUrl || DEFAULTS.apiBaseUrl,
+    pbUrl: p.pbUrl || DEFAULTS.pbUrl,
   };
 }
 
@@ -46,6 +53,10 @@ function withMainInfoPlist(config, props) {
   return withInfoPlist(config, (cfg) => {
     cfg.modResults.API_BASE_URL = props.apiBaseUrl;
     cfg.modResults.APP_GROUP = props.appGroup;
+    // PB_URL is read by the share extension's tag-commit PATCH. Also
+    // mirrored here so the main app can read it (e.g. future RN code that
+    // wants to surface the same endpoint).
+    cfg.modResults.PB_URL = props.pbUrl;
     return cfg;
   });
 }
@@ -236,6 +247,8 @@ function renderInfoPlist(props) {
   <string>${props.apiBaseUrl}</string>
   <key>APP_GROUP</key>
   <string>${props.appGroup}</string>
+  <key>PB_URL</key>
+  <string>${props.pbUrl}</string>
   <key>NSExtension</key>
   <dict>
     <key>NSExtensionAttributes</key>

@@ -10,6 +10,12 @@ import Security
 
 private let APP_GROUP = (Bundle.main.infoDictionary?["APP_GROUP"] as? String) ?? "group.app.tryflowy"
 private let API_BASE_URL = (Bundle.main.infoDictionary?["API_BASE_URL"] as? String) ?? "http://localhost:4000"
+// PocketBase URL for the tag-commit PATCH (option (b) tag attach). Same fallback
+// the web app uses (http://localhost:8090) when PB_URL isn't set in env/plugin.
+// In prod the extension needs PB exposed publicly — see plugins/withShareExtension.js
+// `pbUrl` prop. items.updateRule is "@request.auth.id != '' && user = @request.auth.id"
+// so the user's bearer token suffices to PATCH their own item's tags field.
+private let PB_URL = (Bundle.main.infoDictionary?["PB_URL"] as? String) ?? "http://localhost:8090"
 private let AUTH_KEY = "pb_auth"
 private let MAX_IMAGES = 10
 private let MAX_FILES = 10
@@ -47,6 +53,20 @@ private struct IngestPayload: Codable {
   let raw_pdfs: [ShareFile]?
   let raw_file: ShareFile?
   let raw_files: [ShareFile]?
+  // Always [] from the share extension today — picker UI hasn't run yet
+  // when /api/ingest fires (success screen → tag picker → Done → PATCH).
+  // Field is wired for API parity and so a future pre-tag flow can set it
+  // without bumping the server contract.
+  let tags: [String]
+}
+
+// Minimal response decode. The server returns more (e.g. `cached`,
+// `duplicate`) but we only need `id` to drive the follow-up PATCH.
+private struct IngestResponse: Decodable {
+  struct Data: Decodable {
+    let id: String
+  }
+  let data: Data
 }
 
 // MARK: - Keychain
@@ -152,11 +172,24 @@ final class ShareViewController: UIViewController {
   private var hosting: UIHostingController<StatusView>?
   private let viewModel = ShareViewModel(appGroup: APP_GROUP)
 
+  /// Cached after Keychain.readToken() in process(). Reused by patchTags()
+  /// when the user closes the tag picker — avoids a second keychain round-trip
+  /// (the lookup logs diagnostics on failure, noise we don't want on a normal
+  /// follow-up call).
+  private var authToken: String?
+
   override func viewDidLoad() {
     super.viewDidLoad()
     view.backgroundColor = .clear
 
     viewModel.onAutoDismiss = { [weak self] in self?.finish() }
+    viewModel.onCommitTags = { [weak self] tags in
+      // Detached so we don't block dismissSheet()'s synchronous flow. The
+      // extension may finish before this completes; URLSession will run the
+      // request to completion as long as the host process doesn't terminate.
+      // For the share extension this is fine — the user has already moved on.
+      Task { [weak self] in await self?.patchTags(tags: tags) }
+    }
 
     let controller = UIHostingController(rootView: StatusView(viewModel: viewModel, onDismiss: { [weak self] in self?.finish() }))
     controller.view.backgroundColor = .clear
@@ -193,6 +226,7 @@ final class ShareViewController: UIViewController {
       finish(cancelled: true)
       return
     }
+    self.authToken = token
     guard let payload = await extractPayload() else {
       await MainActor.run { viewModel.update(.failure("Nothing to share")) }
       try? await Task.sleep(nanoseconds: 1_200_000_000)
@@ -200,12 +234,17 @@ final class ShareViewController: UIViewController {
       return
     }
     do {
-      try await postIngest(payload: payload, token: token)
+      let itemId = try await postIngest(payload: payload, token: token)
       // Success path: SuccessView's .onAppear arms a 3s auto-dismiss via
       // viewModel.scheduleAutoDismiss(); the model's onAutoDismiss callback
       // calls finish(). No further sleep+finish() here — that would race
       // the model's timer and skip past the new success animation.
-      await MainActor.run { viewModel.update(.success) }
+      // We also stash the server-assigned id on the model so the tag-commit
+      // PATCH (fired from dismissSheet() → onCommitTags) can target it.
+      await MainActor.run {
+        viewModel.itemId = itemId
+        viewModel.update(.success)
+      }
     } catch {
       // Failure path keeps a brief on-screen delay then dismisses, since
       // we don't enter SuccessView here and there's no model-driven timer.
@@ -264,14 +303,16 @@ final class ShareViewController: UIViewController {
       return IngestPayload(
         type: IngestType.pdf.rawValue,
         raw_url: nil, raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
-        raw_pdf: nil, raw_pdfs: pdfs, raw_file: nil, raw_files: nil
+        raw_pdf: nil, raw_pdfs: pdfs, raw_file: nil, raw_files: nil,
+        tags: []
       )
     }
     if let single = pdfs.first {
       return IngestPayload(
         type: IngestType.pdf.rawValue,
         raw_url: nil, raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
-        raw_pdf: single, raw_pdfs: nil, raw_file: nil, raw_files: nil
+        raw_pdf: single, raw_pdfs: nil, raw_file: nil, raw_files: nil,
+        tags: []
       )
     }
 
@@ -292,14 +333,16 @@ final class ShareViewController: UIViewController {
       return IngestPayload(
         type: IngestType.screenshot.rawValue,
         raw_url: nil, raw_image: nil, raw_images: images, raw_video: nil, video_mime: nil,
-        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil
+        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil,
+        tags: []
       )
     }
     if let single = images.first {
       return IngestPayload(
         type: IngestType.screenshot.rawValue,
         raw_url: nil, raw_image: single, raw_images: nil, raw_video: nil, video_mime: nil,
-        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil
+        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil,
+        tags: []
       )
     }
 
@@ -324,14 +367,16 @@ final class ShareViewController: UIViewController {
       return IngestPayload(
         type: IngestType.file.rawValue,
         raw_url: nil, raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
-        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: files
+        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: files,
+        tags: []
       )
     }
     if let single = files.first {
       return IngestPayload(
         type: IngestType.file.rawValue,
         raw_url: nil, raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
-        raw_pdf: nil, raw_pdfs: nil, raw_file: single, raw_files: nil
+        raw_pdf: nil, raw_pdfs: nil, raw_file: single, raw_files: nil,
+        tags: []
       )
     }
 
@@ -343,7 +388,8 @@ final class ShareViewController: UIViewController {
       type: classify(url: url).rawValue,
       raw_url: url.absoluteString,
       raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
-      raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil
+      raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil,
+      tags: []
     )
   }
 
@@ -418,7 +464,8 @@ final class ShareViewController: UIViewController {
       raw_images: nil,
       raw_video: bytes.base64EncodedString(),
       video_mime: mime,
-      raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil
+      raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil,
+      tags: []
     )
   }
 
@@ -429,7 +476,7 @@ final class ShareViewController: UIViewController {
     return nil
   }
 
-  private func postIngest(payload: IngestPayload, token: String) async throws {
+  private func postIngest(payload: IngestPayload, token: String) async throws -> String {
     guard let url = URL(string: "\(API_BASE_URL)/api/ingest") else {
       throw NSError(domain: "flowy.share", code: -2, userInfo: [NSLocalizedDescriptionKey: "Bad API URL"])
     }
@@ -450,6 +497,53 @@ final class ShareViewController: UIViewController {
     if !(200...299).contains(http.statusCode) {
       let body = String(data: data, encoding: .utf8) ?? "\(http.statusCode)"
       throw NSError(domain: "flowy.share", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: body])
+    }
+    // The duplicate path returns { data: { id, status, duplicate: true } } —
+    // the id is still the user's own existing item, so PATCHing tags onto it
+    // is the right behavior (user re-saved and edited tags in one motion).
+    let decoded = try JSONDecoder().decode(IngestResponse.self, from: data)
+    return decoded.data.id
+  }
+
+  /// PATCH /api/collections/items/records/{id} with `{ "tags": [...] }`.
+  /// Fires from viewModel.onCommitTags when the user closes the tag picker.
+  /// Silent on failure — by the time this runs the success screen is already
+  /// dismissing, so there's no UI to surface an error against. Logs to NSLog
+  /// for debugging via `xcrun simctl spawn booted log stream`.
+  private func patchTags(tags: [String]) async {
+    guard !tags.isEmpty else { return }
+    guard let itemId = await MainActor.run(body: { viewModel.itemId }) else {
+      NSLog("[flowy.share] patchTags: no itemId yet, skipping (race?)")
+      return
+    }
+    guard let token = authToken else {
+      NSLog("[flowy.share] patchTags: no cached token, skipping")
+      return
+    }
+    guard let url = URL(string: "\(PB_URL)/api/collections/items/records/\(itemId)") else {
+      NSLog("[flowy.share] patchTags: bad PB_URL %@", PB_URL)
+      return
+    }
+    var req = URLRequest(url: url, timeoutInterval: 15)
+    req.httpMethod = "PATCH"
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    do {
+      req.httpBody = try JSONSerialization.data(withJSONObject: ["tags": tags])
+    } catch {
+      NSLog("[flowy.share] patchTags: JSON encode failed: %@", error.localizedDescription)
+      return
+    }
+    do {
+      let (data, response) = try await URLSession.shared.data(for: req)
+      if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+        let body = String(data: data, encoding: .utf8) ?? "\(http.statusCode)"
+        NSLog("[flowy.share] patchTags: HTTP %d body=%@", http.statusCode, String(body.prefix(200)))
+      } else {
+        NSLog("[flowy.share] patchTags: ok item=%@ tags=%d", itemId, tags.count)
+      }
+    } catch {
+      NSLog("[flowy.share] patchTags: network error: %@", error.localizedDescription)
     }
   }
 }

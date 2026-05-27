@@ -24,8 +24,21 @@ final class ShareViewModel: ObservableObject {
   @Published var recentTags: [String] = []
   @Published var isSheetPresented: Bool = false
 
+  /// Server-assigned id for the newly created item. Set by the hosting view
+  /// controller after /api/ingest returns. nil until then. The tag-commit
+  /// PATCH no-ops without it (e.g. if the user closes the sheet before the
+  /// network round-trip completes).
+  @Published var itemId: String?
+
   /// Called when the auto-dismiss timer fires. Set by the hosting view controller.
   var onAutoDismiss: (() -> Void)?
+
+  /// Called when the user is done picking tags. Hosting view controller
+  /// installs this with a PATCH to the items collection. Fires from
+  /// `dismissSheet()` so both "tapped Done" and "swiped to dismiss" paths
+  /// commit. We pass the current `selectedTags` snapshot to avoid the
+  /// controller needing to re-reach into the model on a background task.
+  var onCommitTags: (([String]) -> Void)?
 
   private let appGroup: String
   private let defaults: UserDefaults?
@@ -100,6 +113,13 @@ final class ShareViewModel: ObservableObject {
 
   func dismissSheet() {
     isSheetPresented = false
+    // Commit picker selections to the server. Empty selection → controller
+    // no-ops; non-empty → fires PATCH /api/collections/items/records/{id}.
+    // This fires on BOTH the explicit Done button and swipe-to-dismiss
+    // because both routes funnel through .sheet(onDismiss:) → here.
+    if !selectedTags.isEmpty {
+      onCommitTags?(selectedTags)
+    }
     // Resume the dismiss countdown so the success screen still goes away
     // once the user is done picking tags — unless they navigated away from
     // success in the meantime (failure path doesn't auto-dismiss this way).
