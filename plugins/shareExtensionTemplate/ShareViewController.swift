@@ -73,18 +73,62 @@ private enum Keychain {
     if status != errSecSuccess {
       NSLog("[flowy.share] keychain lookup failed: OSStatus=%d service=%@ account=%@ accessGroup=%@",
             Int(status), APP_GROUP, AUTH_KEY, APP_GROUP)
+      dumpVisibleItems()
       return nil
     }
     guard let data = item as? Data,
           let raw = String(data: data, encoding: .utf8) else { return nil }
 
+    NSLog("[flowy.share] keychain hit: rawLen=%d rawPrefix=%@", raw.count, String(raw.prefix(40)))
+
     // PocketBase AsyncAuthStore serializes as JSON { "token": "...", "model": {...} }
-    if let jsonData = raw.data(using: .utf8),
-       let obj = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-       let token = obj["token"] as? String {
-      return token
+    if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+      if let token = obj["token"] as? String {
+        NSLog("[flowy.share] token parsed: len=%d prefix=%@ suffix=%@",
+              token.count, String(token.prefix(10)), String(token.suffix(6)))
+        return token
+      }
+      NSLog("[flowy.share] JSON parsed but no 'token' field; keys=%@",
+            String(describing: Array(obj.keys)))
+    } else {
+      NSLog("[flowy.share] JSON parse failed, sending raw payload as bearer (almost certainly wrong)")
     }
     return raw
+  }
+
+  // Diagnostic: dump every generic-password item the extension's process can see,
+  // regardless of service/account/access-group filters. Lets us tell whether the
+  // main app's item is visible (→ filter mismatch) or not (→ access group issue).
+  static func dumpVisibleItems() {
+    let q: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecMatchLimit as String: kSecMatchLimitAll,
+      kSecReturnAttributes as String: true,
+    ]
+    var result: CFTypeRef?
+    let st = SecItemCopyMatching(q as CFDictionary, &result)
+    if st != errSecSuccess {
+      NSLog("[flowy.share] diag: broad SecItemCopyMatching failed OSStatus=%d", Int(st))
+      return
+    }
+    guard let items = result as? [[String: Any]] else {
+      NSLog("[flowy.share] diag: no items visible")
+      return
+    }
+    NSLog("[flowy.share] diag: %d items visible to this extension", items.count)
+    for (i, attrs) in items.enumerated() {
+      let svc = attrs[kSecAttrService as String] as? String ?? "<none>"
+      let agrp = attrs[kSecAttrAccessGroup as String] as? String ?? "<none>"
+      let acctDesc: String
+      if let d = attrs[kSecAttrAccount as String] as? Data {
+        acctDesc = "data:" + (String(data: d, encoding: .utf8) ?? d.map { String(format: "%02x", $0) }.joined())
+      } else if let s = attrs[kSecAttrAccount as String] as? String {
+        acctDesc = "str:" + s
+      } else {
+        acctDesc = "<none>"
+      }
+      NSLog("[flowy.share] diag #%d service=%@ account=%@ accessGroup=%@", i, svc, acctDesc, agrp)
+    }
   }
 }
 
@@ -99,10 +143,6 @@ private func classify(url: URL) -> IngestType {
     return .instagram
   }
   if host.hasSuffix("tiktok.com") { return .video }
-  if host.hasSuffix("pinterest.com") || host.hasSuffix("pin.it") { return .pinterest }
-  if host.hasSuffix("dribbble.com") { return .dribbble }
-  if host.hasSuffix("linkedin.com") || host.hasSuffix("lnkd.in") { return .linkedin }
-  if host.hasSuffix("twitter.com") || host.hasSuffix("x.com") || host.hasSuffix("t.co") { return .twitter }
   return .url
 }
 
@@ -110,13 +150,15 @@ private func classify(url: URL) -> IngestType {
 
 final class ShareViewController: UIViewController {
   private var hosting: UIHostingController<StatusView>?
-  private let state = StatusState()
+  private let viewModel = ShareViewModel(appGroup: APP_GROUP)
 
   override func viewDidLoad() {
     super.viewDidLoad()
     view.backgroundColor = .clear
 
-    let controller = UIHostingController(rootView: StatusView(state: state, onDismiss: { [weak self] in self?.finish() }))
+    viewModel.onAutoDismiss = { [weak self] in self?.finish() }
+
+    let controller = UIHostingController(rootView: StatusView(viewModel: viewModel, onDismiss: { [weak self] in self?.finish() }))
     controller.view.backgroundColor = .clear
     addChild(controller)
     controller.view.translatesAutoresizingMaskIntoConstraints = false
@@ -146,22 +188,22 @@ final class ShareViewController: UIViewController {
 
   private func process() async {
     guard let token = Keychain.readToken() else {
-      await MainActor.run { state.update(.failure("Sign in on the Flowy app first")) }
+      await MainActor.run { viewModel.update(.failure("Sign in on the Flowy app first")) }
       try? await Task.sleep(nanoseconds: 1_200_000_000)
       finish(cancelled: true)
       return
     }
     guard let payload = await extractPayload() else {
-      await MainActor.run { state.update(.failure("Nothing to share")) }
+      await MainActor.run { viewModel.update(.failure("Nothing to share")) }
       try? await Task.sleep(nanoseconds: 1_200_000_000)
       finish(cancelled: true)
       return
     }
     do {
       try await postIngest(payload: payload, token: token)
-      await MainActor.run { state.update(.success) }
+      await MainActor.run { viewModel.update(.success) }
     } catch {
-      await MainActor.run { state.update(.failure(error.localizedDescription)) }
+      await MainActor.run { viewModel.update(.failure(error.localizedDescription)) }
     }
     try? await Task.sleep(nanoseconds: 1_200_000_000)
     finish()
@@ -408,22 +450,15 @@ final class ShareViewController: UIViewController {
 
 // MARK: - SwiftUI status
 
-@MainActor
-private final class StatusState: ObservableObject {
-  enum State { case loading, success, failure(String) }
-  @Published var state: State = .loading
-  func update(_ next: State) { state = next }
-}
-
-private struct StatusView: View {
-  @ObservedObject var state: StatusState
+struct StatusView: View {
+  @ObservedObject var viewModel: ShareViewModel
   let onDismiss: () -> Void
 
   var body: some View {
     ZStack {
       Color.black.opacity(0.35).ignoresSafeArea().onTapGesture { onDismiss() }
       VStack(spacing: 12) {
-        switch state.state {
+        switch viewModel.status {
         case .loading:
           ProgressView().controlSize(.large)
           Text("Sending to Flowy…").font(.headline)
