@@ -10,6 +10,7 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Share,
   Text,
   TextInput,
   View,
@@ -19,6 +20,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EnrichedSections } from '@/components/inbox/EnrichedSections';
 import { ExploreCTA } from '@/components/inbox/ExploreCTA';
+import { SourceChip } from '@/components/inbox/SourceChip';
+import { TagEditor } from '@/components/inbox/TagEditor';
 import { TagSuggestions } from '@/components/inbox/TagSuggestions';
 import { ContentRenderer } from '@/components/inbox/content/ContentRenderer';
 import { Badge } from '@/components/ui/Badge';
@@ -31,6 +34,7 @@ import { getContentType } from '@/lib/contentType';
 import { ENV } from '@/lib/env';
 import { pb } from '@/lib/pb';
 import { relativeDate } from '@/lib/relativeDate';
+import { sourceChip } from '@/lib/sourceChip';
 import { hostOf, thumbnailFor, typeGlyph } from '@/lib/thumbnails';
 import { useResolvedColors } from '@/lib/theme';
 import type { Item } from '@/types';
@@ -60,6 +64,7 @@ export default function ItemDetailScreen() {
   const { data: relatedItems = [] } = useRelatedItems(item);
   const { width } = useWindowDimensions();
   const colors = useResolvedColors();
+  const actions = useItemActions();
 
   const [editing, setEditing] = useState(false);
 
@@ -123,6 +128,7 @@ export default function ItemDetailScreen() {
         </Pressable>
         <View className="flex-row gap-4">
           <ReloadButton item={item} />
+          <ShareButton item={item} />
           <Pressable onPress={() => setEditing(true)} hitSlop={8}>
             <Text className="text-fg" style={{ fontFamily: 'Inter_500Medium', fontSize: 14 }}>
               Edit
@@ -192,6 +198,7 @@ export default function ItemDetailScreen() {
             {item.title ?? 'Untitled'}
           </Text>
           <View className="flex-row flex-wrap items-center gap-2">
+            <SourceChip chip={sourceChip(item, contentType)} />
             {item.category ? <Badge label={item.category} tone="accent" /> : null}
             <Text
               className="text-muted"
@@ -232,6 +239,13 @@ export default function ItemDetailScreen() {
           <ExploreCTA
             exploration={item.exploration}
             isReceipt={item.type === 'receipt'}
+            onPress={() => {
+              void actions.exploreMany([item.id], { deep: true }).then((res) => {
+                if (!res.ok && 'error' in res && res.error.message !== 'Cancelled') {
+                  Alert.alert('Exploration failed', res.error.message);
+                }
+              });
+            }}
           />
         ) : null}
 
@@ -293,13 +307,7 @@ export default function ItemDetailScreen() {
 
         <ContentRenderer item={item} contentType={contentType} />
 
-        {(item.tags ?? []).length > 0 ? (
-          <View className="flex-row flex-wrap gap-2">
-            {(item.tags ?? []).map((tag) => (
-              <Badge key={tag} label={tag} />
-            ))}
-          </View>
-        ) : null}
+        <TagEditor item={item} />
 
         <TagSuggestions item={item} />
 
@@ -400,6 +408,30 @@ const RelatedCard: React.FC<{ item: Item }> = ({ item }) => {
           </Text>
         </View>
       </View>
+    </Pressable>
+  );
+};
+
+const ShareButton: React.FC<{ item: Item }> = ({ item }) => {
+  const onPress = async () => {
+    const url = item.source_url ?? item.raw_url;
+    const title = item.title ?? 'Flowy item';
+    try {
+      await Share.share(
+        url
+          ? { url, message: `${title}\n${url}`, title }
+          : { message: title, title },
+      );
+    } catch {
+      // Share sheet cancellations come back as rejections on iOS in some RN
+      // versions — silently ignore. Other errors aren't worth alerting on.
+    }
+  };
+  return (
+    <Pressable onPress={onPress} hitSlop={8} accessibilityLabel="Share item">
+      <Text className="text-fg" style={{ fontFamily: 'Inter_500Medium', fontSize: 14 }}>
+        Share
+      </Text>
     </Pressable>
   );
 };

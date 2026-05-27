@@ -131,6 +131,15 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  exploreMany: (
+    ids: string[],
+    options: { deep?: boolean; includeVideoFrames?: boolean } = {},
+  ) =>
+    request<BulkActionResult>('/api/items/bulk/explore', {
+      method: 'POST',
+      body: JSON.stringify({ ids, ...options }),
+    }),
+
   registerEmail: (email: string, password: string, name?: string) =>
     request<AuthSession>('/api/auth/register', {
       method: 'POST',

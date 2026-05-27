@@ -101,9 +101,29 @@ export const useItemActions = () => {
     [qc, mark],
   );
 
+  const exploreMany = useCallback(
+    async (
+      ids: string[],
+      options: { deep?: boolean; includeVideoFrames?: boolean } = {},
+    ): Promise<BulkResult> => {
+      if (ids.length === 0) return { ok: true, data: { succeeded: [], failed: [] } };
+      mark(ids, true);
+      const res = await api.exploreMany(ids, options);
+      mark(ids, false);
+      if (res.error) return { ok: false, error: res.error };
+      // Each affected item must refetch — its exploration field just flipped to "exploring".
+      for (const id of ids) {
+        void qc.invalidateQueries({ queryKey: invalidateItem(id) });
+      }
+      void qc.invalidateQueries({ queryKey: ['items'] });
+      return { ok: true, data: res.data };
+    },
+    [qc, mark],
+  );
+
   return useMemo(
-    () => ({ open, reloadItem, deleteItem, reloadMany, deleteMany, pending }),
-    [open, reloadItem, deleteItem, reloadMany, deleteMany, pending],
+    () => ({ open, reloadItem, deleteItem, reloadMany, deleteMany, exploreMany, pending }),
+    [open, reloadItem, deleteItem, reloadMany, deleteMany, exploreMany, pending],
   );
 };
 
