@@ -160,7 +160,11 @@ struct SuccessView: View {
       Text("Good find!")
       Text("It's in your mind.")
     }
-    .font(.system(size: 32, weight: .regular, design: .serif).italic())
+    // Instrument Serif Italic, bundled as a UIAppFont. PostScript name
+    // verified via the TTF name table ("InstrumentSerif-Italic", nameID 6).
+    // If the resource didn't ship, .custom silently falls back to .system
+    // serif — so a missing-font regression looks ~right but not pixel-true.
+    .font(.custom("InstrumentSerif-Italic", size: 32))
     .foregroundStyle(Color.white)
     .multilineTextAlignment(.center)
     .shadow(color: Color.black.opacity(0.18), radius: 8, y: 2)

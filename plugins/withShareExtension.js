@@ -31,6 +31,8 @@ function resolveProps(props) {
 }
 
 const TEMPLATE_DIR = path.join(__dirname, 'shareExtensionTemplate');
+const TEMPLATE_FONTS_DIR = path.join(TEMPLATE_DIR, 'Fonts');
+const FONTS_SUBDIR = 'Fonts';
 
 function withMainEntitlements(config, props) {
   return withEntitlementsPlist(config, (cfg) => {
@@ -69,6 +71,18 @@ function listTemplateSwiftFiles() {
     .sort();
 }
 
+// Fonts bundled into the extension (currently just Instrument Serif, used
+// by the SuccessView tagline). Lives in a sibling Fonts/ subdir so it can
+// be a separate PBXGroup in Xcode. Memory floor matters — each .ttf gets
+// memory-mapped at extension launch; we keep this to 2 weights / ~140KB.
+function listTemplateFontFiles() {
+  if (!fs.existsSync(TEMPLATE_FONTS_DIR)) return [];
+  return fs
+    .readdirSync(TEMPLATE_FONTS_DIR)
+    .filter((n) => n.endsWith('.ttf') || n.endsWith('.otf'))
+    .sort();
+}
+
 function withShareExtensionSources(config, props) {
   return withDangerousMod(config, [
     'ios',
@@ -99,6 +113,21 @@ function withShareExtensionSources(config, props) {
 
       for (const [name, content] of Object.entries(files)) {
         fs.writeFileSync(path.join(targetDir, name), content);
+      }
+
+      // Mirror bundled font binaries (Instrument Serif) under
+      // ios/ShareExtension/Fonts/. Unlike .swift files we always overwrite
+      // — fonts are pristine binaries and there's no in-flight edit risk.
+      const fonts = listTemplateFontFiles();
+      if (fonts.length > 0) {
+        const fontsTargetDir = path.join(targetDir, FONTS_SUBDIR);
+        fs.mkdirSync(fontsTargetDir, { recursive: true });
+        for (const fname of fonts) {
+          fs.copyFileSync(
+            path.join(TEMPLATE_FONTS_DIR, fname),
+            path.join(fontsTargetDir, fname),
+          );
+        }
       }
 
       return cfg;
@@ -150,6 +179,45 @@ function ensureShareExtensionSwiftFiles(project, targetUuid, targetName) {
   }
 }
 
+// Idempotently registers .ttf/.otf files in plugins/shareExtensionTemplate/Fonts/
+// as resources of the extension target. Nests them under a "Fonts" PBXGroup
+// inside the extension's main group on first run; reuses it on subsequent
+// prebuilds. addResourceFile auto-appends to PBXResourcesBuildPhase for
+// the given target, so we don't manage the build phase manually.
+//
+// One wart: xcode-lib's addResourceFile → correctForResourcesPath calls
+// `pbxGroupByName('Resources')` and crashes if no group has that exact
+// name. We pre-create a phantom Resources group (with no path) so the
+// lookup succeeds and file paths are not mangled. The phantom isn't wired
+// into the project tree — it just needs to exist in the PBXGroup section.
+function ensureResourcesGroupExists(project) {
+  if (project.pbxGroupByName('Resources')) return;
+  // pbxCreateGroup(name, path) — empty path means correctForPath's
+  // `if (section.path)` short-circuits and leaves file.path untouched.
+  project.pbxCreateGroup('Resources', '');
+}
+
+function ensureShareExtensionFontFiles(project, targetUuid, targetName) {
+  const fonts = listTemplateFontFiles();
+  if (fonts.length === 0) return;
+  const parentGroupKey = findGroupKeyByName(project, targetName);
+  if (!parentGroupKey) return;
+
+  ensureResourcesGroupExists(project);
+
+  let fontsGroupKey = findGroupKeyByName(project, FONTS_SUBDIR);
+  if (!fontsGroupKey) {
+    const fontsGroup = project.pbxCreateGroup(FONTS_SUBDIR, FONTS_SUBDIR);
+    project.addToPbxGroup(fontsGroup, parentGroupKey);
+    fontsGroupKey = fontsGroup;
+  }
+
+  for (const fname of fonts) {
+    if (sourceFileAlreadyAdded(project, fname)) continue;
+    project.addResourceFile(fname, { target: targetUuid }, fontsGroupKey);
+  }
+}
+
 function withShareExtensionTarget(config, props) {
   return withXcodeProject(config, (cfg) => {
     const project = cfg.modResults;
@@ -162,8 +230,10 @@ function withShareExtensionTarget(config, props) {
     if (existingTargetKey) {
       targetUuid = existingTargetKey;
       // Target was created on a prior prebuild — make sure any new Swift
-      // files added since then are registered as sources too.
+      // files added since then are registered as sources too, and any new
+      // fonts get added to the Resources build phase.
       ensureShareExtensionSwiftFiles(project, targetUuid, targetName);
+      ensureShareExtensionFontFiles(project, targetUuid, targetName);
     } else {
       const mainBundleId =
         (cfg.ios && cfg.ios.bundleIdentifier) ||
@@ -190,6 +260,10 @@ function withShareExtensionTarget(config, props) {
       for (const swift of sourcesToAdd) {
         project.addSourceFile(swift, { target: targetUuid }, groupKey);
       }
+      // Register bundled fonts (Fonts/*.ttf) — creates the nested Fonts
+      // group and adds to the existing PBXResourcesBuildPhase via the
+      // xcode addResourceFile API.
+      ensureShareExtensionFontFiles(project, targetUuid, targetName);
       // Info.plist is wired via INFOPLIST_FILE, not as a resource
     }
 
@@ -220,12 +294,19 @@ function withShareExtensionTarget(config, props) {
   });
 }
 
+function renderUIAppFontsBlock() {
+  const fonts = listTemplateFontFiles();
+  if (fonts.length === 0) return '';
+  const items = fonts.map((f) => `    <string>${f}</string>`).join('\n');
+  return `  <key>UIAppFonts</key>\n  <array>\n${items}\n  </array>\n`;
+}
+
 function renderInfoPlist(props) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleDisplayName</key>
+${renderUIAppFontsBlock()}  <key>CFBundleDisplayName</key>
   <string>Tryflowy</string>
   <key>CFBundleDevelopmentRegion</key>
   <string>$(DEVELOPMENT_LANGUAGE)</string>
