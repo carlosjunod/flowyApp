@@ -60,7 +60,9 @@ export default function ItemDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const id = params.id;
   const { data: item, isLoading, error } = useItemById(id);
-  useItemStatus(id);
+  // Pass the exploration status so the watcher re-arms when one starts. It
+  // settles on a ready item, and an exploration can begin long after that.
+  useItemStatus(id, item?.exploration?.status);
   const { data: relatedItems = [] } = useRelatedItems(item);
   const { width } = useWindowDimensions();
   const colors = useResolvedColors();

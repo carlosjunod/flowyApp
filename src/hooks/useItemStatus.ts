@@ -21,12 +21,31 @@ const isSettled = (item: Item): boolean => {
   return ingestDone && !exploringNow;
 };
 
-export const useItemStatus = (id: string | undefined): void => {
+// Upper bound on how long we keep watching an exploration. A worker that dies
+// after writing `exploring` would otherwise leave this polling every 3s and
+// holding a realtime subscription for as long as the screen stays open.
+const MAX_EXPLORE_WATCH_MS = 5 * 60_000;
+
+/**
+ * @param id           item to watch
+ * @param watchKey     re-arms the watcher when it changes. Pass the item's
+ *                     `exploration.status`: settling is not permanent, because
+ *                     an exploration can start *after* the item is ready. The
+ *                     effect only depends on [id, qc], so without this the
+ *                     watcher stops on the first tick of a ready, unexplored
+ *                     item and never comes back when the user presses Explore
+ *                     — leaving the CTA on its shimmer forever.
+ */
+export const useItemStatus = (id: string | undefined, watchKey?: string): void => {
   const qc = useQueryClient();
 
   useEffect(() => {
     if (!id) return;
+    const startedAt = Date.now();
     let cancelled = false;
+    // Set once we have stopped watching, so a subscription whose setup resolves
+    // after that point is torn down instead of quietly staying live.
+    let settled = false;
     let intervalHandle: ReturnType<typeof setInterval> | null = null;
     let unsubscribe: (() => void) | null = null;
 
@@ -38,7 +57,9 @@ export const useItemStatus = (id: string | undefined): void => {
     };
 
     const maybeStop = (item: Item) => {
-      if (isSettled(item)) {
+      const givingUp = Date.now() - startedAt > MAX_EXPLORE_WATCH_MS;
+      if (isSettled(item) || givingUp) {
+        settled = true;
         stopPolling();
         unsubscribe?.();
       }
@@ -56,7 +77,10 @@ export const useItemStatus = (id: string | undefined): void => {
         const fn = await pb.collection('items').subscribe<Item>(id, (ev) => {
           if (ev.record) handleItem(ev.record);
         });
-        if (cancelled) {
+        // `settled` matters as much as `cancelled`: if subscribe() takes longer
+        // than a poll tick and that tick settled the item, assigning here would
+        // leave a live subscription nobody ever closes.
+        if (cancelled || settled) {
           fn();
           return;
         }
@@ -80,5 +104,5 @@ export const useItemStatus = (id: string | undefined): void => {
       stopPolling();
       unsubscribe?.();
     };
-  }, [id, qc]);
+  }, [id, qc, watchKey]);
 };

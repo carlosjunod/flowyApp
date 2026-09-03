@@ -216,11 +216,22 @@ export async function* chatStream(
       // non-array (`{}`, `null`, `"x"`) would otherwise reach `.map()` in
       // ChatMessage and crash the whole conversation view.
       const parsed: unknown = JSON.parse(header);
+      // Checking `id` alone is not enough: these fields are rendered straight
+      // into <Text>, so an object-valued `title` or `category` throws
+      // "Objects are not valid as a React child" and takes the chat down.
+      const isStringOrAbsent = (v: unknown): boolean => v === undefined || typeof v === 'string';
       citations = Array.isArray(parsed)
-        ? parsed.filter(
-            (c): c is CitedItem =>
-              typeof c === 'object' && c !== null && typeof (c as CitedItem).id === 'string',
-          )
+        ? parsed.filter((c): c is CitedItem => {
+            if (typeof c !== 'object' || c === null) return false;
+            const o = c as Record<string, unknown>;
+            return (
+              typeof o.id === 'string' &&
+              isStringOrAbsent(o.title) &&
+              isStringOrAbsent(o.category) &&
+              isStringOrAbsent(o.source_url) &&
+              isStringOrAbsent(o.r2_key)
+            );
+          })
         : [];
     } catch {
       citations = [];

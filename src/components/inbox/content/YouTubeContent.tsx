@@ -95,10 +95,16 @@ const VideoArea: React.FC<{
           mediaPlaybackRequiresUserAction={false}
           javaScriptEnabled
           domStorageEnabled
-          originWhitelist={['https://www.youtube.com', 'https://www.youtube-nocookie.com']}
+          // Permissive whitelist ON PURPOSE: react-native-webview applies
+          // originWhitelist *before* onShouldStartLoadWithRequest and cancels
+          // non-matching requests itself. A narrow list therefore never lets
+          // the callback decide, and silently breaks the player's own consent
+          // and auxiliary frames. The callback below is the real policy.
+          originWhitelist={['*']}
           onShouldStartLoadWithRequest={(req) => {
-            // `isTopFrame === false` covers the player's own iframes/XHR hosts
-            // (googlevideo, ytimg); only police top-level navigations.
+            // iOS reports real frame status, so sub-frames (googlevideo, ytimg,
+            // consent) pass untouched. Android never raises this for inner
+            // frames at all, so only top-level navigations arrive there.
             if (req.isTopFrame === false) return true;
             const allowed =
               req.url.startsWith('https://www.youtube.com/embed/') ||

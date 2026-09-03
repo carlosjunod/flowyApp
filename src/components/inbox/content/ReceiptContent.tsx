@@ -30,10 +30,18 @@ export const ReceiptContent: React.FC<{ item: Item }> = ({ item }) => {
   // reaches `data.items.length` / `.map()` / <CategoryBreakdown items={...}>
   // and crashes the detail screen. Require both, and require store.name,
   // which is dereferenced unconditionally below.
-  const hasStore = Boolean(data?.store) && typeof data?.store?.name === 'string';
-  const hasItems = Array.isArray(data?.items);
+  // Checking `store` alone was not enough, and neither is Array.isArray on its
+  // own: `{store:{name:'x'}, items:[]}` still reaches PaymentGrid, which
+  // dereferences `data.payment.provider`, and `items:[null]` still reaches
+  // renderers that read `it.id` / `it.quantity`. Require every shape actually
+  // dereferenced below.
+  const hasStore = typeof data?.store?.name === 'string';
+  const hasItems =
+    Array.isArray(data?.items) &&
+    data.items.every((it) => typeof it === 'object' && it !== null);
+  const hasPayment = typeof data?.payment === 'object' && data.payment !== null;
 
-  if (!data || !hasStore || !hasItems) {
+  if (!data || !hasStore || !hasItems || !hasPayment) {
     return (
       <View className="rounded-xl border border-border bg-surface p-3.5">
         <Text

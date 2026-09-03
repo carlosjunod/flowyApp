@@ -38,6 +38,9 @@ export const useBulkImport = () => {
   const submit = useCallback(
     async (urls: string[], _dedupeAgainst?: string[]) => {
       if (urls.length === 0) {
+        // Invalidate any run in flight first, otherwise its next completion
+        // overwrites this error and resurrects the previous batch.
+        runIdRef.current += 1;
         setState({
           phase: 'error',
           batch: null,
