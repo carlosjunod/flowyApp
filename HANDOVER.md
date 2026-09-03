@@ -6,6 +6,47 @@
 > **Scope:** All 🔴 items from §5 of the diagnostic — bulk import 404, share-extension OS-level capability gates, video/PDF/file ingest, SIWA + Universal Links bundle-ID mismatch.
 > **Out of scope (not touched):** 🟠 / 🟡 items (#5 Explore wiring, #7 ItemType expansion, #8 email alias, #10 audio, #11 Google button, #12 menu actions, #13 template reconciliation). See "Next session" below.
 
+> ## ⚠️ CORRECTION — 2026-09-03
+>
+> **Items 6 and the entire §2 "Apple Developer Portal" plan below are wrong. Do not follow them.**
+>
+> Verified directly in the Apple Developer Portal: **`app.tryflowy.app` is a Services ID**, not an
+> App ID. It sits under Identifiers → Services IDs, described "tryflowy login", with Sign In with
+> Apple enabled. Apple keeps App IDs and Services IDs in one namespace, so an App ID named
+> `app.tryflowy.app` **can never be registered** while that Services ID exists — and no provisioning
+> profile for it can ever be issued. The May 28 EAS failure to generate a profile for that bundle was
+> this collision, not a missing registration.
+>
+> The App IDs that exist are the ones needed, and both were already registered:
+> `app.tryflowy.client` ("flowy app id") and `app.tryflowy.client.ShareExtension`
+> ("Flowy Share Extension"). The "No credentials set up yet" line in the May 28 audit was EAS looking
+> for `app.tryflowy.app.ShareExtension`, which does not exist.
+>
+> **The bundle stays `app.tryflowy.client`. The server moves instead:** set Railway
+> `APPLE_CLIENT_ID=app.tryflowy.client` and leave `APPLE_WEB_CLIENT_ID=app.tryflowy.app` (the Services
+> ID). `getAudience()` in `apps/web/lib/apple-auth.ts` already returns `[native, web]` when they
+> differ, so native and web both verify with no code change, and the AASA serves
+> `8C72ST495F.app.tryflowy.client` — matching the installed app.
+>
+> Consequently: **no new App ID, no new App Store Connect record, no EAS credential reset, and no
+> testers forced to reinstall.** Ship from the existing ASC record on bundle `.client`, which already
+> has the builds and holds the "Flowy" name. The other ASC record (bundle `app.tryflowy.app`) has no
+> builds and no backing App ID — do not ship it.
+>
+> Also: **"Keychain Sharing" is not a Developer Portal capability** — it is an entitlement the app
+> already declares, so ignore that line in §2. What does need checking on the `app.tryflowy.client`
+> App ID is Associated Domains, App Groups (`group.app.tryflowy`), Sign in with Apple, and
+> **Push Notifications** (the app uses `expo-notifications`; easy to miss).
+>
+> Separately, **web Sign in with Apple is broken for one narrow reason**: the `app.tryflowy.app`
+> Services ID has its Primary App ID set correctly to `app.tryflowy.client`, but its **Website URLs
+> list is empty**. Add domain `tryflowy.app` and return URL `https://tryflowy.app/login`.
+>
+> Note that *Associated Domains* (App ID capability, drives Universal Links via the AASA) and
+> *Website URLs* (Services ID, drives web SIWA only) are different screens for different things.
+
+
+
 ---
 
 ## 1. What changed
