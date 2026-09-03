@@ -34,11 +34,22 @@ const randomBatchId = (): string =>
 export const useBulkImport = () => {
   const qc = useQueryClient();
   const [state, setState] = useState<State>({ phase: 'idle', batch: null, error: null });
-  const cancelledRef = useRef(false);
+  // Monotonic run id rather than a shared `cancelled` boolean.
+  //
+  // A boolean cannot express what this hook needs: `reset()` must abandon the
+  // run that is in flight while leaving the hook able to start a new one. The
+  // previous code did `cancelled = true; cancelled = false;` back to back, so
+  // the in-flight workers — which only observe the flag after each `await` —
+  // never saw the `true` and kept importing into a sheet the user had closed.
+  //
+  // Each submit claims the next id and compares against it; `reset()` and
+  // unmount simply bump the id, which invalidates every run in flight without
+  // blocking the next one.
+  const runIdRef = useRef(0);
 
   useEffect(() => {
     return () => {
-      cancelledRef.current = true;
+      runIdRef.current += 1;
     };
   }, []);
 
@@ -61,7 +72,10 @@ export const useBulkImport = () => {
         return;
       }
 
-      cancelledRef.current = false;
+      // Claim this run. Anything already in flight is now stale.
+      const runId = (runIdRef.current += 1);
+      const isStale = (): boolean => runIdRef.current !== runId;
+
       const batchId = randomBatchId();
       const total = urls.length;
 
@@ -77,11 +91,11 @@ export const useBulkImport = () => {
 
       const worker = async () => {
         while (queue.length > 0) {
-          if (cancelledRef.current) return;
+          if (isStale()) return;
           const url = queue.shift();
           if (!url) break;
           const res = await api.ingest({ type: 'url', raw_url: url });
-          if (cancelledRef.current) return;
+          if (isStale()) return;
           if (res.error) dead += 1;
           processed += 1;
           setState((s) =>
@@ -101,7 +115,7 @@ export const useBulkImport = () => {
       );
       await Promise.all(workers);
 
-      if (cancelledRef.current) return;
+      if (isStale()) return;
 
       setState({
         phase: 'done',
@@ -114,8 +128,9 @@ export const useBulkImport = () => {
   );
 
   const reset = useCallback(() => {
-    cancelledRef.current = true;
-    cancelledRef.current = false;
+    // Bumping the id abandons whatever is in flight; the next submit claims a
+    // fresh one, so this does not block starting another import.
+    runIdRef.current += 1;
     setState({ phase: 'idle', batch: null, error: null });
   }, []);
 
