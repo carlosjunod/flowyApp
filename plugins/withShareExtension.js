@@ -109,7 +109,7 @@ function withShareExtensionTarget(config, props) {
     const mainBundleId =
       (cfg.ios && cfg.ios.bundleIdentifier) ||
       IOSConfig.BundleIdentifier.getBundleIdentifier(cfg) ||
-      'app.tryflowy.client';
+      'app.tryflowy.app';
     const extBundleId = `${mainBundleId}.${targetName}`;
 
     const target = project.addTarget(targetName, 'app_extension', targetName, extBundleId);
