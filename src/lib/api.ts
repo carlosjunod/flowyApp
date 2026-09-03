@@ -8,6 +8,9 @@ import type {
   CitedItem,
   Digest,
   DigestSettings,
+  ImportBatch,
+  IngestBulkPayload,
+  IngestBulkResponse,
   IngestPayload,
   IngestResponse,
   Item,
@@ -129,6 +132,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+
+  ingestBulk: (payload: IngestBulkPayload) =>
+    request<IngestBulkResponse>('/api/ingest/bulk', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getImportBatch: (id: string) =>
+    request<ImportBatch>(`/api/import-batches/${id}`),
 
   registerEmail: (email: string, password: string, name?: string) =>
     request<AuthSession>('/api/auth/register', {

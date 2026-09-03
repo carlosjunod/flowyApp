@@ -171,11 +171,16 @@ export type IngestPayload = {
 
 export type IngestResponse = { id: string; status: ItemStatus };
 
-// Bulk URL import runs entirely client-side now — there is no
-// `/api/ingest/bulk` or `/api/import-batches/:id` server endpoint. The
-// hook (`useBulkImport`) loops `POST /api/ingest` with bounded
-// concurrency and surfaces this synthetic batch shape so the existing UI
-// (BulkImportSheet) can keep showing per-link progress.
+export type IngestBulkPayload = {
+  urls: string[];
+  dedupeAgainst?: string[];
+};
+
+export type IngestBulkResponse = {
+  batch_id: string;
+  total: number;
+};
+
 export type ImportBatchStatus = 'processing' | 'done';
 
 export type ImportBatch = {
