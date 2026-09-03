@@ -1,6 +1,6 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
-const BUNDLE_ID = 'app.tryflowy.app';
+const BUNDLE_ID = 'app.tryflowy.client';
 const APP_GROUP = 'group.app.tryflowy';
 const ASSOCIATED_DOMAIN = 'applinks:tryflowy.app';
 const APPLE_TEAM_ID = '8C72ST495F';
