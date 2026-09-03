@@ -22,11 +22,16 @@ const CONCURRENCY = 4;
 export const useBulkImport = () => {
   const qc = useQueryClient();
   const [state, setState] = useState<State>({ phase: 'idle', batch: null, error: null });
-  const cancelledRef = useRef(false);
+  // Monotonic run id rather than a shared `cancelled` boolean. reset() must
+  // abandon the run in flight while leaving the hook able to start a new one,
+  // which a boolean cannot express: the old code set it true then immediately
+  // false, so workers — which only check after each await — never saw the
+  // true and kept importing into a sheet the user had closed.
+  const runIdRef = useRef(0);
 
   useEffect(() => {
     return () => {
-      cancelledRef.current = true;
+      runIdRef.current += 1;
     };
   }, []);
 
@@ -40,7 +45,9 @@ export const useBulkImport = () => {
         });
         return;
       }
-      cancelledRef.current = false;
+      // Claim this run. Anything already in flight is now stale.
+      const runId = (runIdRef.current += 1);
+      const isStale = (): boolean => runIdRef.current !== runId;
 
       const total = urls.length;
       let processed = 0;
@@ -67,11 +74,11 @@ export const useBulkImport = () => {
       const queue = [...urls];
       const worker = async () => {
         while (queue.length > 0) {
-          if (cancelledRef.current) return;
+          if (isStale()) return;
           const url = queue.shift();
           if (!url) break;
           const res = await api.ingest({ type: 'url', raw_url: url });
-          if (cancelledRef.current) return;
+          if (isStale()) return;
           if (res.error) dead += 1;
           processed += 1;
           publish(false);
@@ -80,7 +87,7 @@ export const useBulkImport = () => {
 
       const workers = Array.from({ length: Math.min(CONCURRENCY, total) }, () => worker());
       await Promise.all(workers);
-      if (cancelledRef.current) return;
+      if (isStale()) return;
 
       publish(true);
       void qc.invalidateQueries({ queryKey: ['items'] });
@@ -89,8 +96,8 @@ export const useBulkImport = () => {
   );
 
   const reset = useCallback(() => {
-    cancelledRef.current = true;
-    cancelledRef.current = false;
+    // Bumping the id abandons whatever is in flight without blocking the next run.
+    runIdRef.current += 1;
     setState({ phase: 'idle', batch: null, error: null });
   }, []);
 

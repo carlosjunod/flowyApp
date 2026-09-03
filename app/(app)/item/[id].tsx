@@ -235,7 +235,16 @@ export default function ItemDetailScreen() {
           </Pressable>
         ) : null}
 
-        {item.exploration ? (
+        {/* Rendered unconditionally, and NOT behind `item.exploration`.
+            That field only exists once an exploration has already run: the
+            server creates it when POST /api/items/bulk/explore starts a job.
+            Gating on it meant the only control that can start one appeared
+            solely on items that no longer needed it — and with auto-enrich at
+            ingest opt-in and off (AUTO_ENRICH_ENABLED), that was every item.
+            ExploreCTA already handles `exploration === undefined` as its
+            `idle` variant. Only ready items can be explored (the server
+            answers NOT_READY otherwise), so still gate on status. */}
+        {item.status === 'ready' ? (
           <ExploreCTA
             exploration={item.exploration}
             isReceipt={item.type === 'receipt'}
