@@ -50,3 +50,5 @@ yarn-error.*
 
 expo-env.d.ts
 # @end expo-cli
+# Claude Code worktrees (multi-GB local copies, never versioned)
+.claude/worktrees/
