@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -32,10 +32,26 @@ export default function InboxAliasScreen() {
   const [error, setError] = useState<string | null>(null);
   const [howOpen, setHowOpen] = useState(false);
 
+  // Every state write here follows an await, and this screen is a pushed
+  // route the user can leave at any moment. Without these guards, navigating
+  // away mid-request — or within the 1.5s copy-feedback window — updates an
+  // unmounted component and leaks the timer.
+  const mountedRef = useRef(true);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     const res = await api.getEmailAlias();
+    if (!mountedRef.current) return;
     if (res.error) {
       setError(res.error.code === 'NETWORK_ERROR' ? 'NETWORK_ERROR' : res.error.message);
     } else {
@@ -52,8 +68,12 @@ export default function InboxAliasScreen() {
     if (!data) return;
     try {
       await Clipboard.setStringAsync(data.email);
+      if (!mountedRef.current) return;
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => {
+        if (mountedRef.current) setCopied(false);
+      }, 1500);
     } catch {
       // Clipboard rarely fails on RN; surface silently.
     }
@@ -72,6 +92,7 @@ export default function InboxAliasScreen() {
             setRegenerating(true);
             setError(null);
             const res = await api.regenerateEmailAlias();
+            if (!mountedRef.current) return;
             setRegenerating(false);
             if (res.error) {
               if (res.error.code === 'RATE_LIMITED' || res.error.status === 429) {

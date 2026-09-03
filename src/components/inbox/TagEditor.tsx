@@ -29,7 +29,16 @@ export const TagEditor: React.FC<{ item: Item }> = ({ item }) => {
     [item.id, patch],
   );
 
+  // Every edit sends the whole array, derived from the last rendered
+  // `item.tags`. While a PATCH is in flight that array is stale, so two quick
+  // edits would both build on the same base and whichever response landed
+  // last would silently undo the other. Serializing on the pending flag is
+  // enough to remove the race: one write at a time, each built on the result
+  // of the previous.
+  const busy = patch.isPending;
+
   const add = useCallback(() => {
+    if (busy) return;
     const value = draft.trim().replace(/^#/, '');
     if (!value) return;
     if (tags.includes(value)) {
@@ -38,13 +47,14 @@ export const TagEditor: React.FC<{ item: Item }> = ({ item }) => {
     }
     setDraft('');
     void persist([...tags, value]);
-  }, [draft, tags, persist]);
+  }, [busy, draft, tags, persist]);
 
   const remove = useCallback(
     (tag: string) => {
+      if (busy) return;
       void persist(tags.filter((t) => t !== tag));
     },
-    [tags, persist],
+    [busy, tags, persist],
   );
 
   return (
@@ -77,7 +87,9 @@ export const TagEditor: React.FC<{ item: Item }> = ({ item }) => {
             </Text>
             <Pressable
               onPress={() => remove(tag)}
+              disabled={busy}
               accessibilityLabel={`Remove tag ${tag}`}
+              accessibilityState={{ disabled: busy }}
               hitSlop={6}
               style={({ pressed }) => [
                 {
@@ -113,6 +125,7 @@ export const TagEditor: React.FC<{ item: Item }> = ({ item }) => {
           value={draft}
           onChangeText={setDraft}
           onSubmitEditing={add}
+          editable={!busy}
           returnKeyType="done"
           placeholder="Add a tag"
           placeholderTextColor={colors.muted}
