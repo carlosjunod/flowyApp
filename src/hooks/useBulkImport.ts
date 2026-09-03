@@ -18,6 +18,16 @@ type State = {
 // contract so BulkImportSheet (which reads batch.processed/total/dead_count)
 // needs no changes.
 const CONCURRENCY = 4;
+// Every URL is one POST /api/ingest, each of which scrapes and hits Claude
+// upstream. A pasted reading list of 500 links would sit here for minutes
+// hammering those limits, so the sheet refuses the batch instead.
+const MAX_URLS = 100;
+
+// The batch is synthetic (no server row), but it still needs to be distinct
+// per run: a fixed id makes two consecutive imports indistinguishable to
+// anything that keys on it, including React reconciliation in the sheet.
+const randomBatchId = (): string =>
+  `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export const useBulkImport = () => {
   const qc = useQueryClient();
@@ -36,7 +46,7 @@ export const useBulkImport = () => {
   }, []);
 
   const submit = useCallback(
-    async (urls: string[], _dedupeAgainst?: string[]) => {
+    async (urls: string[]) => {
       if (urls.length === 0) {
         // Invalidate any run in flight first, otherwise its next completion
         // overwrites this error and resurrects the previous batch.
@@ -48,10 +58,20 @@ export const useBulkImport = () => {
         });
         return;
       }
+      if (urls.length > MAX_URLS) {
+        runIdRef.current += 1;
+        setState({
+          phase: 'error',
+          batch: null,
+          error: { code: 'INVALID_INPUT', message: `Max ${MAX_URLS} URLs per batch` },
+        });
+        return;
+      }
       // Claim this run. Anything already in flight is now stale.
       const runId = (runIdRef.current += 1);
       const isStale = (): boolean => runIdRef.current !== runId;
 
+      const batchId = randomBatchId();
       const total = urls.length;
       let processed = 0;
       let dead = 0;
@@ -59,7 +79,7 @@ export const useBulkImport = () => {
         setState({
           phase: done ? 'done' : 'polling',
           batch: {
-            id: 'local',
+            id: batchId,
             status: done ? 'done' : 'processing',
             processed,
             dead_count: dead,
@@ -70,7 +90,7 @@ export const useBulkImport = () => {
 
       setState({
         phase: 'submitting',
-        batch: { id: 'local', status: 'processing', processed: 0, dead_count: 0, total },
+        batch: { id: batchId, status: 'processing', processed: 0, dead_count: 0, total },
         error: null,
       });
 
