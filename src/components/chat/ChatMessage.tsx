@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import React, { useMemo } from 'react';
 import { Text, View } from 'react-native';
-import Markdown, { type ASTNode } from 'react-native-markdown-display';
+import Markdown, { renderRules, type ASTNode } from 'react-native-markdown-display';
 
 import { useResolvedColors } from '@/lib/theme';
 import type { ChatMessage as ChatMessageType, CitedItem } from '@/types';
@@ -128,7 +128,13 @@ export const ChatMessage: React.FC<Props> = ({ message }) => {
   // `<a>` override. All other links get default behavior.
   const rules = useMemo(
     () => ({
-      link: (node: ASTNode) => {
+      link: (
+        node: ASTNode,
+        children: React.ReactNode[],
+        parent: ASTNode[],
+        styles: Record<string, unknown>,
+        onLinkPress?: (url: string) => boolean,
+      ) => {
         const href = (node.attributes?.href as string | undefined) ?? '';
         if (href.startsWith(ITEM_PROTO)) {
           const id = href.slice(ITEM_PROTO.length);
@@ -141,8 +147,17 @@ export const ChatMessage: React.FC<Props> = ({ message }) => {
             />
           );
         }
-        // Returning undefined lets default rendering handle it.
-        return undefined;
+        // Delegate to the library's own renderer. Returning `undefined` here
+        // does NOT fall through: AstRenderer.renderNode uses whatever the
+        // registered rule returns, so every ordinary markdown link — its text
+        // included — was silently dropped from the message.
+        // Typed as possibly-undefined; fall back to plain text so a link can
+        // still never vanish, which is the bug being fixed here.
+        return (
+          renderRules.link?.(node, children, parent, styles, onLinkPress) ?? (
+            <Text key={node.key}>{children}</Text>
+          )
+        );
       },
     }),
     [byId, indexById],

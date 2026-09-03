@@ -212,7 +212,16 @@ export async function* chatStream(
   const header = res.headers.get('x-items');
   if (header) {
     try {
-      citations = JSON.parse(header) as CitedItem[];
+      // Validate the shape, don't just cast it. Any syntactically valid
+      // non-array (`{}`, `null`, `"x"`) would otherwise reach `.map()` in
+      // ChatMessage and crash the whole conversation view.
+      const parsed: unknown = JSON.parse(header);
+      citations = Array.isArray(parsed)
+        ? parsed.filter(
+            (c): c is CitedItem =>
+              typeof c === 'object' && c !== null && typeof (c as CitedItem).id === 'string',
+          )
+        : [];
     } catch {
       citations = [];
     }

@@ -24,7 +24,16 @@ export const ReceiptContent: React.FC<{ item: Item }> = ({ item }) => {
   const data = item.structured_content as ReceiptData | undefined;
   const photoUrl = data?.originalPhotoUrl ?? item.original_media_urls?.[0];
 
-  if (!data || !data.store) {
+  // `structured_content` is `unknown` on the wire and this cast does not check
+  // anything, so the guard has to. Checking only `store` was not enough: a
+  // legacy or partially-extracted receipt that has a store but no line items
+  // reaches `data.items.length` / `.map()` / <CategoryBreakdown items={...}>
+  // and crashes the detail screen. Require both, and require store.name,
+  // which is dereferenced unconditionally below.
+  const hasStore = Boolean(data?.store) && typeof data?.store?.name === 'string';
+  const hasItems = Array.isArray(data?.items);
+
+  if (!data || !hasStore || !hasItems) {
     return (
       <View className="rounded-xl border border-border bg-surface p-3.5">
         <Text

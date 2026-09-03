@@ -84,12 +84,32 @@ const VideoArea: React.FC<{
         className="mb-3 overflow-hidden rounded-xl border border-border bg-black"
         style={{ aspectRatio: 16 / 9, width: '100%' }}
       >
+        {/* This WebView runs JavaScript with DOM storage, so it must not be
+            allowed to wander. Without a navigation policy, an ad, an end-card,
+            a redirect or a sign-in flow inside the embed can take it anywhere
+            while keeping those privileges. Player traffic stays inside; every
+            user-initiated navigation leaves for the real browser. */}
         <WebView
           source={{ uri: `https://www.youtube.com/embed/${videoId}?autoplay=1&playsinline=1` }}
           allowsInlineMediaPlayback
           mediaPlaybackRequiresUserAction={false}
           javaScriptEnabled
           domStorageEnabled
+          originWhitelist={['https://www.youtube.com', 'https://www.youtube-nocookie.com']}
+          onShouldStartLoadWithRequest={(req) => {
+            // `isTopFrame === false` covers the player's own iframes/XHR hosts
+            // (googlevideo, ytimg); only police top-level navigations.
+            if (req.isTopFrame === false) return true;
+            const allowed =
+              req.url.startsWith('https://www.youtube.com/embed/') ||
+              req.url.startsWith('https://www.youtube-nocookie.com/embed/') ||
+              req.url === 'about:blank';
+            if (!allowed) {
+              void Linking.openURL(req.url);
+              return false;
+            }
+            return true;
+          }}
           style={{ flex: 1, backgroundColor: 'black' }}
         />
       </View>
