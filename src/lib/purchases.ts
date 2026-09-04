@@ -18,12 +18,12 @@ import Purchases, {
 } from 'react-native-purchases';
 
 import { ENV } from './env';
+import { createRetryableOnce } from './retryableOnce';
 import { createSerialQueue } from './serialQueue';
 
 /** StoreKit only. Android would need its own RevenueCat key and products. */
 const SUPPORTED = Platform.OS === 'ios';
 
-let configurePromise: Promise<boolean> | null = null;
 let configured = false;
 
 export function isPurchasesConfigured(): boolean {
@@ -31,30 +31,33 @@ export function isPurchasesConfigured(): boolean {
 }
 
 /**
+ * Configure once. Success is remembered; failure is NOT — a cached failure
+ * would leave purchases dead for the life of the process, and no amount of
+ * reopening the paywall would recover, while the UI keeps saying "try again".
+ */
+const runConfigure = createRetryableOnce(async () => {
+  try {
+    if (__DEV__) Purchases.setLogLevel(LOG_LEVEL.DEBUG);
+    await Purchases.configure({ apiKey: ENV.REVENUECAT_IOS_KEY });
+    configured = true;
+    return true;
+  } catch (err) {
+    // A misconfigured key must not take the app down on launch; the paywall
+    // degrades to "unavailable" and everything else keeps working.
+    console.warn('[purchases] configure failed:', err);
+    return false;
+  }
+});
+
+/**
  * Idempotent, and safe to call from several places at once — concurrent
- * callers await the same configure. Resolves false when purchases are
- * unavailable, which is the normal state in a build without the key.
+ * callers share one attempt. Resolves false when purchases are unavailable,
+ * which is the normal state in a build without the key.
  */
 export function initPurchases(): Promise<boolean> {
-  if (configurePromise) return configurePromise;
-  if (!SUPPORTED || !ENV.REVENUECAT_IOS_KEY) {
-    configurePromise = Promise.resolve(false);
-    return configurePromise;
-  }
-  configurePromise = (async () => {
-    try {
-      if (__DEV__) Purchases.setLogLevel(LOG_LEVEL.DEBUG);
-      await Purchases.configure({ apiKey: ENV.REVENUECAT_IOS_KEY });
-      configured = true;
-      return true;
-    } catch (err) {
-      // A misconfigured key must not take the app down on launch; the paywall
-      // degrades to "unavailable" and everything else keeps working.
-      console.warn('[purchases] configure failed:', err);
-      return false;
-    }
-  })();
-  return configurePromise;
+  // Not transient: a build with no key does not sell, so do not retry it.
+  if (!SUPPORTED || !ENV.REVENUECAT_IOS_KEY) return Promise.resolve(false);
+  return runConfigure();
 }
 
 /**
