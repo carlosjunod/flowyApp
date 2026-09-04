@@ -164,6 +164,8 @@ export type ApiErrorCode =
   | 'INGEST_FAILED'
   | 'RATE_LIMITED'
   | 'SERVER_ERROR'
+  /** DELETE /api/account — the typed confirmation phrase did not match. */
+  | 'CONFIRMATION_MISMATCH'
   | 'UNKNOWN';
 
 export type ApiError = {

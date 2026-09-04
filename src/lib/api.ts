@@ -152,10 +152,33 @@ export const api = {
       body: JSON.stringify({ id_token: idToken, email }),
     }),
 
-  authApple: (identityToken: string, email?: string) =>
+  /**
+   * `authorizationCode` is the one-time code Apple returns alongside the
+   * identity token. The server trades it for a refresh token so it can revoke
+   * Flowy's access when the account is deleted — Apple requires that of any
+   * app offering Sign in with Apple plus account deletion. Optional: sign-in
+   * works without it, only revocation is lost.
+   */
+  authApple: (identityToken: string, email?: string, authorizationCode?: string) =>
     request<AuthSession>('/api/auth/apple', {
       method: 'POST',
-      body: JSON.stringify({ identity_token: identityToken, email }),
+      body: JSON.stringify({
+        identity_token: identityToken,
+        email,
+        authorization_code: authorizationCode,
+      }),
+    }),
+
+  /**
+   * Permanently delete the signed-in account. App Store Review 5.1.1(v)
+   * requires this to be reachable in-app. Irreversible: the server revokes the
+   * Apple token, deletes the user (cascading every item), and sweeps the
+   * search index and uploaded files.
+   */
+  deleteAccount: (confirmation: string) =>
+    request<{ deleted: true; warnings: string[] }>('/api/account', {
+      method: 'DELETE',
+      body: JSON.stringify({ confirmation }),
     }),
 
   listDigests: () => request<Digest[]>('/api/digest'),

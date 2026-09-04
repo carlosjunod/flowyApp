@@ -68,7 +68,14 @@ export default function LoginScreen() {
         setError('Apple sign-in failed: no identity token');
         return;
       }
-      const res = await api.authApple(credential.identityToken, credential.email ?? undefined);
+      // Forward the one-time code too: the server trades it for a refresh
+      // token so account deletion can revoke Flowy's access to the Apple
+      // Account, which Apple requires of apps offering both.
+      const res = await api.authApple(
+        credential.identityToken,
+        credential.email ?? undefined,
+        credential.authorizationCode ?? undefined,
+      );
       if (res.error) {
         setError(res.error.message);
         return;

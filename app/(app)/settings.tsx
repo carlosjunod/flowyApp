@@ -2,11 +2,13 @@ import { Feather } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { Link } from 'expo-router';
 import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DeleteAccountSection } from '@/components/settings/DeleteAccountSection';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/lib/auth';
+import { ENV } from '@/lib/env';
 import { useResolvedColors, useTheme } from '@/lib/theme';
 
 type ThemeOption = 'system' | 'light' | 'dark';
@@ -41,6 +43,7 @@ export default function SettingsScreen() {
             <Text className="text-base text-fg mt-1">{user?.email ?? 'Unknown'}</Text>
           </View>
           <Button title="Sign out" variant="danger" onPress={signOut} />
+          <DeleteAccountSection />
         </Section>
 
         <Section title="Appearance">
@@ -124,6 +127,10 @@ export default function SettingsScreen() {
         <Section title="About">
           <Row label="Version" value={version} />
           <Row label="Build" value={Constants.expoConfig?.runtimeVersion?.toString() ?? '—'} />
+          {/* App Store Connect requires a reachable privacy policy, and the
+              terms are linked beside it so both live in one obvious place. */}
+          <LegalRow label="Privacy Policy" path="/privacy" />
+          <LegalRow label="Terms of Service" path="/terms" />
         </Section>
       </ScrollView>
     </SafeAreaView>
@@ -143,3 +150,20 @@ const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
     <Text className="text-sm text-muted">{value}</Text>
   </View>
 );
+
+const LegalRow: React.FC<{ label: string; path: string }> = ({ label, path }) => {
+  const colors = useResolvedColors();
+  return (
+    <Pressable
+      onPress={() => {
+        void Linking.openURL(`${ENV.API_BASE_URL}${path}`);
+      }}
+      accessibilityRole="link"
+      style={({ pressed }) => [pressed && { opacity: 0.7 }]}
+      className="flex-row items-center justify-between rounded-xl border border-border bg-card px-4 py-3"
+    >
+      <Text className="text-sm text-fg">{label}</Text>
+      <Feather name="external-link" size={16} color={colors.muted} />
+    </Pressable>
+  );
+};
