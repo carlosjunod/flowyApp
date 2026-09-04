@@ -60,7 +60,9 @@ export default function ItemDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const id = params.id;
   const { data: item, isLoading, error } = useItemById(id);
-  useItemStatus(id);
+  // Pass the exploration status so the watcher re-arms when one starts. It
+  // settles on a ready item, and an exploration can begin long after that.
+  useItemStatus(id, item?.exploration?.status);
   const { data: relatedItems = [] } = useRelatedItems(item);
   const { width } = useWindowDimensions();
   const colors = useResolvedColors();
@@ -235,7 +237,16 @@ export default function ItemDetailScreen() {
           </Pressable>
         ) : null}
 
-        {item.exploration ? (
+        {/* Rendered unconditionally, and NOT behind `item.exploration`.
+            That field only exists once an exploration has already run: the
+            server creates it when POST /api/items/bulk/explore starts a job.
+            Gating on it meant the only control that can start one appeared
+            solely on items that no longer needed it — and with auto-enrich at
+            ingest opt-in and off (AUTO_ENRICH_ENABLED), that was every item.
+            ExploreCTA already handles `exploration === undefined` as its
+            `idle` variant. Only ready items can be explored (the server
+            answers NOT_READY otherwise), so still gate on status. */}
+        {item.status === 'ready' ? (
           <ExploreCTA
             exploration={item.exploration}
             isReceipt={item.type === 'receipt'}

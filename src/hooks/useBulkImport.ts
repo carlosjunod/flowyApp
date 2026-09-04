@@ -18,21 +18,39 @@ type State = {
 // contract so BulkImportSheet (which reads batch.processed/total/dead_count)
 // needs no changes.
 const CONCURRENCY = 4;
+// Every URL is one POST /api/ingest, each of which scrapes and hits Claude
+// upstream. A pasted reading list of 500 links would sit here for minutes
+// hammering those limits, so the sheet refuses the batch instead.
+const MAX_URLS = 100;
+
+// The batch is synthetic (no server row), but it still needs to be distinct
+// per run: a fixed id makes two consecutive imports indistinguishable to
+// anything that keys on it, including React reconciliation in the sheet.
+const randomBatchId = (): string =>
+  `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export const useBulkImport = () => {
   const qc = useQueryClient();
   const [state, setState] = useState<State>({ phase: 'idle', batch: null, error: null });
-  const cancelledRef = useRef(false);
+  // Monotonic run id rather than a shared `cancelled` boolean. reset() must
+  // abandon the run in flight while leaving the hook able to start a new one,
+  // which a boolean cannot express: the old code set it true then immediately
+  // false, so workers — which only check after each await — never saw the
+  // true and kept importing into a sheet the user had closed.
+  const runIdRef = useRef(0);
 
   useEffect(() => {
     return () => {
-      cancelledRef.current = true;
+      runIdRef.current += 1;
     };
   }, []);
 
   const submit = useCallback(
-    async (urls: string[], _dedupeAgainst?: string[]) => {
+    async (urls: string[]) => {
       if (urls.length === 0) {
+        // Invalidate any run in flight first, otherwise its next completion
+        // overwrites this error and resurrects the previous batch.
+        runIdRef.current += 1;
         setState({
           phase: 'error',
           batch: null,
@@ -40,8 +58,20 @@ export const useBulkImport = () => {
         });
         return;
       }
-      cancelledRef.current = false;
+      if (urls.length > MAX_URLS) {
+        runIdRef.current += 1;
+        setState({
+          phase: 'error',
+          batch: null,
+          error: { code: 'INVALID_INPUT', message: `Max ${MAX_URLS} URLs per batch` },
+        });
+        return;
+      }
+      // Claim this run. Anything already in flight is now stale.
+      const runId = (runIdRef.current += 1);
+      const isStale = (): boolean => runIdRef.current !== runId;
 
+      const batchId = randomBatchId();
       const total = urls.length;
       let processed = 0;
       let dead = 0;
@@ -49,7 +79,7 @@ export const useBulkImport = () => {
         setState({
           phase: done ? 'done' : 'polling',
           batch: {
-            id: 'local',
+            id: batchId,
             status: done ? 'done' : 'processing',
             processed,
             dead_count: dead,
@@ -60,18 +90,18 @@ export const useBulkImport = () => {
 
       setState({
         phase: 'submitting',
-        batch: { id: 'local', status: 'processing', processed: 0, dead_count: 0, total },
+        batch: { id: batchId, status: 'processing', processed: 0, dead_count: 0, total },
         error: null,
       });
 
       const queue = [...urls];
       const worker = async () => {
         while (queue.length > 0) {
-          if (cancelledRef.current) return;
+          if (isStale()) return;
           const url = queue.shift();
           if (!url) break;
           const res = await api.ingest({ type: 'url', raw_url: url });
-          if (cancelledRef.current) return;
+          if (isStale()) return;
           if (res.error) dead += 1;
           processed += 1;
           publish(false);
@@ -80,7 +110,7 @@ export const useBulkImport = () => {
 
       const workers = Array.from({ length: Math.min(CONCURRENCY, total) }, () => worker());
       await Promise.all(workers);
-      if (cancelledRef.current) return;
+      if (isStale()) return;
 
       publish(true);
       void qc.invalidateQueries({ queryKey: ['items'] });
@@ -89,8 +119,8 @@ export const useBulkImport = () => {
   );
 
   const reset = useCallback(() => {
-    cancelledRef.current = true;
-    cancelledRef.current = false;
+    // Bumping the id abandons whatever is in flight without blocking the next run.
+    runIdRef.current += 1;
     setState({ phase: 'idle', batch: null, error: null });
   }, []);
 
