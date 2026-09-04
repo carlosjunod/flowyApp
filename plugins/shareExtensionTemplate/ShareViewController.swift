@@ -10,6 +10,12 @@ import Security
 
 private let APP_GROUP = (Bundle.main.infoDictionary?["APP_GROUP"] as? String) ?? "group.app.tryflowy"
 private let API_BASE_URL = (Bundle.main.infoDictionary?["API_BASE_URL"] as? String) ?? "http://localhost:4000"
+// PocketBase URL for the tag-commit PATCH (option (b) tag attach). Same fallback
+// the web app uses (http://localhost:8090) when PB_URL isn't set in env/plugin.
+// In prod the extension needs PB exposed publicly — see plugins/withShareExtension.js
+// `pbUrl` prop. items.updateRule is "@request.auth.id != '' && user = @request.auth.id"
+// so the user's bearer token suffices to PATCH their own item's tags field.
+private let PB_URL = (Bundle.main.infoDictionary?["PB_URL"] as? String) ?? "http://localhost:8090"
 private let AUTH_KEY = "pb_auth"
 private let MAX_IMAGES = 10
 private let MAX_FILES = 10
@@ -47,6 +53,20 @@ private struct IngestPayload: Codable {
   let raw_pdfs: [ShareFile]?
   let raw_file: ShareFile?
   let raw_files: [ShareFile]?
+  // Always [] from the share extension today — picker UI hasn't run yet
+  // when /api/ingest fires (success screen → tag picker → Done → PATCH).
+  // Field is wired for API parity and so a future pre-tag flow can set it
+  // without bumping the server contract.
+  let tags: [String]
+}
+
+// Minimal response decode. The server returns more (e.g. `cached`,
+// `duplicate`) but we only need `id` to drive the follow-up PATCH.
+private struct IngestResponse: Decodable {
+  struct Data: Decodable {
+    let id: String
+  }
+  let data: Data
 }
 
 // MARK: - Keychain
@@ -73,18 +93,62 @@ private enum Keychain {
     if status != errSecSuccess {
       NSLog("[flowy.share] keychain lookup failed: OSStatus=%d service=%@ account=%@ accessGroup=%@",
             Int(status), APP_GROUP, AUTH_KEY, APP_GROUP)
+      dumpVisibleItems()
       return nil
     }
     guard let data = item as? Data,
           let raw = String(data: data, encoding: .utf8) else { return nil }
 
+    NSLog("[flowy.share] keychain hit: rawLen=%d rawPrefix=%@", raw.count, String(raw.prefix(40)))
+
     // PocketBase AsyncAuthStore serializes as JSON { "token": "...", "model": {...} }
-    if let jsonData = raw.data(using: .utf8),
-       let obj = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-       let token = obj["token"] as? String {
-      return token
+    if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+      if let token = obj["token"] as? String {
+        NSLog("[flowy.share] token parsed: len=%d prefix=%@ suffix=%@",
+              token.count, String(token.prefix(10)), String(token.suffix(6)))
+        return token
+      }
+      NSLog("[flowy.share] JSON parsed but no 'token' field; keys=%@",
+            String(describing: Array(obj.keys)))
+    } else {
+      NSLog("[flowy.share] JSON parse failed, sending raw payload as bearer (almost certainly wrong)")
     }
     return raw
+  }
+
+  // Diagnostic: dump every generic-password item the extension's process can see,
+  // regardless of service/account/access-group filters. Lets us tell whether the
+  // main app's item is visible (→ filter mismatch) or not (→ access group issue).
+  static func dumpVisibleItems() {
+    let q: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecMatchLimit as String: kSecMatchLimitAll,
+      kSecReturnAttributes as String: true,
+    ]
+    var result: CFTypeRef?
+    let st = SecItemCopyMatching(q as CFDictionary, &result)
+    if st != errSecSuccess {
+      NSLog("[flowy.share] diag: broad SecItemCopyMatching failed OSStatus=%d", Int(st))
+      return
+    }
+    guard let items = result as? [[String: Any]] else {
+      NSLog("[flowy.share] diag: no items visible")
+      return
+    }
+    NSLog("[flowy.share] diag: %d items visible to this extension", items.count)
+    for (i, attrs) in items.enumerated() {
+      let svc = attrs[kSecAttrService as String] as? String ?? "<none>"
+      let agrp = attrs[kSecAttrAccessGroup as String] as? String ?? "<none>"
+      let acctDesc: String
+      if let d = attrs[kSecAttrAccount as String] as? Data {
+        acctDesc = "data:" + (String(data: d, encoding: .utf8) ?? d.map { String(format: "%02x", $0) }.joined())
+      } else if let s = attrs[kSecAttrAccount as String] as? String {
+        acctDesc = "str:" + s
+      } else {
+        acctDesc = "<none>"
+      }
+      NSLog("[flowy.share] diag #%d service=%@ account=%@ accessGroup=%@", i, svc, acctDesc, agrp)
+    }
   }
 }
 
@@ -99,10 +163,6 @@ private func classify(url: URL) -> IngestType {
     return .instagram
   }
   if host.hasSuffix("tiktok.com") { return .video }
-  if host.hasSuffix("pinterest.com") || host.hasSuffix("pin.it") { return .pinterest }
-  if host.hasSuffix("dribbble.com") { return .dribbble }
-  if host.hasSuffix("linkedin.com") || host.hasSuffix("lnkd.in") { return .linkedin }
-  if host.hasSuffix("twitter.com") || host.hasSuffix("x.com") || host.hasSuffix("t.co") { return .twitter }
   return .url
 }
 
@@ -110,13 +170,28 @@ private func classify(url: URL) -> IngestType {
 
 final class ShareViewController: UIViewController {
   private var hosting: UIHostingController<StatusView>?
-  private let state = StatusState()
+  private let viewModel = ShareViewModel(appGroup: APP_GROUP)
+
+  /// Cached after Keychain.readToken() in process(). Reused by patchTags()
+  /// when the user closes the tag picker — avoids a second keychain round-trip
+  /// (the lookup logs diagnostics on failure, noise we don't want on a normal
+  /// follow-up call).
+  private var authToken: String?
 
   override func viewDidLoad() {
     super.viewDidLoad()
     view.backgroundColor = .clear
 
-    let controller = UIHostingController(rootView: StatusView(state: state, onDismiss: { [weak self] in self?.finish() }))
+    viewModel.onAutoDismiss = { [weak self] in self?.finish() }
+    viewModel.onCommitTags = { [weak self] tags in
+      // Detached so we don't block dismissSheet()'s synchronous flow. The
+      // extension may finish before this completes; URLSession will run the
+      // request to completion as long as the host process doesn't terminate.
+      // For the share extension this is fine — the user has already moved on.
+      Task { [weak self] in await self?.patchTags(tags: tags) }
+    }
+
+    let controller = UIHostingController(rootView: StatusView(viewModel: viewModel, onDismiss: { [weak self] in self?.finish() }))
     controller.view.backgroundColor = .clear
     addChild(controller)
     controller.view.translatesAutoresizingMaskIntoConstraints = false
@@ -146,25 +221,37 @@ final class ShareViewController: UIViewController {
 
   private func process() async {
     guard let token = Keychain.readToken() else {
-      await MainActor.run { state.update(.failure("Sign in on the Flowy app first")) }
+      await MainActor.run { viewModel.update(.failure("Sign in on the Flowy app first")) }
       try? await Task.sleep(nanoseconds: 1_200_000_000)
       finish(cancelled: true)
       return
     }
+    self.authToken = token
     guard let payload = await extractPayload() else {
-      await MainActor.run { state.update(.failure("Nothing to share")) }
+      await MainActor.run { viewModel.update(.failure("Nothing to share")) }
       try? await Task.sleep(nanoseconds: 1_200_000_000)
       finish(cancelled: true)
       return
     }
     do {
-      try await postIngest(payload: payload, token: token)
-      await MainActor.run { state.update(.success) }
+      let itemId = try await postIngest(payload: payload, token: token)
+      // Success path: SuccessView's .onAppear arms a 3s auto-dismiss via
+      // viewModel.scheduleAutoDismiss(); the model's onAutoDismiss callback
+      // calls finish(). No further sleep+finish() here — that would race
+      // the model's timer and skip past the new success animation.
+      // We also stash the server-assigned id on the model so the tag-commit
+      // PATCH (fired from dismissSheet() → onCommitTags) can target it.
+      await MainActor.run {
+        viewModel.itemId = itemId
+        viewModel.update(.success)
+      }
     } catch {
-      await MainActor.run { state.update(.failure(error.localizedDescription)) }
+      // Failure path keeps a brief on-screen delay then dismisses, since
+      // we don't enter SuccessView here and there's no model-driven timer.
+      await MainActor.run { viewModel.update(.failure(error.localizedDescription)) }
+      try? await Task.sleep(nanoseconds: 1_200_000_000)
+      finish()
     }
-    try? await Task.sleep(nanoseconds: 1_200_000_000)
-    finish()
   }
 
   private func extractPayload() async -> IngestPayload? {
@@ -216,14 +303,16 @@ final class ShareViewController: UIViewController {
       return IngestPayload(
         type: IngestType.pdf.rawValue,
         raw_url: nil, raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
-        raw_pdf: nil, raw_pdfs: pdfs, raw_file: nil, raw_files: nil
+        raw_pdf: nil, raw_pdfs: pdfs, raw_file: nil, raw_files: nil,
+        tags: []
       )
     }
     if let single = pdfs.first {
       return IngestPayload(
         type: IngestType.pdf.rawValue,
         raw_url: nil, raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
-        raw_pdf: single, raw_pdfs: nil, raw_file: nil, raw_files: nil
+        raw_pdf: single, raw_pdfs: nil, raw_file: nil, raw_files: nil,
+        tags: []
       )
     }
 
@@ -244,14 +333,16 @@ final class ShareViewController: UIViewController {
       return IngestPayload(
         type: IngestType.screenshot.rawValue,
         raw_url: nil, raw_image: nil, raw_images: images, raw_video: nil, video_mime: nil,
-        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil
+        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil,
+        tags: []
       )
     }
     if let single = images.first {
       return IngestPayload(
         type: IngestType.screenshot.rawValue,
         raw_url: nil, raw_image: single, raw_images: nil, raw_video: nil, video_mime: nil,
-        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil
+        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil,
+        tags: []
       )
     }
 
@@ -276,14 +367,16 @@ final class ShareViewController: UIViewController {
       return IngestPayload(
         type: IngestType.file.rawValue,
         raw_url: nil, raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
-        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: files
+        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: files,
+        tags: []
       )
     }
     if let single = files.first {
       return IngestPayload(
         type: IngestType.file.rawValue,
         raw_url: nil, raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
-        raw_pdf: nil, raw_pdfs: nil, raw_file: single, raw_files: nil
+        raw_pdf: nil, raw_pdfs: nil, raw_file: single, raw_files: nil,
+        tags: []
       )
     }
 
@@ -295,7 +388,8 @@ final class ShareViewController: UIViewController {
       type: classify(url: url).rawValue,
       raw_url: url.absoluteString,
       raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
-      raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil
+      raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil,
+      tags: []
     )
   }
 
@@ -370,7 +464,8 @@ final class ShareViewController: UIViewController {
       raw_images: nil,
       raw_video: bytes.base64EncodedString(),
       video_mime: mime,
-      raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil
+      raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil,
+      tags: []
     )
   }
 
@@ -381,7 +476,7 @@ final class ShareViewController: UIViewController {
     return nil
   }
 
-  private func postIngest(payload: IngestPayload, token: String) async throws {
+  private func postIngest(payload: IngestPayload, token: String) async throws -> String {
     guard let url = URL(string: "\(API_BASE_URL)/api/ingest") else {
       throw NSError(domain: "flowy.share", code: -2, userInfo: [NSLocalizedDescriptionKey: "Bad API URL"])
     }
@@ -403,37 +498,121 @@ final class ShareViewController: UIViewController {
       let body = String(data: data, encoding: .utf8) ?? "\(http.statusCode)"
       throw NSError(domain: "flowy.share", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: body])
     }
+    // The duplicate path returns { data: { id, status, duplicate: true } } —
+    // the id is still the user's own existing item, so PATCHing tags onto it
+    // is the right behavior (user re-saved and edited tags in one motion).
+    let decoded = try JSONDecoder().decode(IngestResponse.self, from: data)
+    return decoded.data.id
+  }
+
+  /// PATCH /api/collections/items/records/{id} with `{ "tags": [...] }`.
+  /// Fires from viewModel.onCommitTags when the user closes the tag picker.
+  /// Silent on failure — by the time this runs the success screen is already
+  /// dismissing, so there's no UI to surface an error against. Logs to NSLog
+  /// for debugging via `xcrun simctl spawn booted log stream`.
+  private func patchTags(tags: [String]) async {
+    guard !tags.isEmpty else { return }
+    guard let itemId = await MainActor.run(body: { viewModel.itemId }) else {
+      NSLog("[flowy.share] patchTags: no itemId yet, skipping (race?)")
+      return
+    }
+    guard let token = authToken else {
+      NSLog("[flowy.share] patchTags: no cached token, skipping")
+      return
+    }
+    guard let url = URL(string: "\(PB_URL)/api/collections/items/records/\(itemId)") else {
+      NSLog("[flowy.share] patchTags: bad PB_URL %@", PB_URL)
+      return
+    }
+    var req = URLRequest(url: url, timeoutInterval: 15)
+    req.httpMethod = "PATCH"
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    do {
+      req.httpBody = try JSONSerialization.data(withJSONObject: ["tags": tags])
+    } catch {
+      NSLog("[flowy.share] patchTags: JSON encode failed: %@", error.localizedDescription)
+      return
+    }
+    do {
+      let (data, response) = try await URLSession.shared.data(for: req)
+      if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+        let body = String(data: data, encoding: .utf8) ?? "\(http.statusCode)"
+        NSLog("[flowy.share] patchTags: HTTP %d body=%@", http.statusCode, String(body.prefix(200)))
+      } else {
+        NSLog("[flowy.share] patchTags: ok item=%@ tags=%d", itemId, tags.count)
+      }
+    } catch {
+      NSLog("[flowy.share] patchTags: network error: %@", error.localizedDescription)
+    }
   }
 }
 
 // MARK: - SwiftUI status
 
-@MainActor
-private final class StatusState: ObservableObject {
-  enum State { case loading, success, failure(String) }
-  @Published var state: State = .loading
-  func update(_ next: State) { state = next }
-}
-
-private struct StatusView: View {
-  @ObservedObject var state: StatusState
+struct StatusView: View {
+  @ObservedObject var viewModel: ShareViewModel
   let onDismiss: () -> Void
 
+  /// Owned here so SuccessView (pill) and TagPickerSheet (header) can both
+  /// participate in the same matchedGeometryEffect.
+  @Namespace private var heroNS
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
   var body: some View {
+    Group {
+      switch viewModel.status {
+      case .loading:
+        loadingView
+      case .success:
+        SuccessView(
+          viewModel: viewModel,
+          namespace: heroNS,
+          onAddTags: {
+            withAnimation(reduceMotion ? .linear(duration: 0.15) : .snappy) {
+              viewModel.presentSheet()
+            }
+          },
+          onDismiss: onDismiss
+        )
+        .sheet(isPresented: $viewModel.isSheetPresented, onDismiss: {
+          viewModel.dismissSheet()
+        }) {
+          TagPickerSheet(
+            viewModel: viewModel,
+            namespace: heroNS,
+            onDone: { viewModel.isSheetPresented = false }
+          )
+          .presentationDetents([.medium, .large])
+          .presentationDragIndicator(.visible)
+          .presentationBackground(.regularMaterial)
+        }
+      case .failure(let message):
+        failureView(message)
+      }
+    }
+  }
+
+  private var loadingView: some View {
     ZStack {
       Color.black.opacity(0.35).ignoresSafeArea().onTapGesture { onDismiss() }
       VStack(spacing: 12) {
-        switch state.state {
-        case .loading:
-          ProgressView().controlSize(.large)
-          Text("Sending to Flowy…").font(.headline)
-        case .success:
-          Image(systemName: "checkmark.circle.fill").resizable().frame(width: 44, height: 44).foregroundColor(.green)
-          Text("Saved").font(.headline)
-        case .failure(let message):
-          Image(systemName: "xmark.octagon.fill").resizable().frame(width: 44, height: 44).foregroundColor(.red)
-          Text(message).font(.subheadline).multilineTextAlignment(.center)
-        }
+        ProgressView().controlSize(.large)
+        Text("Sending to Flowy…").font(.headline)
+      }
+      .padding(24)
+      .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+      .padding(40)
+    }
+  }
+
+  private func failureView(_ message: String) -> some View {
+    ZStack {
+      Color.black.opacity(0.35).ignoresSafeArea().onTapGesture { onDismiss() }
+      VStack(spacing: 12) {
+        Image(systemName: "xmark.octagon.fill")
+          .resizable().frame(width: 44, height: 44).foregroundColor(.red)
+        Text(message).font(.subheadline).multilineTextAlignment(.center)
       }
       .padding(24)
       .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
