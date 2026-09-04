@@ -10,7 +10,7 @@
 
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { PurchasesPackage } from 'react-native-purchases';
@@ -21,11 +21,11 @@ import { matchesTarget, useRefreshSubscription, useSubscription } from '@/hooks/
 import { useAuth } from '@/lib/auth';
 import { PAYWALL_PLANS, productId } from '@/lib/plans';
 import {
-  ensurePurchaserBound,
   getOfferingPackages,
   isUserCancelled,
-  purchase,
-  restore,
+  purchaseAs,
+  PurchaserIdentityError,
+  restoreAs,
 } from '@/lib/purchases';
 import { useResolvedColors } from '@/lib/theme';
 import type { BillingInterval, PaidPlanId } from '@/types';
@@ -46,6 +46,12 @@ export default function PaywallScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<PaidPlanId | null>(null);
   const [restoring, setRestoring] = useState(false);
+
+  // `busy` and `restoring` are state, so a guard reading them sees the LAST
+  // render: two quick taps both pass before setBusy commits. A ref flips
+  // synchronously, so it is the thing that actually prevents two overlapping
+  // StoreKit operations. The state below only drives what the UI shows.
+  const txLock = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,21 +79,20 @@ export default function PaywallScreen() {
   const onSubscribe = useCallback(
     async (plan: PaidPlanId) => {
       const pkg = packageFor(plan);
-      if (!pkg || busy) return;
+      if (!pkg || txLock.current) return;
+      const userId = user?.id;
+      if (!userId) {
+        Alert.alert('Not signed in', 'Sign in again to subscribe.');
+        return;
+      }
+      txLock.current = true;
       setBusy(plan);
       try {
-        // Fail closed: never let a charge happen unless RevenueCat's app user
-        // id is provably this PocketBase user. A purchase made under an
-        // anonymous id is charged by Apple and grants nobody.
-        if (!user?.id || !(await ensurePurchaserBound(user.id))) {
-          Alert.alert(
-            'Not signed in',
-            'We could not confirm your account with the App Store. Nothing was charged — please try again in a moment.',
-          );
-          return;
-        }
-
-        await purchase(pkg);
+        // Fail closed: the identity check and the charge happen in one queued
+        // section inside purchaseAs, so no sign-out or account switch can slip
+        // between them. A purchase made under an anonymous id is charged by
+        // Apple and grants nobody.
+        await purchaseAs(userId, pkg);
 
         // The webhook grants the plan server-side; ask the server rather than
         // trusting the local receipt. Wait for THIS plan and interval, not just
@@ -105,30 +110,36 @@ export default function PaywallScreen() {
           );
         }
       } catch (err) {
-        if (!isUserCancelled(err)) {
+        if (err instanceof PurchaserIdentityError) {
+          Alert.alert(
+            'Could not confirm your account',
+            'We could not verify your account with the App Store. Nothing was charged — please try again in a moment.',
+          );
+        } else if (!isUserCancelled(err)) {
           console.warn('[paywall] purchase failed:', err);
           Alert.alert('Purchase failed', 'Nothing was charged. Please try again.');
         }
       } finally {
+        txLock.current = false;
         setBusy(null);
       }
     },
-    [busy, interval, packageFor, refreshSubscription, user?.id],
+    [interval, packageFor, refreshSubscription, user?.id],
   );
 
   // Required by App Store review: an app selling a subscription without a
   // visible restore control gets rejected.
   const onRestore = useCallback(async () => {
-    if (restoring) return;
+    if (txLock.current) return;
+    const userId = user?.id;
+    if (!userId) {
+      Alert.alert('Not signed in', 'Sign in again to restore your purchases.');
+      return;
+    }
+    txLock.current = true;
     setRestoring(true);
     try {
-      // Same gate as a purchase: a restore under the wrong identity would
-      // attach someone else's entitlement to this account.
-      if (!user?.id || !(await ensurePurchaserBound(user.id))) {
-        Alert.alert('Not signed in', 'We could not confirm your account with the App Store.');
-        return;
-      }
-      await restore();
+      await restoreAs(userId);
       const sub = await refreshSubscription({ waitForPaid: true });
       if (sub?.isPaid) {
         Alert.alert('Restored', `Your ${sub.plan} plan is active.`);
@@ -137,13 +148,24 @@ export default function PaywallScreen() {
         Alert.alert('Nothing to restore', 'No previous purchase was found for this Apple ID.');
       }
     } catch (err) {
-      console.warn('[paywall] restore failed:', err);
-      Alert.alert('Restore failed', 'Please try again.');
+      if (err instanceof PurchaserIdentityError) {
+        Alert.alert(
+          'Could not confirm your account',
+          'We could not verify your account with the App Store. Please try again in a moment.',
+        );
+      } else {
+        console.warn('[paywall] restore failed:', err);
+        Alert.alert('Restore failed', 'Please try again.');
+      }
     } finally {
+      txLock.current = false;
       setRestoring(false);
     }
-  }, [restoring, refreshSubscription, user?.id]);
+  }, [refreshSubscription, user?.id]);
 
+  // Every transactional control is disabled while any one of them is running,
+  // not just the card that was tapped.
+  const locked = busy !== null || restoring;
   const currentPlan = subscription.data?.isPaid ? subscription.data.plan : null;
   const storeUnavailable = !loading && packages.length === 0;
 
@@ -216,6 +238,7 @@ export default function PaywallScreen() {
                 interval={interval}
                 pkg={packageFor(plan.id)}
                 busy={busy === plan.id}
+                locked={locked}
                 current={currentPlan === plan.id}
                 onPress={() => void onSubscribe(plan.id)}
               />
@@ -224,9 +247,10 @@ export default function PaywallScreen() {
 
           <Pressable
             onPress={() => void onRestore()}
-            disabled={restoring}
+            disabled={locked}
             accessibilityRole="button"
-            style={({ pressed }) => [pressed && { opacity: 0.7 }, restoring && { opacity: 0.5 }]}
+            accessibilityState={{ disabled: locked }}
+            style={({ pressed }) => [pressed && { opacity: 0.7 }, locked && { opacity: 0.5 }]}
             className="py-3 items-center"
           >
             <Text className="text-sm text-accent font-semibold">

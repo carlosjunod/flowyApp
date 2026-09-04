@@ -18,6 +18,7 @@ import Purchases, {
 } from 'react-native-purchases';
 
 import { ENV } from './env';
+import { createSerialQueue } from './serialQueue';
 
 /** StoreKit only. Android would need its own RevenueCat key and products. */
 const SUPPORTED = Platform.OS === 'ios';
@@ -56,76 +57,48 @@ export function initPurchases(): Promise<boolean> {
   return configurePromise;
 }
 
-/** The id we last bound successfully, and the binding currently in flight. */
+/**
+ * Every operation that reads or changes the RevenueCat identity — and every
+ * operation that spends money under it — runs through one queue.
+ *
+ * Verifying the app user id and then calling StoreKit as two separate awaits
+ * is not enough: a logIn or logOut started by the auth effect can land in
+ * between, so the gate passes for user A and Apple charges user B. Holding the
+ * check and the charge in a single queued section is what closes that window.
+ */
+const identityQueue = createSerialQueue();
+
+/** The id currently bound in RevenueCat, as far as this module knows. */
 let boundUserId: string | null = null;
-let identityPromise: Promise<boolean> | null = null;
+
+/** Thrown when a purchase or restore could not be proven to belong to the user. */
+export class PurchaserIdentityError extends Error {
+  constructor() {
+    super('RevenueCat identity does not match the signed-in user');
+    this.name = 'PurchaserIdentityError';
+  }
+}
 
 /**
- * Bind the RevenueCat identity to the PocketBase user. Awaits configure first
- * so callers can fire this the moment a session appears.
- *
- * Callers that are about to move money must NOT rely on this having finished —
- * it is started from an effect and is not awaited there. Use
- * `ensurePurchaserBound` immediately before a purchase or restore.
+ * Bind and verify. MUST be called only from inside the queue — it performs the
+ * check that the caller's very next line depends on staying true.
  */
-export function identifyPurchaser(userId: string): Promise<boolean> {
-  if (!userId) return Promise.resolve(false);
-  const pending = (async () => {
-    if (!(await initPurchases())) return false;
+async function bindLocked(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  if (!(await initPurchases())) return false;
+
+  if (boundUserId !== userId) {
     try {
       await Purchases.logIn(userId);
       boundUserId = userId;
-      return true;
     } catch (err) {
       console.warn('[purchases] logIn failed:', err);
       if (boundUserId === userId) boundUserId = null;
       return false;
     }
-  })();
-  identityPromise = pending;
-  return pending;
-}
-
-export async function forgetPurchaser(): Promise<void> {
-  boundUserId = null;
-  identityPromise = null;
-  if (!configured) return;
-  try {
-    await Purchases.logOut();
-  } catch (err) {
-    // logOut throws when the current user is already anonymous. Harmless.
-    console.warn('[purchases] logOut failed:', err);
-  }
-}
-
-/**
- * Fail-closed gate to run immediately before any purchase or restore.
- *
- * `identifyPurchaser` is fired from an auth effect and is NOT awaited there, so
- * a user who reaches the paywall quickly — or who just switched accounts — can
- * otherwise transact while `logIn` is still in flight or after it failed. A
- * purchase completed under an anonymous `$RCAnonymousID:` is charged by Apple
- * and grants nobody, and nothing downstream can repair it.
- *
- * Waits for any binding in flight, rebinds if needed, then asks the SDK for the
- * app user id rather than trusting this module's own bookkeeping. Returns false
- * whenever it cannot prove the identity matches; callers must abort on false.
- */
-export async function ensurePurchaserBound(userId: string): Promise<boolean> {
-  if (!userId) return false;
-  if (!(await initPurchases())) return false;
-
-  // Whatever the auth effect started, let it settle before judging the state.
-  if (identityPromise) {
-    try {
-      await identityPromise;
-    } catch {
-      // Swallowed: the verification below is what decides, not this outcome.
-    }
   }
 
-  if (boundUserId !== userId && !(await identifyPurchaser(userId))) return false;
-
+  // Ask the SDK rather than trusting this module's bookkeeping.
   try {
     return (await Purchases.getAppUserID()) === userId;
   } catch (err) {
@@ -134,20 +107,57 @@ export async function ensurePurchaserBound(userId: string): Promise<boolean> {
   }
 }
 
+/**
+ * Bind the RevenueCat identity to the PocketBase user. Fired from the auth
+ * effect and deliberately not awaited there; the queue is what makes that safe.
+ */
+export function identifyPurchaser(userId: string): Promise<boolean> {
+  if (!userId) return Promise.resolve(false);
+  return identityQueue(() => bindLocked(userId));
+}
+
+export function forgetPurchaser(): Promise<void> {
+  return identityQueue(async () => {
+    boundUserId = null;
+    if (!configured) return;
+    try {
+      await Purchases.logOut();
+    } catch (err) {
+      // logOut throws when the current user is already anonymous. Harmless.
+      console.warn('[purchases] logOut failed:', err);
+    }
+  });
+}
+
+/**
+ * Buy, fail-closed, with the identity check and the charge in one section.
+ *
+ * Throws `PurchaserIdentityError` when the buyer could not be proven to be
+ * `userId` — a purchase completed under an anonymous `$RCAnonymousID:` is
+ * charged by Apple and grants nobody, and nothing downstream can repair it.
+ */
+export function purchaseAs(userId: string, pkg: PurchasesPackage): Promise<CustomerInfo> {
+  return identityQueue(async () => {
+    if (!(await bindLocked(userId))) throw new PurchaserIdentityError();
+    const { customerInfo } = await Purchases.purchasePackage(pkg);
+    return customerInfo;
+  });
+}
+
+/** Same gate as a purchase: restoring under the wrong identity would attach
+ * someone else's entitlement to this account. */
+export function restoreAs(userId: string): Promise<CustomerInfo> {
+  return identityQueue(async () => {
+    if (!(await bindLocked(userId))) throw new PurchaserIdentityError();
+    return Purchases.restorePurchases();
+  });
+}
+
 /** Empty when purchases are unavailable or the offering has no packages. */
 export async function getOfferingPackages(): Promise<PurchasesPackage[]> {
   if (!(await initPurchases())) return [];
   const offerings = await Purchases.getOfferings();
   return offerings.current?.availablePackages ?? [];
-}
-
-export async function purchase(pkg: PurchasesPackage): Promise<CustomerInfo> {
-  const { customerInfo } = await Purchases.purchasePackage(pkg);
-  return customerInfo;
-}
-
-export async function restore(): Promise<CustomerInfo> {
-  return Purchases.restorePurchases();
 }
 
 /** True when the user dismissed the App Store sheet — not an error to report. */

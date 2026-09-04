@@ -15,11 +15,21 @@ type Props = {
   /** Null when StoreKit has no package for this plan+interval. */
   pkg: PurchasesPackage | null;
   busy: boolean;
+  /** True while ANY purchase or restore is running, not just this card's. */
+  locked: boolean;
   current: boolean;
   onPress: () => void;
 };
 
-export const PlanCard: React.FC<Props> = ({ plan, interval, pkg, busy, current, onPress }) => {
+export const PlanCard: React.FC<Props> = ({
+  plan,
+  interval,
+  pkg,
+  busy,
+  locked,
+  current,
+  onPress,
+}) => {
   const colors = useResolvedColors();
   const available = pkg !== null;
   // StoreKit's localized `priceString` is what the purchase sheet will charge:
@@ -62,7 +72,7 @@ export const PlanCard: React.FC<Props> = ({ plan, interval, pkg, busy, current, 
         title={cta}
         variant={featured ? 'accent' : 'secondary'}
         loading={busy}
-        disabled={!available || current}
+        disabled={!available || current || locked}
         onPress={onPress}
         accessibilityLabel={`${cta}, ${price} per ${interval}`}
       />
