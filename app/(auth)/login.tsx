@@ -130,13 +130,13 @@ export default function LoginScreen() {
               className="mt-2"
             />
 
-            {appleAvailable ? (
-              <View className="mt-4 gap-3">
-                <View className="flex-row items-center gap-3">
-                  <View className="flex-1 h-px bg-border" />
-                  <Text className="text-xs text-muted">or</Text>
-                  <View className="flex-1 h-px bg-border" />
-                </View>
+            <View className="mt-4 gap-3">
+              <View className="flex-row items-center gap-3">
+                <View className="flex-1 h-px bg-border" />
+                <Text className="text-xs text-muted">or</Text>
+                <View className="flex-1 h-px bg-border" />
+              </View>
+              {appleAvailable ? (
                 <AppleAuthentication.AppleAuthenticationButton
                   buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
                   buttonStyle={
@@ -148,8 +148,23 @@ export default function LoginScreen() {
                   style={{ height: 44, width: '100%', opacity: appleLoading ? 0.6 : 1 }}
                   onPress={onApple}
                 />
-              </View>
-            ) : null}
+              ) : null}
+              {/*
+                Google entry point. `api.authGoogle` is wired server-side, but no
+                native Google lib is installed yet (@react-native-google-signin or
+                expo-auth-session) — adding one needs a rebuild. Until then this
+                surfaces the option and a clear message instead of silently 404ing.
+              */}
+              <Pressable
+                onPress={() =>
+                  setError('Google sign-in is being set up — use email or Apple for now.')
+                }
+                accessibilityRole="button"
+                className="h-11 rounded-xl border border-border bg-card items-center justify-center"
+              >
+                <Text className="text-fg text-sm font-medium">Continue with Google</Text>
+              </Pressable>
+            </View>
           </View>
 
           <View className="flex-row items-center justify-center mt-8 gap-1">

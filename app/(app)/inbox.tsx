@@ -181,12 +181,15 @@ export default function InboxScreen() {
             </View>
           )}
           ListEmptyComponent={
-            <View className="items-center justify-center px-6 pt-16">
-              <Text className="text-5xl mb-3">{search ? '🔍' : '📥'}</Text>
-              <Text className="text-base text-muted">
-                {search ? 'No items match your search' : 'Nothing saved yet'}
-              </Text>
-            </View>
+            <EmptyState
+              hasFilters={!!search || !!category}
+              search={search}
+              category={category}
+              onClearFilters={() => {
+                setSearchInput('');
+                setCategory(null);
+              }}
+            />
           }
           ListFooterComponent={
             query.hasNextPage ? (
@@ -224,12 +227,15 @@ export default function InboxScreen() {
             )
           }
           ListEmptyComponent={
-            <View className="items-center justify-center px-6 pt-16">
-              <Text className="text-5xl mb-3">{search ? '🔍' : '📥'}</Text>
-              <Text className="text-base text-muted">
-                {search ? 'No items match your search' : 'Nothing saved yet'}
-              </Text>
-            </View>
+            <EmptyState
+              hasFilters={!!search || !!category}
+              search={search}
+              category={category}
+              onClearFilters={() => {
+                setSearchInput('');
+                setCategory(null);
+              }}
+            />
           }
           ListFooterComponent={
             query.hasNextPage ? (
@@ -253,6 +259,48 @@ export default function InboxScreen() {
 type ListRow =
   | { kind: 'header'; label: string; count: number }
   | { kind: 'item'; item: Item };
+
+// Distinguishes a filtered empty inbox (user search/category produced no
+// matches) from a first-run empty inbox (no items at all). Web equivalent:
+// apps/web/components/inbox/InboxGrid.tsx#EmptyState.
+const EmptyState: React.FC<{
+  hasFilters: boolean;
+  search: string;
+  category: string | null;
+  onClearFilters: () => void;
+}> = ({ hasFilters, search, category, onClearFilters }) => {
+  if (hasFilters) {
+    const what = search
+      ? `“${search}”`
+      : category
+        ? `the ${category} category`
+        : 'your filters';
+    return (
+      <View className="items-center justify-center px-6 pt-16">
+        <Text className="text-5xl mb-3">🔍</Text>
+        <Text className="text-base text-muted text-center mb-3">
+          No items match {what}.
+        </Text>
+        <Pressable
+          onPress={onClearFilters}
+          hitSlop={6}
+          accessibilityRole="button"
+          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+        >
+          <Text className="text-accent" style={{ fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>
+            Clear filters
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+  return (
+    <View className="items-center justify-center px-6 pt-16">
+      <Text className="text-5xl mb-3">📥</Text>
+      <Text className="text-base text-muted">Nothing saved yet</Text>
+    </View>
+  );
+};
 
 const SectionHeader: React.FC<{ label: string; count: number }> = ({ label, count }) => (
   <View className="flex-row items-baseline justify-between px-4 pt-5 pb-2">

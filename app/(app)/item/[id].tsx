@@ -10,28 +10,31 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Share,
   Text,
   TextInput,
   View,
   useWindowDimensions,
 } from 'react-native';
-import Markdown from 'react-native-markdown-display';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EnrichedSections } from '@/components/inbox/EnrichedSections';
 import { ExploreCTA } from '@/components/inbox/ExploreCTA';
-import { MediaCarousel } from '@/components/inbox/MediaCarousel';
+import { SourceChip } from '@/components/inbox/SourceChip';
+import { TagEditor } from '@/components/inbox/TagEditor';
 import { TagSuggestions } from '@/components/inbox/TagSuggestions';
-import { ReceiptContent } from '@/components/inbox/content/ReceiptContent';
+import { ContentRenderer } from '@/components/inbox/content/ContentRenderer';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { useItemActions } from '@/hooks/useItemActions';
 import { useDeleteItem, useItemById, usePatchItem } from '@/hooks/useItems';
 import { useItemStatus } from '@/hooks/useItemStatus';
+import { getContentType } from '@/lib/contentType';
 import { ENV } from '@/lib/env';
 import { pb } from '@/lib/pb';
 import { relativeDate } from '@/lib/relativeDate';
+import { sourceChip } from '@/lib/sourceChip';
 import { hostOf, thumbnailFor, typeGlyph } from '@/lib/thumbnails';
 import { useResolvedColors } from '@/lib/theme';
 import type { Item } from '@/types';
@@ -57,10 +60,13 @@ export default function ItemDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const id = params.id;
   const { data: item, isLoading, error } = useItemById(id);
-  useItemStatus(id);
+  // Pass the exploration status so the watcher re-arms when one starts. It
+  // settles on a ready item, and an exploration can begin long after that.
+  useItemStatus(id, item?.exploration?.status);
   const { data: relatedItems = [] } = useRelatedItems(item);
   const { width } = useWindowDimensions();
   const colors = useResolvedColors();
+  const actions = useItemActions();
 
   const [editing, setEditing] = useState(false);
 
@@ -89,6 +95,13 @@ export default function ItemDetailScreen() {
     ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`
     : null;
 
+  // Content type drives which renderer paints the body — and decides whether
+  // the screen owns a static hero. youtube/reel/carousel renderers paint their
+  // own primary media, so the static hero would just duplicate it. receipt
+  // and generic don't, so they keep the hero block.
+  const contentType = getContentType(item);
+  const showHero = contentType === 'receipt' || contentType === 'generic';
+
   const heroWidth = width - 32;
   const heroHeight = Math.round(heroWidth * 1.25);
   const heroThumb = thumbnailFor(item);
@@ -97,7 +110,6 @@ export default function ItemDetailScreen() {
     : null;
   const heroUri = firstSlideUri
     ?? (heroThumb.kind === 'image' ? heroThumb.uri : null);
-  const showCarousel = (item.media?.length ?? 0) > 1;
 
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
@@ -118,6 +130,7 @@ export default function ItemDetailScreen() {
         </Pressable>
         <View className="flex-row gap-4">
           <ReloadButton item={item} />
+          <ShareButton item={item} />
           <Pressable onPress={() => setEditing(true)} hitSlop={8}>
             <Text className="text-fg" style={{ fontFamily: 'Inter_500Medium', fontSize: 14 }}>
               Edit
@@ -127,14 +140,8 @@ export default function ItemDetailScreen() {
         </View>
       </View>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 96, gap: 16 }}>
-        <View className="relative">
-          {showCarousel && item.media ? (
-            <MediaCarousel
-              slides={item.media}
-              width={heroWidth}
-              height={heroHeight}
-            />
-          ) : (
+        {showHero ? (
+          <View className="relative">
             <View
               className="bg-surface"
               style={{
@@ -157,28 +164,28 @@ export default function ItemDetailScreen() {
                 </View>
               )}
             </View>
-          )}
-          {domainLabel ? (
-            <View
-              className="absolute top-3 left-3 flex-row items-center gap-1.5 rounded-full px-2.5 py-1.5"
-              style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}
-            >
-              {faviconUri ? (
-                <Image
-                  source={{ uri: faviconUri }}
-                  style={{ width: 14, height: 14, borderRadius: 3 }}
-                  contentFit="contain"
-                />
-              ) : null}
-              <Text
-                style={{ fontFamily: 'Inter_500Medium', fontSize: 12, color: '#1C1815' }}
-                numberOfLines={1}
+            {domainLabel ? (
+              <View
+                className="absolute top-3 left-3 flex-row items-center gap-1.5 rounded-full px-2.5 py-1.5"
+                style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}
               >
-                {domainLabel}
-              </Text>
-            </View>
-          ) : null}
-        </View>
+                {faviconUri ? (
+                  <Image
+                    source={{ uri: faviconUri }}
+                    style={{ width: 14, height: 14, borderRadius: 3 }}
+                    contentFit="contain"
+                  />
+                ) : null}
+                <Text
+                  style={{ fontFamily: 'Inter_500Medium', fontSize: 12, color: '#1C1815' }}
+                  numberOfLines={1}
+                >
+                  {domainLabel}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
         <View className="gap-2.5">
           <Text
@@ -193,6 +200,7 @@ export default function ItemDetailScreen() {
             {item.title ?? 'Untitled'}
           </Text>
           <View className="flex-row flex-wrap items-center gap-2">
+            <SourceChip chip={sourceChip(item, contentType)} />
             {item.category ? <Badge label={item.category} tone="accent" /> : null}
             <Text
               className="text-muted"
@@ -229,10 +237,26 @@ export default function ItemDetailScreen() {
           </Pressable>
         ) : null}
 
-        {item.exploration ? (
+        {/* Rendered unconditionally, and NOT behind `item.exploration`.
+            That field only exists once an exploration has already run: the
+            server creates it when POST /api/items/bulk/explore starts a job.
+            Gating on it meant the only control that can start one appeared
+            solely on items that no longer needed it — and with auto-enrich at
+            ingest opt-in and off (AUTO_ENRICH_ENABLED), that was every item.
+            ExploreCTA already handles `exploration === undefined` as its
+            `idle` variant. Only ready items can be explored (the server
+            answers NOT_READY otherwise), so still gate on status. */}
+        {item.status === 'ready' ? (
           <ExploreCTA
             exploration={item.exploration}
             isReceipt={item.type === 'receipt'}
+            onPress={() => {
+              void actions.exploreMany([item.id], { deep: true }).then((res) => {
+                if (!res.ok && 'error' in res && res.error.message !== 'Cancelled') {
+                  Alert.alert('Exploration failed', res.error.message);
+                }
+              });
+            }}
           />
         ) : null}
 
@@ -292,90 +316,9 @@ export default function ItemDetailScreen() {
           </View>
         ) : null}
 
-        {item.type === 'receipt' ? <ReceiptContent item={item} /> : null}
+        <ContentRenderer item={item} contentType={contentType} />
 
-        {item.type !== 'receipt' && item.content ? (
-          <View>
-            <Markdown
-              style={{
-                body: {
-                  color: colors.fg,
-                  fontSize: 16,
-                  lineHeight: 26,
-                  fontFamily: 'Inter_400Regular',
-                },
-                paragraph: { marginTop: 0, marginBottom: 12 },
-                blockquote: {
-                  borderLeftWidth: 3,
-                  borderLeftColor: colors.accent,
-                  paddingLeft: 14,
-                  paddingVertical: 4,
-                  marginVertical: 8,
-                  fontFamily: 'InstrumentSerif_400Regular',
-                  fontStyle: 'italic',
-                },
-                heading2: {
-                  fontSize: 22,
-                  marginTop: 16,
-                  marginBottom: 8,
-                  fontFamily: 'InstrumentSerif_400Regular',
-                  color: colors.fg,
-                },
-                heading3: {
-                  fontSize: 18,
-                  marginTop: 12,
-                  marginBottom: 6,
-                  fontFamily: 'Inter_600SemiBold',
-                  color: colors.fg,
-                },
-                link: { color: colors.accent, fontWeight: '600' as const },
-                code_inline: {
-                  backgroundColor: colors.surface,
-                  color: colors.fg,
-                  borderColor: colors.border,
-                  borderWidth: 1,
-                  borderRadius: 4,
-                  paddingHorizontal: 5,
-                  paddingVertical: 1,
-                  fontFamily: 'Menlo',
-                  fontSize: 13,
-                },
-                fence: {
-                  backgroundColor: colors.surface,
-                  color: colors.fg,
-                  borderColor: colors.border,
-                  borderWidth: 1,
-                  borderRadius: 10,
-                  padding: 12,
-                  marginVertical: 8,
-                  fontFamily: 'Menlo',
-                  fontSize: 13,
-                },
-                code_block: {
-                  backgroundColor: colors.surface,
-                  color: colors.fg,
-                  borderColor: colors.border,
-                  borderWidth: 1,
-                  borderRadius: 10,
-                  padding: 12,
-                  marginVertical: 8,
-                  fontFamily: 'Menlo',
-                  fontSize: 13,
-                },
-              }}
-            >
-              {item.content}
-            </Markdown>
-          </View>
-        ) : null}
-
-        {(item.tags ?? []).length > 0 ? (
-          <View className="flex-row flex-wrap gap-2">
-            {(item.tags ?? []).map((tag) => (
-              <Badge key={tag} label={tag} />
-            ))}
-          </View>
-        ) : null}
+        <TagEditor item={item} />
 
         <TagSuggestions item={item} />
 
@@ -476,6 +419,30 @@ const RelatedCard: React.FC<{ item: Item }> = ({ item }) => {
           </Text>
         </View>
       </View>
+    </Pressable>
+  );
+};
+
+const ShareButton: React.FC<{ item: Item }> = ({ item }) => {
+  const onPress = async () => {
+    const url = item.source_url ?? item.raw_url;
+    const title = item.title ?? 'Flowy item';
+    try {
+      await Share.share(
+        url
+          ? { url, message: `${title}\n${url}`, title }
+          : { message: title, title },
+      );
+    } catch {
+      // Share sheet cancellations come back as rejections on iOS in some RN
+      // versions — silently ignore. Other errors aren't worth alerting on.
+    }
+  };
+  return (
+    <Pressable onPress={onPress} hitSlop={8} accessibilityLabel="Share item">
+      <Text className="text-fg" style={{ fontFamily: 'Inter_500Medium', fontSize: 14 }}>
+        Share
+      </Text>
     </Pressable>
   );
 };

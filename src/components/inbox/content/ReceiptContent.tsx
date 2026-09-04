@@ -24,7 +24,24 @@ export const ReceiptContent: React.FC<{ item: Item }> = ({ item }) => {
   const data = item.structured_content as ReceiptData | undefined;
   const photoUrl = data?.originalPhotoUrl ?? item.original_media_urls?.[0];
 
-  if (!data || !data.store) {
+  // `structured_content` is `unknown` on the wire and this cast does not check
+  // anything, so the guard has to. Checking only `store` was not enough: a
+  // legacy or partially-extracted receipt that has a store but no line items
+  // reaches `data.items.length` / `.map()` / <CategoryBreakdown items={...}>
+  // and crashes the detail screen. Require both, and require store.name,
+  // which is dereferenced unconditionally below.
+  // Checking `store` alone was not enough, and neither is Array.isArray on its
+  // own: `{store:{name:'x'}, items:[]}` still reaches PaymentGrid, which
+  // dereferences `data.payment.provider`, and `items:[null]` still reaches
+  // renderers that read `it.id` / `it.quantity`. Require every shape actually
+  // dereferenced below.
+  const hasStore = typeof data?.store?.name === 'string';
+  const hasItems =
+    Array.isArray(data?.items) &&
+    data.items.every((it) => typeof it === 'object' && it !== null);
+  const hasPayment = typeof data?.payment === 'object' && data.payment !== null;
+
+  if (!data || !hasStore || !hasItems || !hasPayment) {
     return (
       <View className="rounded-xl border border-border bg-surface p-3.5">
         <Text

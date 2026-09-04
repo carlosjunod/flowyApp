@@ -1,4 +1,5 @@
 import type {
+  AliasData,
   ApiError,
   ApiErrorCode,
   ApiResult,
@@ -8,9 +9,6 @@ import type {
   CitedItem,
   Digest,
   DigestSettings,
-  ImportBatch,
-  IngestBulkPayload,
-  IngestBulkResponse,
   IngestPayload,
   IngestResponse,
   Item,
@@ -133,14 +131,14 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
-  ingestBulk: (payload: IngestBulkPayload) =>
-    request<IngestBulkResponse>('/api/ingest/bulk', {
+  exploreMany: (
+    ids: string[],
+    options: { deep?: boolean; includeVideoFrames?: boolean } = {},
+  ) =>
+    request<BulkActionResult>('/api/items/bulk/explore', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ids, ...options }),
     }),
-
-  getImportBatch: (id: string) =>
-    request<ImportBatch>(`/api/import-batches/${id}`),
 
   registerEmail: (email: string, password: string, name?: string) =>
     request<AuthSession>('/api/auth/register', {
@@ -171,6 +169,11 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(patch),
     }),
+
+  getEmailAlias: () => request<AliasData>('/api/account/alias'),
+
+  regenerateEmailAlias: () =>
+    request<AliasData>('/api/account/alias', { method: 'POST' }),
 };
 
 export type ChatStreamEvent =
@@ -209,7 +212,27 @@ export async function* chatStream(
   const header = res.headers.get('x-items');
   if (header) {
     try {
-      citations = JSON.parse(header) as CitedItem[];
+      // Validate the shape, don't just cast it. Any syntactically valid
+      // non-array (`{}`, `null`, `"x"`) would otherwise reach `.map()` in
+      // ChatMessage and crash the whole conversation view.
+      const parsed: unknown = JSON.parse(header);
+      // Checking `id` alone is not enough: these fields are rendered straight
+      // into <Text>, so an object-valued `title` or `category` throws
+      // "Objects are not valid as a React child" and takes the chat down.
+      const isStringOrAbsent = (v: unknown): boolean => v === undefined || typeof v === 'string';
+      citations = Array.isArray(parsed)
+        ? parsed.filter((c): c is CitedItem => {
+            if (typeof c !== 'object' || c === null) return false;
+            const o = c as Record<string, unknown>;
+            return (
+              typeof o.id === 'string' &&
+              isStringOrAbsent(o.title) &&
+              isStringOrAbsent(o.category) &&
+              isStringOrAbsent(o.source_url) &&
+              isStringOrAbsent(o.r2_key)
+            );
+          })
+        : [];
     } catch {
       citations = [];
     }

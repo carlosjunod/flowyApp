@@ -12,7 +12,12 @@ export type ItemType =
   | 'pinterest'
   | 'dribbble'
   | 'linkedin'
-  | 'twitter';
+  | 'twitter'
+  | 'tiktok'
+  | 'facebook'
+  | 'drive'
+  | 'file'
+  | 'email';
 
 export type ItemStatus = 'pending' | 'processing' | 'ready' | 'error';
 
@@ -96,6 +101,10 @@ export type Item = {
   original_title?: string;
   bookmarked_at?: string;
   import_batch?: string;
+  /** OpenGraph fields surfaced by ingest enrichment (read by detail renderers). */
+  og_image?: string;
+  og_description?: string;
+  site_name?: string;
   /**
    * Type-specific structured payload written by the worker (e.g. `ReceiptData`
    * when `type === 'receipt'`). Stored as JSON in PocketBase. Renderers narrow
@@ -116,13 +125,23 @@ export type Item = {
 
 export * from './receipt';
 
+/**
+ * Rich item reference carried by chat's `x-items` response header. The web
+ * names this `ChatItemRef`; mobile keeps the existing `CitedItem` symbol for
+ * compat. Extended fields (og_image / raw_url / site_name / status) power
+ * citation thumbnails + the "might be related" fallback rail.
+ */
 export type CitedItem = {
   id: string;
   type: ItemType;
   title?: string;
   category?: string;
   source_url?: string;
+  raw_url?: string;
   r2_key?: string;
+  og_image?: string;
+  site_name?: string;
+  status?: ItemStatus;
 };
 
 export type ChatRole = 'user' | 'assistant';
@@ -195,6 +214,12 @@ export type AuthSession = {
   token: string;
   userId: string;
   email: string;
+};
+
+export type AliasData = {
+  alias: string;
+  email: string;
+  domain: string;
 };
 
 export type DigestSection = {

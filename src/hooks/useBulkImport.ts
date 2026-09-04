@@ -12,54 +12,45 @@ type State = {
   error: ApiError | null;
 };
 
-const POLL_MS = 2000;
+// The web app has no bulk-ingest endpoint — it loops single POST /api/ingest
+// calls with bounded concurrency (see web BulkAddBookmarksButton). We mirror
+// that here while keeping this hook's public {phase,batch,error,submit,reset}
+// contract so BulkImportSheet (which reads batch.processed/total/dead_count)
+// needs no changes.
+const CONCURRENCY = 4;
+// Every URL is one POST /api/ingest, each of which scrapes and hits Claude
+// upstream. A pasted reading list of 500 links would sit here for minutes
+// hammering those limits, so the sheet refuses the batch instead.
+const MAX_URLS = 100;
+
+// The batch is synthetic (no server row), but it still needs to be distinct
+// per run: a fixed id makes two consecutive imports indistinguishable to
+// anything that keys on it, including React reconciliation in the sheet.
+const randomBatchId = (): string =>
+  `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export const useBulkImport = () => {
   const qc = useQueryClient();
   const [state, setState] = useState<State>({ phase: 'idle', batch: null, error: null });
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cancelledRef = useRef(false);
-
-  const clearTimer = () => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  };
+  // Monotonic run id rather than a shared `cancelled` boolean. reset() must
+  // abandon the run in flight while leaving the hook able to start a new one,
+  // which a boolean cannot express: the old code set it true then immediately
+  // false, so workers — which only check after each await — never saw the
+  // true and kept importing into a sheet the user had closed.
+  const runIdRef = useRef(0);
 
   useEffect(() => {
     return () => {
-      cancelledRef.current = true;
-      clearTimer();
+      runIdRef.current += 1;
     };
   }, []);
 
-  const poll = useCallback(
-    async (batchId: string) => {
-      if (cancelledRef.current) return;
-      const res = await api.getImportBatch(batchId);
-      if (cancelledRef.current) return;
-      if (res.error) {
-        setState({ phase: 'error', batch: null, error: res.error });
-        return;
-      }
-      const batch = res.data;
-      if (batch.status === 'done') {
-        setState({ phase: 'done', batch, error: null });
-        void qc.invalidateQueries({ queryKey: ['items'] });
-        return;
-      }
-      setState((s) => ({ ...s, batch }));
-      timerRef.current = setTimeout(() => {
-        void poll(batchId);
-      }, POLL_MS);
-    },
-    [qc],
-  );
-
   const submit = useCallback(
-    async (urls: string[], dedupeAgainst?: string[]) => {
+    async (urls: string[]) => {
       if (urls.length === 0) {
+        // Invalidate any run in flight first, otherwise its next completion
+        // overwrites this error and resurrects the previous batch.
+        runIdRef.current += 1;
         setState({
           phase: 'error',
           batch: null,
@@ -67,35 +58,69 @@ export const useBulkImport = () => {
         });
         return;
       }
-      cancelledRef.current = false;
-      clearTimer();
-      setState({ phase: 'submitting', batch: null, error: null });
-      const res = await api.ingestBulk({ urls, dedupeAgainst });
-      if (cancelledRef.current) return;
-      if (res.error) {
-        setState({ phase: 'error', batch: null, error: res.error });
+      if (urls.length > MAX_URLS) {
+        runIdRef.current += 1;
+        setState({
+          phase: 'error',
+          batch: null,
+          error: { code: 'INVALID_INPUT', message: `Max ${MAX_URLS} URLs per batch` },
+        });
         return;
       }
+      // Claim this run. Anything already in flight is now stale.
+      const runId = (runIdRef.current += 1);
+      const isStale = (): boolean => runIdRef.current !== runId;
+
+      const batchId = randomBatchId();
+      const total = urls.length;
+      let processed = 0;
+      let dead = 0;
+      const publish = (done: boolean) =>
+        setState({
+          phase: done ? 'done' : 'polling',
+          batch: {
+            id: batchId,
+            status: done ? 'done' : 'processing',
+            processed,
+            dead_count: dead,
+            total,
+          },
+          error: null,
+        });
+
       setState({
-        phase: 'polling',
-        batch: {
-          id: res.data.batch_id,
-          status: 'processing',
-          processed: 0,
-          dead_count: 0,
-          total: res.data.total,
-        },
+        phase: 'submitting',
+        batch: { id: batchId, status: 'processing', processed: 0, dead_count: 0, total },
         error: null,
       });
-      void poll(res.data.batch_id);
+
+      const queue = [...urls];
+      const worker = async () => {
+        while (queue.length > 0) {
+          if (isStale()) return;
+          const url = queue.shift();
+          if (!url) break;
+          const res = await api.ingest({ type: 'url', raw_url: url });
+          if (isStale()) return;
+          if (res.error) dead += 1;
+          processed += 1;
+          publish(false);
+        }
+      };
+
+      const workers = Array.from({ length: Math.min(CONCURRENCY, total) }, () => worker());
+      await Promise.all(workers);
+      if (isStale()) return;
+
+      publish(true);
+      void qc.invalidateQueries({ queryKey: ['items'] });
     },
-    [poll],
+    [qc],
   );
 
   const reset = useCallback(() => {
-    cancelledRef.current = true;
-    clearTimer();
-    cancelledRef.current = false;
+    // Bumping the id abandons whatever is in flight without blocking the next run.
+    runIdRef.current += 1;
     setState({ phase: 'idle', batch: null, error: null });
   }, []);
 

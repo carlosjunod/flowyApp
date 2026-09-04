@@ -33,6 +33,11 @@ export const typeGlyph: Record<ItemType, string> = {
   dribbble: '🏀',
   linkedin: '💼',
   twitter: '🐦',
+  tiktok: '🎵',
+  facebook: '📘',
+  drive: '📁',
+  file: '📎',
+  email: '✉️',
 };
 
 export type Thumb =

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 
 import { useResolvedColors } from '@/lib/theme';
 
@@ -41,7 +41,11 @@ export const ChatInput: React.FC<Props> = ({ onSend, disabled }) => {
           canSend ? 'bg-accent' : 'bg-accent/40'
         }`}
       >
-        <Text className="text-white font-semibold">Send</Text>
+        {disabled ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <Text className="text-white font-semibold">Send</Text>
+        )}
       </Pressable>
     </View>
   );

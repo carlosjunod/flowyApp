@@ -28,7 +28,7 @@ export default function ChatScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
       >
         <View className="flex-1">
-          <ChatWindow messages={messages} />
+          <ChatWindow messages={messages} onPromptTap={send} />
           {error ? (
             <Text className="text-danger text-sm px-4 pb-1">{error}</Text>
           ) : null}

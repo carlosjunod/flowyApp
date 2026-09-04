@@ -79,6 +79,21 @@ export default function SettingsScreen() {
           </Text>
         </Section>
 
+        <Section title="Inbox">
+          <Link href="/inbox-alias" asChild>
+            <Pressable
+              style={({ pressed }) => [pressed && { opacity: 0.7 }]}
+              className="rounded-xl border border-border bg-card px-4 py-3 flex-row items-center justify-between"
+            >
+              <View className="flex-1">
+                <Text className="text-base text-fg">Email to inbox</Text>
+                <Text className="text-xs text-muted mt-1">View, copy, regenerate your inbox address.</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={colors.muted} />
+            </Pressable>
+          </Link>
+        </Section>
+
         <Section title="Daily digest">
           <Link href="/digest" asChild>
             <Pressable

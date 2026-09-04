@@ -56,6 +56,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-secure-store',
     'expo-notifications',
     'expo-apple-authentication',
+    'expo-video',
     './plugins/withShareExtension',
     './plugins/withPodfileSigningFix',
   ],
