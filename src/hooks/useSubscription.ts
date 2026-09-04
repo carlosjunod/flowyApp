@@ -2,7 +2,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
 import { api } from '@/lib/api';
+import { satisfiesTarget, shouldPoll, type RefreshTarget } from '@/lib/entitlement';
 import type { SubscriptionView } from '@/types';
+
+export type { RefreshTarget };
 
 export const SUBSCRIPTION_QUERY_KEY = ['subscription'] as const;
 
@@ -23,17 +26,19 @@ export function useSubscription() {
 /**
  * Re-read entitlement after a purchase or restore.
  *
- * A completed StoreKit transaction is not yet an entitlement: RevenueCat has
- * to deliver its webhook and the server has to write the subscriptions row.
- * That is normally sub-second but is not synchronous with the purchase call,
- * so poll briefly rather than declaring failure on the first miss. Resolves
- * with the last view seen — paid or not — and the caller decides what to say.
+ * A completed StoreKit transaction is not yet an entitlement: RevenueCat has to
+ * deliver its webhook and the server has to write the subscriptions row. That
+ * is normally sub-second but is not synchronous with the purchase call, so poll
+ * briefly rather than declaring failure on the first miss. Resolves with the
+ * last view seen — whether or not it matched — and the caller decides what to
+ * say.
  */
 export function useRefreshSubscription() {
   const qc = useQueryClient();
   return useCallback(
-    async (opts: { waitForPaid?: boolean } = {}): Promise<SubscriptionView | null> => {
-      const attempts = opts.waitForPaid ? [0, 1000, 2000, 3000] : [0];
+    async (target: RefreshTarget = {}): Promise<SubscriptionView | null> => {
+      const polling = shouldPoll(target);
+      const attempts = polling ? [0, 1000, 2000, 3000, 4000] : [0];
       let last: SubscriptionView | null = null;
       for (const delay of attempts) {
         if (delay) await new Promise((r) => setTimeout(r, delay));
@@ -44,11 +49,16 @@ export function useRefreshSubscription() {
           // not evidence the purchase failed.
           continue;
         }
-        if (!opts.waitForPaid || last.isPaid) break;
+        if (!polling || satisfiesTarget(last, target)) break;
       }
       if (last) qc.setQueryData(SUBSCRIPTION_QUERY_KEY, last);
       return last;
     },
     [qc],
   );
+}
+
+/** Did the server actually land on what the caller bought? */
+export function matchesTarget(view: SubscriptionView | null, target: RefreshTarget): boolean {
+  return view ? satisfiesTarget(view, target) : false;
 }

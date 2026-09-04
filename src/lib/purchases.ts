@@ -56,27 +56,81 @@ export function initPurchases(): Promise<boolean> {
   return configurePromise;
 }
 
+/** The id we last bound successfully, and the binding currently in flight. */
+let boundUserId: string | null = null;
+let identityPromise: Promise<boolean> | null = null;
+
 /**
  * Bind the RevenueCat identity to the PocketBase user. Awaits configure first
  * so callers can fire this the moment a session appears.
+ *
+ * Callers that are about to move money must NOT rely on this having finished —
+ * it is started from an effect and is not awaited there. Use
+ * `ensurePurchaserBound` immediately before a purchase or restore.
  */
-export async function identifyPurchaser(userId: string): Promise<void> {
-  if (!userId) return;
-  if (!(await initPurchases())) return;
-  try {
-    await Purchases.logIn(userId);
-  } catch (err) {
-    console.warn('[purchases] logIn failed:', err);
-  }
+export function identifyPurchaser(userId: string): Promise<boolean> {
+  if (!userId) return Promise.resolve(false);
+  const pending = (async () => {
+    if (!(await initPurchases())) return false;
+    try {
+      await Purchases.logIn(userId);
+      boundUserId = userId;
+      return true;
+    } catch (err) {
+      console.warn('[purchases] logIn failed:', err);
+      if (boundUserId === userId) boundUserId = null;
+      return false;
+    }
+  })();
+  identityPromise = pending;
+  return pending;
 }
 
 export async function forgetPurchaser(): Promise<void> {
+  boundUserId = null;
+  identityPromise = null;
   if (!configured) return;
   try {
     await Purchases.logOut();
   } catch (err) {
     // logOut throws when the current user is already anonymous. Harmless.
     console.warn('[purchases] logOut failed:', err);
+  }
+}
+
+/**
+ * Fail-closed gate to run immediately before any purchase or restore.
+ *
+ * `identifyPurchaser` is fired from an auth effect and is NOT awaited there, so
+ * a user who reaches the paywall quickly — or who just switched accounts — can
+ * otherwise transact while `logIn` is still in flight or after it failed. A
+ * purchase completed under an anonymous `$RCAnonymousID:` is charged by Apple
+ * and grants nobody, and nothing downstream can repair it.
+ *
+ * Waits for any binding in flight, rebinds if needed, then asks the SDK for the
+ * app user id rather than trusting this module's own bookkeeping. Returns false
+ * whenever it cannot prove the identity matches; callers must abort on false.
+ */
+export async function ensurePurchaserBound(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  if (!(await initPurchases())) return false;
+
+  // Whatever the auth effect started, let it settle before judging the state.
+  if (identityPromise) {
+    try {
+      await identityPromise;
+    } catch {
+      // Swallowed: the verification below is what decides, not this outcome.
+    }
+  }
+
+  if (boundUserId !== userId && !(await identifyPurchaser(userId))) return false;
+
+  try {
+    return (await Purchases.getAppUserID()) === userId;
+  } catch (err) {
+    console.warn('[purchases] app user id check failed:', err);
+    return false;
   }
 }
 

@@ -14,7 +14,12 @@ export interface PaywallPlan {
   id: PaidPlanId;
   name: string;
   tagline: string;
-  /** Display strings only; StoreKit is the source of truth for what is charged. */
+  /**
+   * FALLBACK display strings for the moment before StoreKit offerings load.
+   * The paywall renders `pkg.product.priceString` whenever it has one, because
+   * that carries the viewer's currency and any App Store Connect price change.
+   * These must stay in step with the prices configured in App Store Connect.
+   */
   priceMonth: string;
   priceYear: string;
   highlights: string[];

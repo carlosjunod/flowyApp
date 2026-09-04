@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
 import { Text, View } from 'react-native';
+import type { PurchasesPackage } from 'react-native-purchases';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -11,23 +12,21 @@ import type { BillingInterval } from '@/types';
 type Props = {
   plan: PaywallPlan;
   interval: BillingInterval;
-  /** False when StoreKit has no package for this plan+interval. */
-  available: boolean;
+  /** Null when StoreKit has no package for this plan+interval. */
+  pkg: PurchasesPackage | null;
   busy: boolean;
   current: boolean;
   onPress: () => void;
 };
 
-export const PlanCard: React.FC<Props> = ({
-  plan,
-  interval,
-  available,
-  busy,
-  current,
-  onPress,
-}) => {
+export const PlanCard: React.FC<Props> = ({ plan, interval, pkg, busy, current, onPress }) => {
   const colors = useResolvedColors();
-  const price = interval === 'month' ? plan.priceMonth : plan.priceYear;
+  const available = pkg !== null;
+  // StoreKit's localized `priceString` is what the purchase sheet will charge:
+  // it carries the viewer's currency and any App Store Connect price change.
+  // The catalogue string is only a fallback for the moment before offerings
+  // load — showing it to a non-US storefront would disagree with the sheet.
+  const price = pkg?.product.priceString ?? (interval === 'month' ? plan.priceMonth : plan.priceYear);
   const featured = plan.badge === 'most_popular';
 
   const cta = current ? 'Current plan' : available ? `Choose ${plan.name}` : 'Unavailable';

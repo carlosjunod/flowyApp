@@ -17,9 +17,16 @@ import type { PurchasesPackage } from 'react-native-purchases';
 
 import { PlanCard } from '@/components/billing/PlanCard';
 import { Spinner } from '@/components/ui/Spinner';
-import { useRefreshSubscription, useSubscription } from '@/hooks/useSubscription';
+import { matchesTarget, useRefreshSubscription, useSubscription } from '@/hooks/useSubscription';
+import { useAuth } from '@/lib/auth';
 import { PAYWALL_PLANS, productId } from '@/lib/plans';
-import { getOfferingPackages, isUserCancelled, purchase, restore } from '@/lib/purchases';
+import {
+  ensurePurchaserBound,
+  getOfferingPackages,
+  isUserCancelled,
+  purchase,
+  restore,
+} from '@/lib/purchases';
 import { useResolvedColors } from '@/lib/theme';
 import type { BillingInterval, PaidPlanId } from '@/types';
 
@@ -30,6 +37,7 @@ const INTERVALS: readonly { value: BillingInterval; label: string }[] = [
 
 export default function PaywallScreen() {
   const colors = useResolvedColors();
+  const { user } = useAuth();
   const subscription = useSubscription();
   const refreshSubscription = useRefreshSubscription();
 
@@ -68,11 +76,27 @@ export default function PaywallScreen() {
       if (!pkg || busy) return;
       setBusy(plan);
       try {
+        // Fail closed: never let a charge happen unless RevenueCat's app user
+        // id is provably this PocketBase user. A purchase made under an
+        // anonymous id is charged by Apple and grants nobody.
+        if (!user?.id || !(await ensurePurchaserBound(user.id))) {
+          Alert.alert(
+            'Not signed in',
+            'We could not confirm your account with the App Store. Nothing was charged — please try again in a moment.',
+          );
+          return;
+        }
+
         await purchase(pkg);
+
         // The webhook grants the plan server-side; ask the server rather than
-        // trusting the local receipt.
-        const sub = await refreshSubscription({ waitForPaid: true });
-        if (sub?.isPaid) {
+        // trusting the local receipt. Wait for THIS plan and interval, not just
+        // any paid state — an upgrading subscriber is already paid, so a
+        // generic isPaid check would report success before the new transaction
+        // was applied.
+        const target = { expectedPlan: plan, expectedInterval: interval };
+        const sub = await refreshSubscription(target);
+        if (matchesTarget(sub, target)) {
           router.back();
         } else {
           Alert.alert(
@@ -89,7 +113,7 @@ export default function PaywallScreen() {
         setBusy(null);
       }
     },
-    [busy, packageFor, refreshSubscription],
+    [busy, interval, packageFor, refreshSubscription, user?.id],
   );
 
   // Required by App Store review: an app selling a subscription without a
@@ -98,6 +122,12 @@ export default function PaywallScreen() {
     if (restoring) return;
     setRestoring(true);
     try {
+      // Same gate as a purchase: a restore under the wrong identity would
+      // attach someone else's entitlement to this account.
+      if (!user?.id || !(await ensurePurchaserBound(user.id))) {
+        Alert.alert('Not signed in', 'We could not confirm your account with the App Store.');
+        return;
+      }
       await restore();
       const sub = await refreshSubscription({ waitForPaid: true });
       if (sub?.isPaid) {
@@ -112,7 +142,7 @@ export default function PaywallScreen() {
     } finally {
       setRestoring(false);
     }
-  }, [restoring, refreshSubscription]);
+  }, [restoring, refreshSubscription, user?.id]);
 
   const currentPlan = subscription.data?.isPaid ? subscription.data.plan : null;
   const storeUnavailable = !loading && packages.length === 0;
@@ -184,7 +214,7 @@ export default function PaywallScreen() {
                 key={plan.id}
                 plan={plan}
                 interval={interval}
-                available={packageFor(plan.id) !== null}
+                pkg={packageFor(plan.id)}
                 busy={busy === plan.id}
                 current={currentPlan === plan.id}
                 onPress={() => void onSubscribe(plan.id)}
