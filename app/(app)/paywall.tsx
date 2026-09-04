@@ -100,8 +100,10 @@ export default function PaywallScreen() {
         // generic isPaid check would report success before the new transaction
         // was applied.
         const target = { expectedPlan: plan, expectedInterval: interval };
-        const sub = await refreshSubscription(target);
-        if (matchesTarget(sub, target)) {
+        const { view, aborted } = await refreshSubscription(target);
+        // Signed out mid-poll: the screen is gone, so say nothing.
+        if (aborted) return;
+        if (matchesTarget(view, target)) {
           router.back();
         } else {
           Alert.alert(
@@ -140,9 +142,10 @@ export default function PaywallScreen() {
     setRestoring(true);
     try {
       await restoreAs(userId);
-      const sub = await refreshSubscription({ waitForPaid: true });
-      if (sub?.isPaid) {
-        Alert.alert('Restored', `Your ${sub.plan} plan is active.`);
+      const { view, aborted } = await refreshSubscription({ waitForPaid: true });
+      if (aborted) return;
+      if (view?.isPaid) {
+        Alert.alert('Restored', `Your ${view.plan} plan is active.`);
         router.back();
       } else {
         Alert.alert('Nothing to restore', 'No previous purchase was found for this Apple ID.');

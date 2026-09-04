@@ -30,3 +30,16 @@ export function satisfiesTarget(view: SubscriptionView, target: RefreshTarget): 
 export function shouldPoll(target: RefreshTarget): boolean {
   return Boolean(target.waitForPaid || target.expectedPlan);
 }
+
+/**
+ * May a poll that outlived its screen still write to the cache?
+ *
+ * The post-purchase poll runs for up to ~10s, during which the user can close
+ * the paywall and sign out. Writing the result afterwards would repopulate the
+ * cache — after `queryClient.clear()` — with the previous account's paid plan,
+ * which the next account would then be shown. Only the identity that started
+ * the poll may commit its result.
+ */
+export function mayCommit(purchaserId: string | null, currentId: string | null): boolean {
+  return purchaserId !== null && purchaserId === currentId;
+}

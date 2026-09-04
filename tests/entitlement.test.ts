@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { satisfiesTarget, shouldPoll } from '../src/lib/entitlement';
+import { mayCommit, satisfiesTarget, shouldPoll } from '../src/lib/entitlement';
 import type { PlanId, SubscriptionView } from '../src/types';
 
 const view = (over: Partial<SubscriptionView> = {}): SubscriptionView => ({
@@ -77,5 +77,27 @@ describe('shouldPoll', () => {
     expect(shouldPoll({})).toBe(false);
     // An interval on its own never triggers polling — it only narrows a plan.
     expect(shouldPoll({ expectedInterval: 'year' })).toBe(false);
+  });
+});
+
+describe('mayCommit — a poll that outlived its screen', () => {
+  it('refuses to write back after the user signed out', () => {
+    // The bug this exists to stop: the post-purchase poll runs for ~10s, the
+    // user closes the paywall and signs out, and the callback then repopulates
+    // the cache — after queryClient.clear() — with the old paid plan.
+    expect(mayCommit('user_a', null)).toBe(false);
+  });
+
+  it('refuses to write one account result into another account', () => {
+    expect(mayCommit('user_a', 'user_b')).toBe(false);
+  });
+
+  it('commits when the session is still the one that started the poll', () => {
+    expect(mayCommit('user_a', 'user_a')).toBe(true);
+  });
+
+  it('never commits a poll that began with no session', () => {
+    expect(mayCommit(null, null)).toBe(false);
+    expect(mayCommit(null, 'user_a')).toBe(false);
   });
 });
