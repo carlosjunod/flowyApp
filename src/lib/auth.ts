@@ -5,6 +5,7 @@ import type { ApiError, AuthSession } from '@/types';
 
 import { ENV } from './env';
 import { hydratePbAuth, pb } from './pb';
+import { forgetPurchaser, identifyPurchaser } from './purchases';
 import { sharedSecureStore } from './secureStore';
 
 type AuthUser = {
@@ -55,6 +56,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubscribe();
     };
   }, []);
+
+  // RevenueCat's `app_user_id` MUST be the PocketBase user id: it is the join
+  // key the server webhook uses to find the user when Apple reports a purchase.
+  // Binding it here — off the single piece of session state — covers sign-in,
+  // session restore on launch, account switch and sign-out with one rule; a
+  // purchase made while anonymous would be charged and grant nobody.
+  const userId = user?.id ?? null;
+  useEffect(() => {
+    if (!ready) return;
+    if (userId) {
+      void identifyPurchaser(userId);
+    } else {
+      void forgetPurchaser();
+    }
+  }, [ready, userId]);
 
   const signIn = useCallback<AuthContextValue['signIn']>(async (email, password) => {
     try {

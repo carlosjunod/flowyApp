@@ -29,3 +29,33 @@ For macOS (Mac Catalyst): in Xcode, target → Supported Destinations → add "M
 - **Bundle identifiers**: main app `app.tryflowy.client`, share extension `app.tryflowy.client.ShareExtension`. App Group `group.app.tryflowy`.
 - **Youtube/TikTok/Instagram host classification** in share extension: hostname suffix match against `youtube.com`, `youtu.be`, `tiktok.com`, `instagram.com`.
 - **Share extension networking**: uses `URLSession` default config; sets `Authorization: Bearer <token>` header from shared keychain. Base URL baked in at build time via `Info.plist` `API_BASE_URL` entry injected by the config plugin from `process.env.EXPO_PUBLIC_API_BASE_URL`.
+
+## App Store IAP (feat/appstore-iap, 2026-09-04)
+
+- **BLOCKER: the server cannot yet grant an Apple purchase.** The mobile side is
+  complete, but `POST /api/billing/apple/webhook` does not exist in the Flowy web
+  repo. Its billing branch (`origin/feat/appstore-iap`) ships Stripe only —
+  `apps/web/app/api/billing/webhook/route.ts` is the Stripe webhook — and that
+  branch is **not merged to main** (5 ahead, 12 behind at time of writing).
+  Until web-plan Task 8 is merged and deployed, a sandbox or production purchase
+  completes on the device, charges the user and grants nothing. **Do not ship a
+  build with a working paywall before that lands.**
+- **BLOCKER: `EXPO_PUBLIC_REVENUECAT_IOS_KEY` has no value yet.** It needs the
+  RevenueCat app from plan Task 4. Add it to the `preview` and `production` `env`
+  blocks in `eas.json` alongside the other `EXPO_PUBLIC_*` vars — it is a public
+  SDK key, not a secret. Until then `initPurchases()` returns false, the paywall
+  reports "Plans are unavailable right now", and nothing else in the app changes.
+- **`SubscriptionView.source` is optional on purpose.** The deployed server does
+  not return it yet. `BillingSection` therefore treats `undefined` as "unknown
+  source" and shows no purchase CTA, rather than assuming Stripe and risking a
+  double charge. Once web-plan Tasks 5/10 ship, `source` arrives and the Apple
+  branch lights up on its own — no mobile change needed.
+- **`react-native-purchases` has no Expo config plugin.** v10.9.0 ships no
+  `app.plugin.js` and no `expo` field; it links through `RNPurchases.podspec` via
+  autolinking. Adding it to `plugins` in `app.config.ts` would fail prebuild with
+  "Failed to resolve plugin for module". Nothing to add there.
+- **Not verified on device.** Plan Task 2 Step 5 (confirm the RevenueCat customer
+  id equals the PocketBase user id, not `$RCAnonymousID:`) and all of Task 4
+  (App Store Connect products, Small Business Program, sandbox purchase/restore/
+  cancel/renew/duplicate-delivery) need a Mac with Xcode, a paid Apple account
+  and the RevenueCat dashboard. None of it was run.

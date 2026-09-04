@@ -1,0 +1,13 @@
+# pnpm >= 11 no longer reads `node-linker` from .npmrc — settings moved here.
+# The .npmrc line is kept for older pnpm; this file is what actually applies
+# now. Without it a fresh install (CI, EAS, a new worktree) gets pnpm's
+# isolated symlink layout, and Metro — which does not follow symlinks — fails
+# on the first transitive import, e.g. NativeWind's babel preset emitting
+# `react-native-css-interop/jsx-runtime`.
+nodeLinker: hoisted
+
+# pnpm >= 10 blocks dependency build scripts and exits non-zero when any are
+# ignored, which makes `expo install` fail. esbuild's postinstall fetches the
+# platform binary Vitest runs on.
+allowBuilds:
+  esbuild: true

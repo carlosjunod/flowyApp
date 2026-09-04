@@ -12,6 +12,7 @@ import type {
   IngestPayload,
   IngestResponse,
   Item,
+  SubscriptionView,
 } from '@/types';
 
 import { ENV } from './env';
@@ -192,6 +193,15 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(patch),
     }),
+
+  /**
+   * The server is the ONLY source of truth for entitlement. After an in-app
+   * purchase the RevenueCat webhook writes the subscription row, so the app
+   * re-reads this rather than trusting the local StoreKit receipt — a local
+   * `customerInfo.entitlements.active` check may drive optimistic UI, never
+   * access.
+   */
+  getSubscription: () => request<SubscriptionView>('/api/billing/subscription'),
 
   getEmailAlias: () => request<AliasData>('/api/account/alias'),
 

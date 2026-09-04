@@ -5,6 +5,7 @@ import React from 'react';
 import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BillingSection } from '@/components/billing/BillingSection';
 import { DeleteAccountSection } from '@/components/settings/DeleteAccountSection';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/lib/auth';
@@ -37,6 +38,10 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 32, gap: 24 }} className="px-4">
+        <Section title="Plan">
+          <BillingSection />
+        </Section>
+
         <Section title="Account">
           <View className="rounded-xl border border-border bg-card px-4 py-3">
             <Text className="text-xs uppercase tracking-wide text-muted">Signed in as</Text>

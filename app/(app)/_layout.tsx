@@ -77,6 +77,9 @@ export default function AppLayout() {
       />
       <Tabs.Screen name="digest-settings" options={{ href: null, title: 'Digest settings' }} />
       <Tabs.Screen name="inbox-alias" options={{ href: null, title: 'Email to inbox' }} />
+      {/* href: null keeps the paywall out of the tab bar — it is pushed from
+          Settings, not browsed to. */}
+      <Tabs.Screen name="paywall" options={{ href: null, title: 'Upgrade' }} />
     </Tabs>
     </SelectionProvider>
   );

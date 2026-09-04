@@ -265,3 +265,59 @@ export type BulkActionResult = {
 };
 
 export type BulkActionPayload = { ids: string[] };
+
+// ---- Billing ----
+// Mirrors the server contract in the Flowy web repo (`apps/web/types/billing.ts`).
+// Keep the two in step: this is a hand-copied contract, not a shared package.
+
+export type PlanId = 'free' | 'starter' | 'plus' | 'pro';
+export type PaidPlanId = Exclude<PlanId, 'free'>;
+export type BillingInterval = 'month' | 'year';
+
+/** Which processor the active subscription is billed through. */
+export type SubscriptionSource = 'stripe' | 'apple';
+
+export type SubscriptionStatus =
+  | 'none'
+  | 'incomplete'
+  | 'incomplete_expired'
+  | 'trialing'
+  | 'active'
+  | 'past_due'
+  | 'canceled'
+  | 'unpaid'
+  | 'paused';
+
+export type PlanLimits = {
+  savesPerMonth: number | 'unlimited';
+  aiActionsPerMonth: number | 'unlimited';
+  deepDivesPerMonth: number | 'unlimited';
+  dailyDigest: boolean;
+  emailIn: boolean;
+  priorityProcessing: boolean;
+  chatHistoryDays: number | 'unlimited';
+};
+
+export type SubscriptionView = {
+  /** Effective plan — falls back to 'free' when the status is not entitled. */
+  plan: PlanId;
+  /** 'none' when the user has no subscriptions row. */
+  status: SubscriptionStatus;
+  billingInterval: BillingInterval | null;
+  /** ISO 8601 */
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  /** ISO 8601 */
+  trialEnd: string | null;
+  hasBillingAccount: boolean;
+  isPaid: boolean;
+  trialEligible: boolean;
+  limits: PlanLimits;
+  /**
+   * OPTIONAL, not nullable-only: the server began reporting `source` with
+   * dual-source (Stripe + Apple) entitlements. A build talking to a server
+   * that predates that sees the field absent, so treat `undefined` as
+   * "unknown", never as "not Apple".
+   */
+  source?: SubscriptionSource | null;
+};
