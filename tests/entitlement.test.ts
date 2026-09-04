@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { mayCommit, satisfiesTarget, shouldPoll } from '../src/lib/entitlement';
+import {
+  isCurrentProduct,
+  mayCommit,
+  satisfiesTarget,
+  shouldPoll,
+} from '../src/lib/entitlement';
 import type { PlanId, SubscriptionView } from '../src/types';
 
 const view = (over: Partial<SubscriptionView> = {}): SubscriptionView => ({
@@ -99,5 +104,38 @@ describe('mayCommit — a poll that outlived its screen', () => {
   it('never commits a poll that began with no session', () => {
     expect(mayCommit(null, null)).toBe(false);
     expect(mayCommit(null, 'user_a')).toBe(false);
+  });
+});
+
+describe('isCurrentProduct — plan and interval together', () => {
+  it('does not block a monthly subscriber from switching to yearly', () => {
+    // flowy_starter_year is a different product from flowy_starter_month, and
+    // the subscription group supports the change. Comparing the plan alone
+    // would disable the card and trap the user on monthly.
+    const monthly = paid('starter', 'month');
+    expect(isCurrentProduct(monthly, 'starter', 'month')).toBe(true);
+    expect(isCurrentProduct(monthly, 'starter', 'year')).toBe(false);
+  });
+
+  it('does not block yearly to monthly either', () => {
+    const yearly = paid('plus', 'year');
+    expect(isCurrentProduct(yearly, 'plus', 'year')).toBe(true);
+    expect(isCurrentProduct(yearly, 'plus', 'month')).toBe(false);
+  });
+
+  it('is never current for a different plan', () => {
+    expect(isCurrentProduct(paid('plus', 'month'), 'pro', 'month')).toBe(false);
+  });
+
+  it('is never current on a free or missing subscription', () => {
+    expect(isCurrentProduct(view(), 'starter', 'month')).toBe(false);
+    expect(isCurrentProduct(null, 'starter', 'month')).toBe(false);
+    expect(isCurrentProduct(undefined, 'starter', 'month')).toBe(false);
+  });
+
+  it('leaves the card tappable when the server does not report the interval', () => {
+    const unknown = view({ plan: 'plus', isPaid: true, billingInterval: null });
+    expect(isCurrentProduct(unknown, 'plus', 'month')).toBe(false);
+    expect(isCurrentProduct(unknown, 'plus', 'year')).toBe(false);
   });
 });

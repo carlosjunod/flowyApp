@@ -18,6 +18,7 @@ import type { PurchasesPackage } from 'react-native-purchases';
 import { PlanCard } from '@/components/billing/PlanCard';
 import { Spinner } from '@/components/ui/Spinner';
 import { matchesTarget, useRefreshSubscription, useSubscription } from '@/hooks/useSubscription';
+import { isCurrentProduct } from '@/lib/entitlement';
 import { useAuth } from '@/lib/auth';
 import {
   beginTransaction,
@@ -190,7 +191,10 @@ export default function PaywallScreen() {
     }
   }, [refreshSubscription, user?.id]);
 
-  const currentPlan = subscription.data?.isPaid ? subscription.data.plan : null;
+  // Compared on plan AND interval: a monthly subscriber must still be able to
+  // move to yearly, which is a different product.
+  const isCurrent = (planId: PaidPlanId): boolean =>
+    isCurrentProduct(subscription.data, planId, interval);
   const storeUnavailable = !loading && packages.length === 0;
 
   return (
@@ -268,7 +272,7 @@ export default function PaywallScreen() {
                 pkg={packageFor(plan.id)}
                 busy={busy === plan.id}
                 locked={locked}
-                current={currentPlan === plan.id}
+                current={isCurrent(plan.id)}
                 onPress={() => void onSubscribe(plan.id)}
               />
             ))

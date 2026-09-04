@@ -43,3 +43,25 @@ export function shouldPoll(target: RefreshTarget): boolean {
 export function mayCommit(purchaserId: string | null, currentId: string | null): boolean {
   return purchaserId !== null && purchaserId === currentId;
 }
+
+/**
+ * Is this exact product — plan AND interval — the one the user already has?
+ *
+ * Comparing the plan alone traps a monthly subscriber who wants to move to
+ * yearly: `flowy_starter_year` is a separate product from `flowy_starter_month`
+ * and a legitimate change within the subscription group.
+ *
+ * When the server does not report `billingInterval` this returns false, so the
+ * card stays tappable. Offering an interval the user may already hold is
+ * harmless — the App Store refuses a duplicate purchase of the same product —
+ * whereas claiming both intervals are "current" would block the switch outright.
+ */
+export function isCurrentProduct(
+  view: SubscriptionView | null | undefined,
+  planId: PlanId,
+  interval: BillingInterval,
+): boolean {
+  if (!view?.isPaid) return false;
+  if (view.plan !== planId) return false;
+  return view.billingInterval === interval;
+}
