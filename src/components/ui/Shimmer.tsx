@@ -6,8 +6,11 @@ import Animated, {
   useSharedValue,
   withRepeat,
   withTiming,
+  cancelAnimation,
+  useReducedMotion,
 } from 'react-native-reanimated';
 
+import { useIsFocused } from '@react-navigation/native';
 import { useTheme } from '@/lib/theme';
 
 type Props = { className?: string };
@@ -21,10 +24,14 @@ const AnimatedLG = Animated.createAnimatedComponent(LinearGradient);
 export const Shimmer: React.FC<Props> = ({ className }) => {
   const { resolved } = useTheme();
   const x = useSharedValue(-1);
+  const reducedMotion = useReducedMotion();
+  const focused = useIsFocused();
 
   useEffect(() => {
-    x.value = withRepeat(withTiming(1, { duration: 1400 }), -1, false);
-  }, [x]);
+    if (focused && !reducedMotion) x.value = withRepeat(withTiming(1, { duration: 1400 }), -1, false);
+    else cancelAnimation(x);
+    return () => cancelAnimation(x);
+  }, [x, focused, reducedMotion]);
 
   const style = useAnimatedStyle(() => ({
     transform: [{ translateX: `${x.value * 100}%` }],

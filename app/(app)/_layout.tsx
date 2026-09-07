@@ -1,17 +1,16 @@
 import { Feather } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
-import { View, useWindowDimensions } from 'react-native';
+import { View } from 'react-native';
 
 import { Spinner } from '@/components/ui/Spinner';
 import { useAuth } from '@/lib/auth';
+import { ChatProvider, useChat } from '@/hooks/useChat';
 import { SelectionProvider } from '@/lib/selection';
 import { useResolvedColors } from '@/lib/theme';
 
 export default function AppLayout() {
   const { user, ready } = useAuth();
-  const { width } = useWindowDimensions();
-  const isWide = width >= 768;
   const colors = useResolvedColors();
 
   if (!ready) {
@@ -23,6 +22,12 @@ export default function AppLayout() {
   }
   if (!user) return <Redirect href="/login" />;
 
+  return <ChatProvider key={user.id} accountId={user.id}><AppTabs /></ChatProvider>;
+}
+
+function AppTabs() {
+  const colors = useResolvedColors();
+  const chat = useChat();
   return (
     <SelectionProvider>
     <Tabs
@@ -30,9 +35,7 @@ export default function AppLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: isWide
-          ? { display: 'none' }
-          : { borderTopColor: colors.border, backgroundColor: colors.bg },
+        tabBarStyle: { borderTopColor: colors.border, backgroundColor: colors.bg },
       }}
     >
       <Tabs.Screen
@@ -48,6 +51,8 @@ export default function AppLayout() {
         name="chat"
         options={{
           title: 'Chat',
+          tabBarBadge: chat.generatingId ? '…' : chat.unread ? '•' : undefined,
+          tabBarAccessibilityLabel: chat.generatingId ? 'Chat, preparing response' : chat.unread ? 'Chat, new response' : 'Chat',
           tabBarIcon: ({ color, size }) => (
             <Feather name="message-square" size={size ?? 20} color={color} />
           ),

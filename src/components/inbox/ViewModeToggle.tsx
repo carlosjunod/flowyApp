@@ -20,10 +20,10 @@ export const ViewModeToggle: React.FC<Props> = ({ value, onChange }) => {
       onPress={() => onChange(next)}
       accessibilityRole="button"
       accessibilityLabel={`Switch to ${next} view`}
-      accessibilityState={{ selected: value === next }}
+
       hitSlop={8}
       style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-      className="h-9 w-9 items-center justify-center rounded-full"
+      className="h-11 w-11 items-center justify-center rounded-full"
     >
       <Feather name={iconName} size={18} color={colors.fg} />
     </Pressable>

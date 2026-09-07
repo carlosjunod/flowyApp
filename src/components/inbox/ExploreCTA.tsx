@@ -1,14 +1,7 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import React, { useEffect } from 'react';
-import { Platform, Pressable, Text } from 'react-native';
-import Animated, {
-  Easing,
-  cancelAnimation,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
+import React from 'react';
+import { Pressable, Text, View } from 'react-native';
+
 
 import { Shimmer } from '@/components/ui/Shimmer';
 import { useResolvedColors } from '@/lib/theme';
@@ -18,8 +11,7 @@ type Props = {
   exploration?: ItemExploration;
   isReceipt?: boolean;
   /**
-   * Tap handler. Visual stub for now — wire to a deep-dive mutation when the
-   * mobile API gains `actions.exploreMany([id], { deep: true })`.
+   * Starts the server exploration action for the item.
    */
   onPress?: () => void;
 };
@@ -37,45 +29,17 @@ const pickVariant = (exploration: ItemExploration | undefined): Variant => {
 };
 
 /**
- * 5-state CTA mirroring the webapp's ExploreCTA. Items now arrive auto-enriched,
- * so the button's primary job is the "Deep dive" — fetching + synthesizing
- * the discovered links. Visual stub for now; wire onPress when the mutation lands.
+ * Displays the actual exploration state. Motion is reserved for active work.
  */
 export const ExploreCTA: React.FC<Props> = ({ exploration, isReceipt, onPress }) => {
   const colors = useResolvedColors();
   const variant = pickVariant(exploration);
 
-  // Pulse halo only on solid-accent states (idle, offerDeepDive). Skipped on
-  // exploring/fullyDone/error since those have their own visual treatment.
-  const isPulsing = variant === 'idle' || variant === 'offerDeepDive';
-  const pulse = useSharedValue(0);
-
-  useEffect(() => {
-    if (isPulsing) {
-      pulse.value = withRepeat(
-        withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.quad) }),
-        -1,
-        true,
-      );
-    } else {
-      cancelAnimation(pulse);
-      pulse.value = 0;
-    }
-    return () => {
-      cancelAnimation(pulse);
-    };
-  }, [isPulsing, pulse]);
-
-  const haloStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 + pulse.value * 0.014 }],
-    shadowOpacity: 0.18 + pulse.value * 0.22,
-  }));
-
   // ── Per-variant style + icon resolution ──
   let bg = colors.accent;
-  let fg = '#FFFFFF';
+  let fg: string = colors.onAccent;
   let borderColor: string | null = null;
-  let label = isReceipt ? 'Analyze & Enrich' : 'Explore & Enrich';
+  let label = isReceipt ? 'Analyze this receipt' : 'Find related sources';
   let disabled = false;
   let showShimmer = false;
   let renderIcon: () => React.ReactElement = () => (
@@ -94,7 +58,7 @@ export const ExploreCTA: React.FC<Props> = ({ exploration, isReceipt, onPress })
     );
   } else if (variant === 'offerDeepDive') {
     bg = colors.accent;
-    fg = '#FFFFFF';
+    fg = colors.onAccent;
     label = 'Deep dive into links';
     renderIcon = () => (
       <MaterialCommunityIcons name="creation" size={14} color={fg} />
@@ -114,24 +78,8 @@ export const ExploreCTA: React.FC<Props> = ({ exploration, isReceipt, onPress })
     renderIcon = () => <Feather name="rotate-ccw" size={14} color={fg} />;
   }
 
-  // Shadow only renders on iOS — animating elevation on Android stutters and
-  // looks worse than a static card. Android relies on the scale breathe alone.
-  const haloShadow = Platform.OS === 'ios' && isPulsing
-    ? {
-        shadowColor: colors.accent,
-        shadowOffset: { width: 0, height: 0 },
-        shadowRadius: 16,
-      }
-    : null;
-
   return (
-    <Animated.View
-      style={[
-        { borderRadius: 14 },
-        haloShadow,
-        isPulsing ? haloStyle : null,
-      ]}
-    >
+    <View style={{ borderRadius: 14 }}>
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ disabled }}
@@ -169,6 +117,6 @@ export const ExploreCTA: React.FC<Props> = ({ exploration, isReceipt, onPress })
           {label}
         </Text>
       </Pressable>
-    </Animated.View>
+    </View>
   );
 };

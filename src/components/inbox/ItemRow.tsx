@@ -52,12 +52,10 @@ export const ItemRow: React.FC<Props> = ({ item }) => {
       selection.toggle(item.id);
       return;
     }
-    if (pending || errored) return;
     router.push(`/item/${item.id}`);
   };
 
   const handleLongPress = () => {
-    if (pending) return;
     if (!selection.mode) selection.enterWith(item.id);
     else selection.toggle(item.id);
   };
@@ -67,9 +65,13 @@ export const ItemRow: React.FC<Props> = ({ item }) => {
     .join(' · ');
 
   return (
-    <Animated.View entering={FadeIn.duration(220)}>
+    <Animated.View entering={FadeIn.duration(180)}>
       <Pressable
-        disabled={pending && !selection.mode}
+        accessibilityRole={selection.mode ? 'checkbox' : 'button'}
+        accessibilityLabel={`${item.title ?? item.raw_url ?? 'Saved item'}${pending ? ', processing' : errored ? ', processing failed' : ''}`}
+        accessibilityState={{ checked: selection.mode ? selected : undefined }}
+        accessibilityActions={[{ name: 'longpress', label: 'Select item' }]}
+        onAccessibilityAction={event => { if (event.nativeEvent.actionName === 'longpress') handleLongPress(); }}
         onPress={handlePress}
         onLongPress={handleLongPress}
         delayLongPress={300}
@@ -125,37 +127,19 @@ export const ItemRow: React.FC<Props> = ({ item }) => {
           <Text
             className="text-fg"
             style={{ fontFamily: 'Inter_500Medium', fontSize: 15 }}
-            numberOfLines={1}
+            numberOfLines={2}
           >
-            {item.title ?? 'Untitled'}
+            {item.title ?? item.raw_url ?? (pending ? 'Preparing saved content…' : 'Saved item')}
           </Text>
           <Text
             className="text-muted"
             style={{ fontFamily: 'Inter_400Regular', fontSize: 12 }}
             numberOfLines={1}
           >
-            {subline || item.type}
+            {errored ? 'Processing failed · Tap to retry' : pending ? 'Processing saved content…' : subline || item.type}
           </Text>
         </View>
-        <View className="items-end gap-1">
-          <Text
-            className="text-muted"
-            style={{ fontFamily: 'InstrumentSerif_400Regular', fontSize: 16 }}
-          >
-            {monthDayLabel(item.created)}
-          </Text>
-          <View
-            className={`w-2 h-2 rounded-full ${
-              errored
-                ? 'bg-danger'
-                : pending
-                  ? 'bg-accent'
-                  : ready
-                    ? 'bg-success'
-                    : 'bg-muted/40'
-            }`}
-          />
-        </View>
+        {pending || errored ? <Feather name={errored ? 'alert-circle' : 'clock'} size={18} color={errored ? '#B91C1C' : '#6B6258'} /> : null}
       </Pressable>
     </Animated.View>
   );

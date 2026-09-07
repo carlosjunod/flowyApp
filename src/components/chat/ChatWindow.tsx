@@ -1,15 +1,18 @@
 import { Feather } from '@expo/vector-icons';
-import React, { useEffect, useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { useResolvedColors } from '@/lib/theme';
 import type { ChatMessage as ChatMessageType } from '@/types';
 
 import { ChatMessage } from './ChatMessage';
-import { ConversationItemsStrip } from './ConversationItemsStrip';
+import { Spinner } from '@/components/ui/Spinner';
 
 type Props = {
   messages: ChatMessageType[];
+  ready: boolean;
+  onRetry: () => void;
+  retryDisabled: boolean;
   /**
    * Called when a user taps a suggested prompt in the welcome state. Wired by
    * ChatScreen to useChat().send. Optional — the welcome state still renders
@@ -19,35 +22,32 @@ type Props = {
 };
 
 const EXAMPLE_PROMPTS = [
-  'What did I save about marketing last week?',
-  'Show me my receipts over $50',
-  'Summarize my recent YouTube videos',
+  'Help me rediscover something I saved recently',
+  'What topics appear in my saved content?',
+  'Summarize my most recent saves',
 ] as const;
 
-export const ChatWindow: React.FC<Props> = ({ messages, onPromptTap }) => {
+export const ChatWindow: React.FC<Props> = ({ messages, onPromptTap, ready, onRetry, retryDisabled }) => {
   const ref = useRef<FlatList<ChatMessageType>>(null);
-
-  useEffect(() => {
-    if (messages.length === 0) return;
-    requestAnimationFrame(() => {
-      ref.current?.scrollToEnd({ animated: true });
-    });
-  }, [messages]);
-
-  if (messages.length === 0) {
-    return <WelcomeState onPromptTap={onPromptTap} />;
-  }
-
+  const following = useRef(true);
+  const [showLatest, setShowLatest] = useState(false);
+  if (!ready) return <View className="flex-1 items-center justify-center"><Spinner /><Text className="text-muted pt-3">Loading conversations…</Text></View>;
+  if (messages.length === 0) return <WelcomeState onPromptTap={onPromptTap} />;
   return (
     <View className="flex-1">
-      <ConversationItemsStrip messages={messages} />
-      <FlatList
-        ref={ref}
-        data={messages}
-        keyExtractor={(m) => m.id}
-        renderItem={({ item }) => <ChatMessage message={item} />}
-        contentContainerStyle={{ paddingVertical: 8 }}
-      />
+      <FlatList ref={ref} data={messages} keyExtractor={m => m.id}
+        keyboardShouldPersistTaps="handled"
+        onScrollBeginDrag={() => { following.current = false; }}
+        onScroll={event => {
+          const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+          const nearEnd = contentSize.height - contentOffset.y - layoutMeasurement.height < 72;
+          following.current = nearEnd;
+          setShowLatest(!nearEnd);
+        }} scrollEventThrottle={100}
+        onContentSizeChange={() => { if (following.current) ref.current?.scrollToEnd({ animated: false }); else setShowLatest(true); }}
+        renderItem={({ item, index }) => <ChatMessage message={item} onRetry={index === messages.length - 1 ? onRetry : undefined} retryDisabled={retryDisabled} />}
+        contentContainerStyle={{ paddingVertical: 8 }} />
+      {showLatest ? <Pressable accessibilityRole="button" onPress={() => { following.current = true; setShowLatest(false); ref.current?.scrollToEnd({ animated: false }); }} className="self-center rounded-full bg-primary px-4 py-3 mb-2"><Text className="text-bg">Latest response ↓</Text></Pressable> : null}
     </View>
   );
 };

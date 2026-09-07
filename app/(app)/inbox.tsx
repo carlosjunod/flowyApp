@@ -22,17 +22,15 @@ import { FilterBar } from '@/components/inbox/FilterBar';
 import { ItemCard } from '@/components/inbox/ItemCard';
 import { ItemRow } from '@/components/inbox/ItemRow';
 import { SelectionActionBar } from '@/components/inbox/SelectionActionBar';
-import { SuggestionHeroCard } from '@/components/inbox/SuggestionHeroCard';
+import { Shimmer } from '@/components/ui/Shimmer';
+import { useReducedMotion } from 'react-native-reanimated';
 import { ViewModeToggle } from '@/components/inbox/ViewModeToggle';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useSelection } from '@/lib/selection';
 import {
-  extractCategories,
   flattenPages,
   useDebounced,
-  useFilteredSearchedItems,
   useItems,
 } from '@/hooks/useItems';
 import { useAuth } from '@/lib/auth';
@@ -55,13 +53,15 @@ export default function InboxScreen() {
   const selection = useSelection();
   const [viewMode, setViewMode] = useViewMode();
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [captureStatus, setCaptureStatus] = useState<'idle' | 'working' | 'done'>('idle');
+  const reducedMotion = useReducedMotion();
 
   const onViewModeChange = useCallback(
     (next: ViewMode) => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      if (!reducedMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setViewMode(next);
     },
-    [setViewMode],
+    [setViewMode, reducedMotion],
   );
 
   const [searchInput, setSearchInput] = useState('');
@@ -72,11 +72,12 @@ export default function InboxScreen() {
     userId: user?.id ?? null,
     sortField: 'created',
     sortDir: 'desc',
+    search, category,
   });
 
   const items = useMemo(() => flattenPages(query.data), [query.data]);
-  const categories = useMemo(() => extractCategories(items), [items]);
-  const visible = useFilteredSearchedItems(items, search, category);
+  const categories = query.data?.pages[0]?.categories ?? [];
+  const visible = items;
 
   useEffect(() => {
     if (!user?.id) return;
@@ -109,13 +110,6 @@ export default function InboxScreen() {
 
   const columns = viewMode === 'grid' ? columnsFor(width) : 1;
 
-  if (query.isLoading) {
-    return (
-      <SafeAreaView className="flex-1 bg-bg">
-        <Spinner className="mt-12" size="large" />
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
@@ -131,18 +125,11 @@ export default function InboxScreen() {
             value={viewMode === 'list' ? 'list' : 'grid'}
             onChange={onViewModeChange}
           />
-          <Pressable
-            onPress={() => setBulkOpen(true)}
-            hitSlop={8}
-            accessibilityLabel="Bulk import links"
-            className="h-9 w-9 items-center justify-center rounded-full"
-          >
-            <Feather name="plus" size={20} color={colors.fg} />
-          </Pressable>
-          <ThemeToggle />
+          <Pressable onPress={() => selection.mode ? selection.exit() : selection.enter()} accessibilityRole="button" accessibilityLabel={selection.mode ? 'Cancel selection' : 'Select items'} className="h-11 justify-center px-2"><Text className="text-fg text-sm">{selection.mode ? 'Cancel' : 'Select'}</Text></Pressable>
+          <Pressable onPress={() => setBulkOpen(true)} accessibilityRole="button" accessibilityLabel="Save a link" className="h-11 rounded-full bg-primary px-4 justify-center"><Text className="text-bg font-semibold">{captureStatus === 'working' ? 'Saving…' : captureStatus === 'done' ? 'Saved' : 'Save'}</Text></Pressable>
         </View>
       </View>
-      <BulkImportSheet visible={bulkOpen} onClose={() => setBulkOpen(false)} />
+      <BulkImportSheet onStatusChange={setCaptureStatus} visible={bulkOpen} onClose={() => setBulkOpen(false)} />
       <FilterBar
         search={searchInput}
         onSearchChange={setSearchInput}
@@ -150,6 +137,9 @@ export default function InboxScreen() {
         category={category}
         onCategoryChange={setCategory}
       />
+      {query.isError ? <View className="px-4 py-3 flex-row items-center gap-2"><Text accessibilityRole="alert" className="text-danger flex-1 text-sm">Your inbox could not be loaded. Check your connection and try again.</Text><Button title="Retry" variant="secondary" onPress={() => { void query.refetch(); }} /></View> : null}
+      {query.isLoading ? <View accessibilityLabel="Loading saved content" className="px-4 gap-3 pt-3">{[1, 2, 3].map(n => <View key={n} className="h-20 bg-surface rounded-xl overflow-hidden relative"><Shimmer /></View>)}</View> : null}
+      {!query.isLoading && !query.isError ? <Text className="text-xs text-muted px-4 pt-2">{query.data?.pages[0]?.totalItems ?? 0} {search || category ? 'results' : 'saved items'}</Text> : null}
       {viewMode === 'grid' ? (
         <FlatList
           key={`grid-${columns}`}
@@ -159,16 +149,11 @@ export default function InboxScreen() {
           columnWrapperStyle={columns > 1 ? { gap: 12, paddingHorizontal: 16 } : undefined}
           contentContainerStyle={{
             paddingTop: 8,
-            paddingBottom: 24,
+            paddingBottom: selection.mode ? 116 : 24,
             gap: columns === 1 ? 16 : 12,
           }}
           refreshing={query.isRefetching}
           onRefresh={onRefresh}
-          ListHeaderComponent={
-            visible.length > 0 ? (
-              <SuggestionHeroCard items={visible} viewMode="grid" />
-            ) : null
-          }
           renderItem={({ item }) => (
             <View
               style={
@@ -180,8 +165,9 @@ export default function InboxScreen() {
               <ItemCard item={item} />
             </View>
           )}
-          ListEmptyComponent={
+          ListEmptyComponent={query.isLoading || query.isError ? null :
             <EmptyState
+              onSave={() => setBulkOpen(true)}
               hasFilters={!!search || !!category}
               search={search}
               category={category}
@@ -211,14 +197,9 @@ export default function InboxScreen() {
           keyExtractor={(row) =>
             row.kind === 'header' ? `h-${row.label}` : row.item.id
           }
-          contentContainerStyle={{ paddingTop: 8, paddingBottom: 24 }}
+          contentContainerStyle={{ paddingTop: 8, paddingBottom: selection.mode ? 116 : 24 }}
           refreshing={query.isRefetching}
           onRefresh={onRefresh}
-          ListHeaderComponent={
-            visible.length > 0 ? (
-              <SuggestionHeroCard items={visible} viewMode="list" />
-            ) : null
-          }
           renderItem={({ item }) =>
             item.kind === 'header' ? (
               <SectionHeader label={item.label} count={item.count} />
@@ -226,8 +207,9 @@ export default function InboxScreen() {
               <ItemRow item={item.item} />
             )
           }
-          ListEmptyComponent={
+          ListEmptyComponent={query.isLoading || query.isError ? null :
             <EmptyState
+              onSave={() => setBulkOpen(true)}
               hasFilters={!!search || !!category}
               search={search}
               category={category}
@@ -268,7 +250,8 @@ const EmptyState: React.FC<{
   search: string;
   category: string | null;
   onClearFilters: () => void;
-}> = ({ hasFilters, search, category, onClearFilters }) => {
+  onSave: () => void;
+}> = ({ hasFilters, search, category, onClearFilters, onSave }) => {
   if (hasFilters) {
     const what = search
       ? `“${search}”`
@@ -297,7 +280,9 @@ const EmptyState: React.FC<{
   return (
     <View className="items-center justify-center px-6 pt-16">
       <Text className="text-5xl mb-3">📥</Text>
-      <Text className="text-base text-muted">Nothing saved yet</Text>
+      <Text className="text-xl text-fg font-semibold mb-2">Keep something worth revisiting</Text>
+      <Text className="text-base text-muted text-center mb-5">Save a link here, or choose Share → Flowy from another app to save links, images and files.</Text>
+      <Button title="Save your first link" onPress={onSave} />
     </View>
   );
 };

@@ -5,21 +5,21 @@ import {
   useQueryClient,
   type InfiniteData,
 } from '@tanstack/react-query';
-import type { ListResult } from 'pocketbase';
 import { useEffect, useMemo, useState } from 'react';
 
-import { api } from '@/lib/api';
+import { api, type ItemsResponse } from '@/lib/api';
 import { pb } from '@/lib/pb';
 import type { Item, SortDir, SortField } from '@/types';
 
 export const PAGE_SIZE = 20;
 
-export type ItemsPage = ListResult<Item>;
+export type ItemsPage = ItemsResponse;
 
-type ItemsParams = { sortField: SortField; sortDir: SortDir; userId: string | null };
+type ItemsParams = { sortField: SortField; sortDir: SortDir; userId: string | null; search?: string; category?: string | null };
+export const normalizeCategory = (value?: string | null): string => { const key = value?.trim().toLowerCase() ?? ''; return key === 'tech' ? 'technology' : key; };
 
 export const itemsQueryKey = (p: ItemsParams): readonly unknown[] =>
-  ['items', p.userId, p.sortField, p.sortDir] as const;
+  ['items', p.userId, p.sortField, p.sortDir, p.search?.trim() ?? '', normalizeCategory(p.category)] as const;
 
 export const useItems = (params: ItemsParams) => {
   return useInfiniteQuery<ItemsPage, Error, InfiniteData<ItemsPage>, readonly unknown[], number>({
@@ -28,10 +28,11 @@ export const useItems = (params: ItemsParams) => {
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       if (!params.userId) throw new Error('No user');
-      return pb.collection('items').getList<Item>(pageParam, PAGE_SIZE, {
-        filter: `user = "${params.userId}"`,
-        sort: `${params.sortDir === 'asc' ? '+' : '-'}${params.sortField},-created`,
-      });
+      const result = await api.listItems({ page: pageParam, perPage: PAGE_SIZE,
+        q: params.search?.trim(), category: normalizeCategory(params.category),
+        sort: params.sortField === 'created' ? 'date' : params.sortField, direction: params.sortDir });
+      if (result.error) throw new Error(result.error.message);
+      return result.data;
     },
     getNextPageParam: (last) =>
       last.page * last.perPage < last.totalItems ? last.page + 1 : undefined,

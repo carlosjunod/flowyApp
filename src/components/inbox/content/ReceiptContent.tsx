@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
+import { thumbnailFor } from '@/lib/thumbnails';
 import { formatCurrency } from '@/lib/currency';
 import { useResolvedColors } from '@/lib/theme';
 import type { Item, ReceiptData, ReceiptItem } from '@/types';
@@ -22,7 +23,8 @@ import type { Item, ReceiptData, ReceiptItem } from '@/types';
  */
 export const ReceiptContent: React.FC<{ item: Item }> = ({ item }) => {
   const data = item.structured_content as ReceiptData | undefined;
-  const photoUrl = data?.originalPhotoUrl ?? item.original_media_urls?.[0];
+  const thumbnail = thumbnailFor(item);
+  const photoUrl = data?.originalPhotoUrl ?? item.original_media_urls?.[0] ?? (thumbnail.kind === 'image' ? thumbnail.uri : undefined);
 
   // `structured_content` is `unknown` on the wire and this cast does not check
   // anything, so the guard has to. Checking only `store` was not enough: a
@@ -48,8 +50,7 @@ export const ReceiptContent: React.FC<{ item: Item }> = ({ item }) => {
           className="text-muted"
           style={{ fontFamily: 'Inter_400Regular', fontSize: 12.5, fontStyle: 'italic' }}
         >
-          Receipt is still being processed — line items and totals will appear here once
-          extraction finishes.
+          {item.status === 'pending' || item.status === 'processing' ? 'Receipt details will appear when processing finishes.' : 'Receipt details could not be extracted. Open the original or try processing again.'}
         </Text>
       </View>
     );
@@ -57,6 +58,7 @@ export const ReceiptContent: React.FC<{ item: Item }> = ({ item }) => {
 
   return (
     <View style={{ gap: 4 }}>
+      <View className="flex-row items-baseline justify-between pb-4"><Text className="text-fg text-lg font-semibold flex-1">{data.store.name}</Text><Text className="text-fg text-2xl font-semibold">{formatCurrency(data.total)}</Text></View>
       <StoreCard data={data} photoUrl={photoUrl} />
       <LineItemsTable data={data} />
       <PaymentGrid data={data} />
@@ -188,10 +190,6 @@ const ConfidenceFlag: React.FC<{ value: number }> = ({ value }) => {
   );
 };
 
-// Column widths for the line-items table — RN flex equivalent of the webapp's
-// CSS grid `1fr 36px 80px 80px 28px`.
-const COL = { qty: 36, unit: 76, total: 80, flag: 32 };
-
 const LineItemsTable: React.FC<{ data: ReceiptData }> = ({ data }) => {
   const colors = useResolvedColors();
   return (
@@ -204,23 +202,6 @@ const LineItemsTable: React.FC<{ data: ReceiptData }> = ({ data }) => {
           overflow: 'hidden',
         }}
       >
-        {/* Header */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: 12,
-            paddingVertical: 10,
-            backgroundColor: colors.surface,
-            gap: 8,
-          }}
-        >
-          <Text style={[headerCellStyle, { flex: 1 }]}>ITEM</Text>
-          <Text style={[headerCellStyle, { width: COL.qty, textAlign: 'center' }]}>QTY</Text>
-          <Text style={[headerCellStyle, { width: COL.unit, textAlign: 'right' }]}>UNIT</Text>
-          <Text style={[headerCellStyle, { width: COL.total, textAlign: 'right' }]}>TOTAL</Text>
-          <View style={{ width: COL.flag }} />
-        </View>
         {/* Rows */}
         {data.items.map((it) => (
           <ReceiptItemRow key={it.id} item={it} />
@@ -276,72 +257,12 @@ const LineItemsTable: React.FC<{ data: ReceiptData }> = ({ data }) => {
   );
 };
 
-const headerCellStyle = {
-  fontFamily: 'Inter_600SemiBold' as const,
-  fontSize: 10,
-  letterSpacing: 0.5,
-  color: '#888',
-};
-
 const ReceiptItemRow: React.FC<{ item: ReceiptItem }> = ({ item }) => {
-  const colors = useResolvedColors();
   const qty = item.quantity % 1 === 0 ? String(item.quantity) : item.quantity.toFixed(2);
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        gap: 8,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-        backgroundColor: colors.surface,
-      }}
-    >
-      <Text
-        className="text-fg"
-        style={{ flex: 1, fontFamily: 'Inter_500Medium', fontSize: 12.5, lineHeight: 16 }}
-      >
-        {item.name}
-      </Text>
-      <Text
-        className="text-muted"
-        style={{
-          width: COL.qty,
-          textAlign: 'center',
-          fontFamily: 'Menlo',
-          fontSize: 11.5,
-        }}
-      >
-        {qty}
-      </Text>
-      <Text
-        className="text-muted"
-        style={{
-          width: COL.unit,
-          textAlign: 'right',
-          fontFamily: 'Menlo',
-          fontSize: 11.5,
-        }}
-      >
-        {formatCurrency(item.unitPrice)}
-      </Text>
-      <Text
-        className="text-fg"
-        style={{
-          width: COL.total,
-          textAlign: 'right',
-          fontFamily: 'Menlo',
-          fontSize: 11.5,
-          fontWeight: '600',
-        }}
-      >
-        {formatCurrency(item.totalPrice)}
-      </Text>
-      <View style={{ width: COL.flag, alignItems: 'center' }}>
-        <ConfidenceFlag value={item.ocrConfidence} />
-      </View>
+    <View className="px-3 py-3 border-t border-border bg-surface gap-1">
+      <View className="flex-row items-start gap-4"><Text className="text-fg flex-1 text-base">{item.name}</Text><Text className="text-fg font-semibold">{formatCurrency(item.totalPrice)}</Text></View>
+      <View className="flex-row items-center gap-3"><Text className="text-muted text-sm flex-1">{qty} × {formatCurrency(item.unitPrice)}</Text>{item.ocrConfidence < 0.95 ? <View className="flex-row items-center gap-1"><Text className="text-muted text-xs">Check original</Text><ConfidenceFlag value={item.ocrConfidence} /></View> : null}</View>
     </View>
   );
 };
@@ -493,7 +414,7 @@ const CategoryBreakdown: React.FC<{ items: ReceiptItem[] }> = ({ items }) => {
   if (rows.length === 0) return null;
 
   return (
-    <Section title="Category Breakdown" sparkle defaultOpen>
+    <Section title="Category Breakdown" sparkle defaultOpen={false}>
       <View style={{ gap: 6 }}>
         {rows.map((row, i) => {
           const display = CATEGORY_DISPLAY[row.category] ?? row.category;
@@ -611,7 +532,7 @@ const SpendingInsights: React.FC<{ data: ReceiptData }> = ({ data }) => {
   if (insights.length === 0) return null;
 
   return (
-    <Section title="Spending Insights" sparkle defaultOpen>
+    <Section title="Spending Insights" sparkle defaultOpen={false}>
       <View style={{ gap: 8 }}>
         {insights.map((line, i) => (
           <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>

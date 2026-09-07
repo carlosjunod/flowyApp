@@ -6,9 +6,9 @@ Users save URLs, screenshots, and short videos from the iOS/macOS share sheet; a
 
 ## Features
 
-- **Inbox** — grid / list / detail view modes, category filter, sort (date / category / type), asc/desc, debounced search, pagination, pending+error states, live updates via PocketBase realtime subscription
-- **Chat** — streaming responses with inline `[[itemId]]` citations that deep-link to item detail
-- **Item detail** — metadata, markdown content, edit modal, delete with confirm
+- **Inbox** — compact list by default, optional visual grid, global debounced search/category facets through `GET /api/items`, newest-first pagination, separate network/empty/processing/error states, accessible selection, and PocketBase realtime invalidation
+- **Chat** — streaming responses with inline `[[itemId]]` citations and expandable sources, account-scoped on-device conversation history and drafts, new/open/delete conversation, stop/retry/copy, and reader-controlled scrolling. A provider above the tabs retains work while navigating inside the app.
+- **Item detail** — title-first hierarchy, compact expandable media, original-source access, readable receipt rows/totals, secondary analysis/tags disclosure, contextual actions and keyboard-safe editing
 - **Native share extension** — iOS + Mac Catalyst, accepts URL / image / text, reads auth token from shared App Group keychain, POSTs to `/api/ingest`
 - Auth via PocketBase email/password, token persisted to shared Keychain so the extension can read it
 
@@ -81,7 +81,7 @@ For Mac Catalyst: open `ios/Tryflowy.xcworkspace`, select the Tryflowy target, a
 
 This client talks to an existing backend — endpoints are hit as documented in `starthere.md`:
 
-- `pb.collection('items').getList(page, 20, …)` for the inbox
+- `GET /api/items?q=&category=&sort=date&direction=desc&page=1&perPage=20` for the inbox. It returns `{data:{items,page,perPage,totalItems,totalPages,categories},error:null}`. Categories are normalized (`tech` → `technology`); search/facets cover the complete account library.
 - `pb.collection('items').subscribe(id, cb)` for realtime status updates
 - `POST /api/ingest` for share-extension uploads (`{type, raw_url, raw_image}`)
 - `POST /api/chat` streams plain text; `x-items` response header carries JSON citations
@@ -103,6 +103,7 @@ All REST calls go through `src/lib/api.ts`, which returns `{ data, error }` with
 npm run start        # expo start (dev server)
 npm run ios          # expo run:ios
 npm run typecheck    # tsc --noEmit
+npm run test:ui-models # Node regression scenarios using the real TS models
 npm run prebuild     # re-apply config plugins to ios/
 ```
 
@@ -120,3 +121,14 @@ npm run prebuild     # re-apply config plugins to ios/
 
 - See `BLOCKERS.md` for environment limitations encountered during scaffolding and all autonomous design decisions.
 - The generated `ios/` folder is git-ignored (managed workflow convention). Run `expo prebuild` after cloning.
+
+
+## Inbox/chat update (2026-09-07)
+
+- Saving a single link and a batch share the **Save links** sheet. Closing it keeps an active batch running while the screen remains mounted; reopening shows results and failed URLs can be retried. Successful submissions mean saved/queued, not finished AI processing.
+- Chat is scoped to the signed-in PocketBase account and this device. `src/hooks/useChat.ts` owns the provider; `src/lib/chatModel.ts` validates stored conversations and marks restored streams interrupted; `src/lib/chatStorage.ts` writes small Unicode-safe Keychain chunks with a manifest published last and serialized writes. Storage failures are visible; loading failure does not overwrite existing history. Account deletion also removes local chat history.
+- New chat retains the old conversation. Stop/retry uses a run identity so late tokens or finalizers cannot overwrite a newer response. Citation metadata is surfaced before the first text token without changing the server stream contract.
+- Tab navigation remains available at tablet/desktop widths. The Chat tab indicates active work/new replies while navigating within Flowy. There is no cross-device chat sync or guarantee of continued execution while iOS/Android suspends the app. Reopening restores an interrupted response for retry.
+- Removed the nonfunctional AI suggestion hero from Inbox and removed the fixed-tag suggestion renderer (`src/components/inbox/TagSuggestions.tsx`). No artificial takeaways are supplied when analysis data is missing.
+- `scripts/test-ui-models.cjs` runs 18 regression scenarios for search parameters/cache isolation, history restoration, draft/retry behavior, early citations, stale stream protection, and atomic/account-scoped local storage. This is model validation, not a simulator or device UI test.
+- Verified locally: `npm run typecheck`, `npm run test:ui-models`, and `git diff --check`. Native visual checks (keyboard, VoiceOver, Dynamic Type, real network suspension, 390pt and tablet layouts) remain device validation; no native E2E success is claimed.

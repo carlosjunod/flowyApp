@@ -93,7 +93,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResu
   }
 }
 
+export type ItemsResponse = { items: Item[]; page: number; perPage: number; totalItems: number; totalPages: number; categories: string[] };
+
 export const api = {
+  listItems: (params: { q?: string; category?: string; sort?: string; direction?: string; page?: number; perPage?: number }) => {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== "") query.set(key, String(value));
+    return request<ItemsResponse>(`/api/items?${query.toString()}`);
+  },
   ingest: (payload: IngestPayload) =>
     request<IngestResponse>('/api/ingest', {
       method: 'POST',
@@ -201,6 +208,7 @@ export const api = {
 
 export type ChatStreamEvent =
   | { type: 'token'; value: string }
+  | { type: 'sources'; citations: CitedItem[] }
   | { type: 'done'; citations: CitedItem[] }
   | { type: 'error'; error: ApiError };
 
@@ -261,6 +269,7 @@ export async function* chatStream(
     }
   }
 
+  yield { type: 'sources', citations };
   const reader = res.body?.getReader();
   if (!reader) {
     const text = await res.text();

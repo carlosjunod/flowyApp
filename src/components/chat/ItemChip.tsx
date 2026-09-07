@@ -54,7 +54,7 @@ type InlineProps = {
 export const InlineItemChip: React.FC<InlineProps> = ({ ref, id, index }) => {
   const colors = useResolvedColors();
   const [thumbErr, setThumbErr] = useState(false);
-  const label = ref ? domainLabelForRef(ref) : id.slice(0, 6);
+  const label = ref ? domainLabelForRef(ref) : 'Source';
   const thumb = ref ? thumbnailUrlForRef(ref) : null;
 
   return (
@@ -62,7 +62,7 @@ export const InlineItemChip: React.FC<InlineProps> = ({ ref, id, index }) => {
       onPress={() => router.push(`/item/${id}`)}
       accessibilityRole="link"
       accessibilityLabel={`Open ${label}`}
-      hitSlop={2}
+      hitSlop={8}
       style={({ pressed }) => [
         {
           flexDirection: 'row',
@@ -70,7 +70,7 @@ export const InlineItemChip: React.FC<InlineProps> = ({ ref, id, index }) => {
           alignSelf: 'flex-start',
           gap: 4,
           paddingHorizontal: 6,
-          paddingVertical: 2,
+          paddingVertical: 7,
           borderRadius: 999,
           borderWidth: 1,
           borderColor: colors.accent + '4D',
@@ -107,7 +107,7 @@ export const InlineItemChip: React.FC<InlineProps> = ({ ref, id, index }) => {
           maxWidth: 160,
         }}
       >
-        {label}
+        {typeof index === 'number' ? 'Source' : label}
       </Text>
     </Pressable>
   );
@@ -167,7 +167,7 @@ const RailChip: React.FC<{ ref: CitedItem; index: number }> = ({ ref, index }) =
           gap: 8,
           paddingLeft: 6,
           paddingRight: 10,
-          paddingVertical: 5,
+          paddingVertical: 8,
           borderRadius: 10,
           borderWidth: 1,
           borderColor: colors.border,

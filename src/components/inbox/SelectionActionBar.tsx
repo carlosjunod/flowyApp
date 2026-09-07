@@ -1,30 +1,23 @@
 import { Feather } from '@expo/vector-icons';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Pressable, Text, View } from 'react-native';
 
 import { useItemActions } from '@/hooks/useItemActions';
 import { useSelection } from '@/lib/selection';
+import { useReducedMotion } from 'react-native-reanimated';
 import { useResolvedColors } from '@/lib/theme';
-
-const useSafeTabBarHeight = (): number => {
-  try {
-    return useBottomTabBarHeight();
-  } catch {
-    return 0;
-  }
-};
 
 export const SelectionActionBar: React.FC = () => {
   const selection = useSelection();
   const actions = useItemActions();
   const colors = useResolvedColors();
-  const tabBarHeight = useSafeTabBarHeight();
+  const reducedMotion = useReducedMotion();
   const slide = useRef(new Animated.Value(0)).current;
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState<'reload' | 'delete' | null>(null);
 
   useEffect(() => {
+    if (reducedMotion) { slide.setValue(selection.mode ? 1 : 0); setVisible(selection.mode); return; }
     if (selection.mode) {
       setVisible(true);
       Animated.spring(slide, {
@@ -41,7 +34,7 @@ export const SelectionActionBar: React.FC = () => {
         duration: 160,
       }).start(() => setVisible(false));
     }
-  }, [selection.mode, slide]);
+  }, [selection.mode, slide, reducedMotion]);
 
   if (!visible) return null;
   const ids = Array.from(selection.selectedIds);
@@ -100,7 +93,7 @@ export const SelectionActionBar: React.FC = () => {
         position: 'absolute',
         left: 0,
         right: 0,
-        bottom: tabBarHeight + 12,
+        bottom: 12,
         alignItems: 'center',
         transform: [{ translateY }],
         opacity: slide,
@@ -109,15 +102,15 @@ export const SelectionActionBar: React.FC = () => {
       <View
         accessibilityRole="toolbar"
         accessibilityLabel="Bulk actions"
-        className="flex-row items-center gap-2 rounded-full border border-border bg-card px-3 py-2 shadow-card"
-        style={{ shadowColor: colors.fg }}
+        className="flex-row flex-wrap items-center justify-center gap-1 rounded-2xl border border-border bg-card px-3 py-2 shadow-card"
+        style={{ shadowColor: colors.fg, maxWidth: '95%' }}
       >
         <Text className="text-sm font-semibold text-fg px-2">
           {count} selected
         </Text>
 
         <BarButton
-          label="Reload"
+          label="Reprocess"
           icon="refresh-cw"
           onPress={onReload}
           disabled={empty || busy !== null}
@@ -136,7 +129,7 @@ export const SelectionActionBar: React.FC = () => {
           hitSlop={8}
           accessibilityLabel="Exit selection"
           style={({ pressed }) => [pressed && { opacity: 0.6 }]}
-          className="px-3 py-1.5"
+          className="px-3 min-h-[44px] justify-center"
         >
           <Text className="text-sm text-muted">Cancel</Text>
         </Pressable>
@@ -164,7 +157,7 @@ const BarButton: React.FC<{
         pressed && !disabled && !loading && { opacity: 0.7 },
         { opacity: disabled ? 0.4 : 1 },
       ]}
-      className={`flex-row items-center gap-1.5 px-3 py-1.5 rounded-full ${
+      className={`flex-row items-center gap-1.5 px-3 min-h-[44px] rounded-full ${
         tone === 'danger' ? 'border border-danger' : 'border border-border'
       }`}
     >

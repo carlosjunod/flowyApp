@@ -37,7 +37,7 @@ export const ItemActionsMenu: React.FC<Props> = ({ item, variant = 'inline', onD
 
   const buildActions = (): Action[] => [
     { key: 'open', label: 'Open' },
-    { key: 'reload', label: 'Reload', disabled: reloadDisabled },
+    { key: 'reload', label: item.status === 'error' ? 'Retry processing' : 'Reprocess', disabled: reloadDisabled },
     { key: 'delete', label: 'Delete', destructive: true },
   ];
 

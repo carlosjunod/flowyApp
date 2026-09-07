@@ -1,5 +1,17 @@
 # FlowyApp — Parity Red-Priority Handover
 
+
+> ## UI/UX implementation update — 2026-09-07
+>
+> Inbox and chat implementation is recorded in `docs/UI-UX-IMPLEMENTATION.md` and the README's dated update. The client now requires the coordinated authenticated `GET /api/items` endpoint for global library search/facets; native `/api/chat` still uses the existing plain-text stream and `x-items` citations contract.
+>
+> Current correction to the historical follow-up table below: ExploreCTA is wired through `actions.exploreMany`; its former dead-stub description no longer applies.
+>
+> Delivered: explicit inbox error/retry states, navigable processing/failed saves, compact cards/list, honest save/import results, removal of fake suggestions, title-first detail and receipt rows, visible selection, wide-screen navigation, account/device chat history and drafts, stop/retry/copy, compact sources and reader-controlled scrolling. In-app navigation preserves active chat work. Suspended-OS background execution and cross-device history are not promised.
+>
+> Validation: TypeScript clean, 18 Node model regression scenarios pass, whitespace diff check clean. No native simulator/device visual or E2E validation was performed for this change; use the current acceptance checklist before shipping native builds. No native capabilities, auth audiences, schema or production data were changed.
+
+
 > **Date:** 2026-05-28
 > **Branch:** `fix/parity-red-priority`
 > **Predecessor:** [`PARITY-DIAGNOSTIC.md`](./PARITY-DIAGNOSTIC.md) (2026-05-25)

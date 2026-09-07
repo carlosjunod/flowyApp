@@ -17,7 +17,7 @@ type Tab = 'visual' | 'transcript';
  * Mirrors apps/web/components/inbox/content/GenericContent.tsx.
  */
 export const GenericContent: React.FC<{ item: Item }> = ({ item }) => {
-  const [tab, setTab] = useState<Tab>('visual');
+  const [tab, setTab] = useState<Tab>(item.content ? 'transcript' : 'visual');
   const colors = useResolvedColors();
 
   const visualParts: string[] = [];
@@ -36,7 +36,8 @@ export const GenericContent: React.FC<{ item: Item }> = ({ item }) => {
   const visualText = visualParts.join('\n\n');
   const transcriptText = item.content ?? '';
 
-  const active = tab === 'visual' ? visualText : transcriptText;
+  const active = tab === 'visual' ? visualText || transcriptText : transcriptText || visualText;
+  if (!active) return null;
   const emptyLabel =
     tab === 'visual'
       ? 'No visual summary available for this item.'
@@ -46,8 +47,8 @@ export const GenericContent: React.FC<{ item: Item }> = ({ item }) => {
     <View>
       <ContentTabs
         tabs={[
-          { id: 'visual', label: 'Visual Summary' },
-          { id: 'transcript', label: 'Transcript' },
+          ...(visualText ? [{ id: 'visual' as const, label: 'Visual summary' }] : []),
+          ...(transcriptText ? [{ id: 'transcript' as const, label: item.type === 'audio' || item.type === 'video' ? 'Transcript' : 'Saved text' }] : []),
         ]}
         active={tab}
         onChange={setTab}
@@ -59,12 +60,12 @@ export const GenericContent: React.FC<{ item: Item }> = ({ item }) => {
           padding: 14,
         }}
       >
-        <Text
+        <Text selectable
           style={{
             fontFamily: 'Inter_400Regular',
-            fontSize: 13,
+            fontSize: 15,
             lineHeight: 21,
-            color: active ? colors.muted : colors.muted,
+            color: colors.fg,
             fontStyle: active ? 'normal' : 'italic',
             opacity: active ? 1 : 0.7,
           }}
@@ -109,7 +110,9 @@ export function ContentTabs<Id extends string>({
               {
                 flex: 1,
                 paddingHorizontal: 12,
-                paddingVertical: 7,
+                minHeight: 44,
+                justifyContent: 'center',
+                paddingVertical: 10,
                 borderRadius: 8,
                 backgroundColor: isActive ? colors.fg : 'transparent',
                 opacity: pressed ? 0.85 : 1,

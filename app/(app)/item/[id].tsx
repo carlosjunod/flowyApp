@@ -1,12 +1,13 @@
 import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
+  KeyboardAvoidingView,
+  Platform,
   Modal,
   Pressable,
   ScrollView,
@@ -22,7 +23,6 @@ import { EnrichedSections } from '@/components/inbox/EnrichedSections';
 import { ExploreCTA } from '@/components/inbox/ExploreCTA';
 import { SourceChip } from '@/components/inbox/SourceChip';
 import { TagEditor } from '@/components/inbox/TagEditor';
-import { TagSuggestions } from '@/components/inbox/TagSuggestions';
 import { ContentRenderer } from '@/components/inbox/content/ContentRenderer';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -69,6 +69,9 @@ export default function ItemDetailScreen() {
   const actions = useItemActions();
 
   const [editing, setEditing] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -81,7 +84,7 @@ export default function ItemDetailScreen() {
     return (
       <SafeAreaView className="flex-1 bg-bg items-center justify-center px-6">
         <Text className="text-base text-danger mb-4">
-          {error?.message ?? 'Item not found'}
+          This item could not be loaded. Check your connection or return to your inbox.
         </Text>
         <Button title="Back" variant="secondary" onPress={() => router.back()} />
       </SafeAreaView>
@@ -100,10 +103,10 @@ export default function ItemDetailScreen() {
   // own primary media, so the static hero would just duplicate it. receipt
   // and generic don't, so they keep the hero block.
   const contentType = getContentType(item);
-  const showHero = contentType === 'receipt' || contentType === 'generic';
+  const showHero = contentType === 'generic';
 
   const heroWidth = width - 32;
-  const heroHeight = Math.round(heroWidth * 1.25);
+  const heroHeight = photoOpen ? Math.min(700, Math.round(heroWidth * 1.25)) : Math.min(200, Math.round(heroWidth * 0.55));
   const heroThumb = thumbnailFor(item);
   const firstSlideUri = item.media && item.media.length > 0
     ? `${ENV.R2_PUBLIC_URL}/${item.media[0]!.r2_key}`
@@ -118,30 +121,62 @@ export default function ItemDetailScreen() {
           onPress={() => router.back()}
           hitSlop={8}
           accessibilityLabel="Back"
-          className="flex-row items-center gap-1.5"
+          accessibilityRole="button"
+          className="flex-row min-h-[44px] items-center gap-1.5"
         >
           <Feather name="chevron-left" size={20} color={colors.fg} />
           <Text
             className="text-fg"
             style={{ fontFamily: 'Inter_500Medium', fontSize: 14 }}
           >
-            Inbox
+            Back
           </Text>
         </Pressable>
-        <View className="flex-row gap-4">
-          <ReloadButton item={item} />
+        <View className="flex-row items-center gap-2">
           <ShareButton item={item} />
-          <Pressable onPress={() => setEditing(true)} hitSlop={8}>
-            <Text className="text-fg" style={{ fontFamily: 'Inter_500Medium', fontSize: 14 }}>
-              Edit
-            </Text>
-          </Pressable>
-          <DeleteButton id={item.id} />
+          <Pressable onPress={() => setActionsOpen(v => !v)} accessibilityRole="button" accessibilityLabel="Item actions" accessibilityState={{ expanded: actionsOpen }} className="w-11 h-11 items-center justify-center"><Feather name="more-horizontal" size={22} color={colors.fg} /></Pressable>
         </View>
       </View>
+      {actionsOpen ? <View className="flex-row flex-wrap items-center justify-around px-4 border-b border-border bg-card">
+        <ReloadButton item={item} />
+        <Pressable onPress={() => { setEditing(true); setActionsOpen(false); }} accessibilityRole="button" className="min-h-[44px] justify-center px-3"><Text className="text-fg">Edit details</Text></Pressable>
+        <DeleteButton id={item.id} />
+      </View> : null}
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 96, gap: 16 }}>
-        {showHero ? (
-          <View className="relative">
+
+
+        <View className="gap-2.5">
+          <Text
+            className="text-fg"
+            style={{
+              fontFamily: 'InstrumentSerif_400Regular',
+              fontSize: 32,
+              lineHeight: 38,
+              letterSpacing: -0.5,
+            }}
+          >
+            {item.title ?? item.raw_url ?? 'Saved item'}
+          </Text>
+          <View className="flex-row flex-wrap items-center gap-2">
+            <SourceChip chip={sourceChip(item, contentType)} />
+            {item.category ? <Badge label={item.category} tone="accent" /> : null}
+            <Text
+              className="text-muted"
+              style={{ fontFamily: 'Inter_400Regular', fontSize: 13 }}
+            >
+              {relativeDate(item.created)}
+            </Text>
+            {item.status !== 'ready' ? (
+              <Badge
+                label={item.status === 'error' ? 'Processing failed' : 'Processing…'}
+                tone={item.status === 'error' ? 'danger' : 'neutral'}
+              />
+            ) : null}
+          </View>
+        </View>
+
+        {showHero && heroUri ? (
+          <Pressable accessibilityRole="button" accessibilityLabel={photoOpen ? "Collapse image" : "Expand image"} accessibilityState={{ expanded: photoOpen }} onPress={() => setPhotoOpen(v => !v)} className="relative">
             <View
               className="bg-surface"
               style={{
@@ -184,51 +219,20 @@ export default function ItemDetailScreen() {
                 </Text>
               </View>
             ) : null}
-          </View>
+          </Pressable>
         ) : null}
-
-        <View className="gap-2.5">
-          <Text
-            className="text-fg"
-            style={{
-              fontFamily: 'InstrumentSerif_400Regular',
-              fontSize: 32,
-              lineHeight: 38,
-              letterSpacing: -0.5,
-            }}
-          >
-            {item.title ?? 'Untitled'}
-          </Text>
-          <View className="flex-row flex-wrap items-center gap-2">
-            <SourceChip chip={sourceChip(item, contentType)} />
-            {item.category ? <Badge label={item.category} tone="accent" /> : null}
-            <Text
-              className="text-muted"
-              style={{ fontFamily: 'Inter_400Regular', fontSize: 13 }}
-            >
-              {relativeDate(item.created)}
-            </Text>
-            {item.status !== 'ready' ? (
-              <Badge
-                label={item.status}
-                tone={item.status === 'error' ? 'danger' : 'neutral'}
-              />
-            ) : null}
-          </View>
-        </View>
-
-        {item.source_url ? (
+        {url ? (
           <Pressable
             accessibilityRole="button"
-            onPress={() => Linking.openURL(item.source_url ?? '')}
+            onPress={() => { if (url) void Linking.openURL(url); }}
             style={({ pressed }) => [pressed && { opacity: 0.92 }]}
             className="rounded-full bg-accent flex-row items-center justify-center gap-2"
             hitSlop={4}
           >
             <View className="flex-row items-center justify-center gap-2 py-3.5 px-5">
-              <Feather name="external-link" size={16} color="#fff" />
+              <Feather name="external-link" size={16} color={colors.onAccent} />
               <Text
-                className="text-white"
+                className="text-on-accent"
                 style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15 }}
               >
                 Open original
@@ -237,44 +241,11 @@ export default function ItemDetailScreen() {
           </Pressable>
         ) : null}
 
-        {/* Rendered unconditionally, and NOT behind `item.exploration`.
-            That field only exists once an exploration has already run: the
-            server creates it when POST /api/items/bulk/explore starts a job.
-            Gating on it meant the only control that can start one appeared
-            solely on items that no longer needed it — and with auto-enrich at
-            ingest opt-in and off (AUTO_ENRICH_ENABLED), that was every item.
-            ExploreCTA already handles `exploration === undefined` as its
-            `idle` variant. Only ready items can be explored (the server
-            answers NOT_READY otherwise), so still gate on status. */}
-        {item.status === 'ready' ? (
-          <ExploreCTA
-            exploration={item.exploration}
-            isReceipt={item.type === 'receipt'}
-            onPress={() => {
-              void actions.exploreMany([item.id], { deep: true }).then((res) => {
-                if (!res.ok && 'error' in res && res.error.message !== 'Cancelled') {
-                  Alert.alert('Exploration failed', res.error.message);
-                }
-              });
-            }}
-          />
-        ) : null}
 
+        {contentType === 'receipt' ? <ContentRenderer item={item} contentType={contentType} /> : null}
         {item.summary ? (
           <View style={{ position: 'relative' }}>
-            <LinearGradient
-              colors={['rgba(219,102,60,0.18)', 'rgba(219,102,60,0.04)', 'transparent']}
-              start={{ x: 0.05, y: 0 }}
-              end={{ x: 0.9, y: 1 }}
-              style={{
-                position: 'absolute',
-                top: -8,
-                left: -8,
-                right: -8,
-                bottom: -8,
-                borderRadius: 28,
-              }}
-            />
+
             <View
               className="rounded-2xl bg-card px-4 py-4 gap-2"
               style={{
@@ -305,22 +276,49 @@ export default function ItemDetailScreen() {
           </View>
         ) : null}
 
+
+        {item.status === 'error' ? (
+          <View className="rounded-xl border border-danger bg-danger/10 p-3">
+            <Text className="text-danger font-medium mb-1">Processing error</Text>
+            <Text className="text-danger">We could not finish processing this save. Your original is still available.</Text>
+            <ReloadButton item={item} />
+          </View>
+        ) : null}
+
+        {contentType !== 'receipt' ? <ContentRenderer item={item} contentType={contentType} /> : null}
+
+        {/* Rendered unconditionally, and NOT behind `item.exploration`.
+            That field only exists once an exploration has already run: the
+            server creates it when POST /api/items/bulk/explore starts a job.
+            Gating on it meant the only control that can start one appeared
+            solely on items that no longer needed it — and with auto-enrich at
+            ingest opt-in and off (AUTO_ENRICH_ENABLED), that was every item.
+            ExploreCTA already handles `exploration === undefined` as its
+            `idle` variant. Only ready items can be explored (the server
+            answers NOT_READY otherwise), so still gate on status. */}
+        {item.status === 'ready' ? (
+          <ExploreCTA
+            exploration={item.exploration}
+            isReceipt={item.type === 'receipt'}
+            onPress={() => {
+              void actions.exploreMany([item.id], { deep: true }).then((res) => {
+                if (!res.ok && 'error' in res && res.error.message !== 'Cancelled') {
+                  Alert.alert('Exploration failed', res.error.message);
+                }
+              });
+            }}
+          />
+        ) : null}
+
         {item.exploration ? (
           <EnrichedSections exploration={item.exploration} />
         ) : null}
 
-        {item.error_msg ? (
-          <View className="rounded-xl border border-danger bg-danger/10 p-3">
-            <Text className="text-danger font-medium mb-1">Processing error</Text>
-            <Text className="text-danger">{item.error_msg}</Text>
-          </View>
-        ) : null}
 
-        <ContentRenderer item={item} contentType={contentType} />
-
-        <TagEditor item={item} />
-
-        <TagSuggestions item={item} />
+        <View>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: tagsOpen }} className="min-h-[44px] justify-center" onPress={() => setTagsOpen(v => !v)}><Text className="text-muted font-medium">Tags ({item.tags?.length ?? 0}) {tagsOpen ? '⌃' : '⌄'}</Text></Pressable>
+          {tagsOpen ? <TagEditor item={item} /> : null}
+        </View>
 
         {relatedItems.length > 0 ? (
           <View className="gap-3 pt-2">
@@ -415,7 +413,7 @@ const RelatedCard: React.FC<{ item: Item }> = ({ item }) => {
             style={{ fontFamily: 'Inter_600SemiBold', fontSize: 13, lineHeight: 16 }}
             numberOfLines={2}
           >
-            {item.title ?? 'Untitled'}
+            {item.title ?? item.raw_url ?? 'Saved item'}
           </Text>
         </View>
       </View>
@@ -424,6 +422,7 @@ const RelatedCard: React.FC<{ item: Item }> = ({ item }) => {
 };
 
 const ShareButton: React.FC<{ item: Item }> = ({ item }) => {
+  const colors = useResolvedColors();
   const onPress = async () => {
     const url = item.source_url ?? item.raw_url;
     const title = item.title ?? 'Flowy item';
@@ -439,10 +438,8 @@ const ShareButton: React.FC<{ item: Item }> = ({ item }) => {
     }
   };
   return (
-    <Pressable onPress={onPress} hitSlop={8} accessibilityLabel="Share item">
-      <Text className="text-fg" style={{ fontFamily: 'Inter_500Medium', fontSize: 14 }}>
-        Share
-      </Text>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Share item" className="w-11 h-11 items-center justify-center">
+      <Feather name="share" size={20} color={colors.fg} />
     </Pressable>
   );
 };
@@ -459,12 +456,12 @@ const ReloadButton: React.FC<{ item: Item }> = ({ item }) => {
     }
   };
   return (
-    <Pressable onPress={onPress} disabled={disabled || busy} hitSlop={8}>
+    <Pressable accessibilityRole="button" accessibilityState={{ disabled: disabled || busy }} className="min-h-[44px] justify-center px-3" onPress={onPress} disabled={disabled || busy}>
       <Text
         className={disabled || busy ? 'text-muted' : 'text-fg'}
         style={{ fontFamily: 'Inter_500Medium', fontSize: 14 }}
       >
-        {busy ? 'Reloading…' : 'Reload'}
+        {busy ? 'Processing…' : item.status === 'error' ? 'Retry processing' : 'Reprocess'}
       </Text>
     </Pressable>
   );
@@ -474,7 +471,7 @@ const DeleteButton: React.FC<{ id: string }> = ({ id }) => {
   const del = useDeleteItem();
   return (
     <Pressable
-      hitSlop={8}
+      accessibilityRole="button" className="min-h-[44px] justify-center px-3"
       onPress={() => {
         Alert.alert('Delete item?', 'This cannot be undone.', [
           { text: 'Cancel', style: 'cancel' },
@@ -494,7 +491,7 @@ const DeleteButton: React.FC<{ id: string }> = ({ id }) => {
       }}
     >
       <Text
-        className="text-accent"
+        className="text-danger"
         style={{ fontFamily: 'Inter_500Medium', fontSize: 14 }}
       >
         Delete
@@ -547,17 +544,19 @@ const EditModal: React.FC<EditProps> = ({ item, onClose }) => {
 
   return (
     <Modal transparent animationType="slide" visible onRequestClose={onClose}>
-      <View className="flex-1 bg-black/40 justify-end">
-        <View className="bg-bg rounded-t-2xl p-4 gap-3">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-black/40 justify-end">
+        <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: '85%' }} className="bg-bg rounded-t-2xl" contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 40 }}>
           <Text className="text-xl font-semibold text-fg">Edit item</Text>
-          <TextInput
+          <Text className="text-fg text-sm">Title</Text>
+          <TextInput accessibilityLabel="Title"
             value={title}
             onChangeText={setTitle}
             placeholder="Title"
             placeholderTextColor={colors.muted}
             className="h-11 rounded-xl border border-border bg-card px-3 text-fg"
           />
-          <TextInput
+          <Text className="text-fg text-sm">Summary</Text>
+          <TextInput accessibilityLabel="Summary"
             value={summary}
             onChangeText={setSummary}
             placeholder="Summary"
@@ -565,14 +564,16 @@ const EditModal: React.FC<EditProps> = ({ item, onClose }) => {
             multiline
             className="min-h-[88px] rounded-xl border border-border bg-card px-3 py-2 text-fg"
           />
-          <TextInput
+          <Text className="text-fg text-sm">Category</Text>
+          <TextInput accessibilityLabel="Category"
             value={category}
             onChangeText={setCategory}
             placeholder="Category"
             placeholderTextColor={colors.muted}
             className="h-11 rounded-xl border border-border bg-card px-3 text-fg"
           />
-          <TextInput
+          <Text className="text-fg text-sm">Tags, separated by commas</Text>
+          <TextInput accessibilityLabel="Tags, separated by commas"
             value={tags}
             onChangeText={setTags}
             placeholder="Tags (comma separated)"
@@ -589,8 +590,8 @@ const EditModal: React.FC<EditProps> = ({ item, onClose }) => {
               <Button title="Save" loading={patch.isPending} onPress={save} />
             </View>
           </View>
-        </View>
-      </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

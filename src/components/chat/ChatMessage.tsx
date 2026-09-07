@@ -1,6 +1,9 @@
+import * as Clipboard from 'expo-clipboard';
+import { useIsFocused } from '@react-navigation/native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { router } from 'expo-router';
-import React, { useMemo } from 'react';
-import { Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import Markdown, { renderRules, type ASTNode } from 'react-native-markdown-display';
 
 import { useResolvedColors } from '@/lib/theme';
@@ -8,7 +11,7 @@ import type { ChatMessage as ChatMessageType, CitedItem } from '@/types';
 
 import { CitedItemsRail, InlineItemChip } from './ItemChip';
 
-type Props = { message: ChatMessageType };
+type Props = { message: ChatMessageType; onRetry?: () => void; retryDisabled?: boolean };
 
 const CITE_RE = /\[\[([A-Za-z0-9_-]+)\]\]/g;
 const ITEM_PROTO = 'item://';
@@ -37,7 +40,11 @@ function preprocessContent(text: string, items: CitedItem[]): { content: string;
   return { content, indexById };
 }
 
-export const ChatMessage: React.FC<Props> = ({ message }) => {
+export const ChatMessage: React.FC<Props> = ({ message, onRetry, retryDisabled }) => {
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const focused = useIsFocused();
+  const reducedMotion = useReducedMotion();
+  const [copyLabel, setCopyLabel] = useState('Copy');
   const colors = useResolvedColors();
   const isUser = message.role === 'user';
   const items = message.citations ?? [];
@@ -61,7 +68,7 @@ export const ChatMessage: React.FC<Props> = ({ message }) => {
   // Web parity: if no citations were emitted, surface up to 3 of the items the
   // LLM had context on as a "might be related" rail.
   const railItems = citedItems.length > 0 ? citedItems : items.slice(0, 3);
-  const railLabel = citedItems.length > 0 ? 'Items in this conversation' : 'Might be related';
+  const railLabel = citedItems.length > 0 ? 'Sources' : 'Related content';
 
   const userText = colors.bg;
   const markdownStyle = useMemo(
@@ -171,21 +178,29 @@ export const ChatMessage: React.FC<Props> = ({ message }) => {
     return true;
   };
 
-  const placeholder = !content && message.streaming ? '…' : '';
 
   return (
     <View className={`px-4 py-2 ${isUser ? 'items-end' : 'items-start'}`}>
       <View
-        className={`max-w-[88%] rounded-2xl px-4 py-3 ${
+        className={`${isUser ? 'max-w-[88%]' : 'w-full'} rounded-2xl px-4 py-3 ${
           isUser ? 'bg-primary' : 'bg-card border border-border'
         }`}
       >
+        {message.streaming && !content ? <View accessibilityLiveRegion="polite" className="flex-row items-center gap-2">{focused && !reducedMotion ? <ActivityIndicator color={colors.muted} size="small" /> : null}<Text className="text-muted">Preparing response…</Text></View> : null}
         <Markdown style={markdownStyle} rules={rules} onLinkPress={onLinkPress}>
-          {content || placeholder}
+          {content}
         </Markdown>
       </View>
+      {!isUser && (message.error || message.interrupted) ? <Text accessibilityRole="alert" className="text-danger text-sm py-2">{message.error ?? 'Response stopped. You can retry when ready.'}</Text> : null}
       {!isUser && !message.streaming ? (
-        <CitedItemsRail items={railItems} label={railLabel} />
+        <View className="w-full">
+          <View className="flex-row flex-wrap items-center gap-3">
+            {railItems.length ? <Pressable accessibilityRole="button" accessibilityState={{ expanded: sourcesOpen }} className="min-h-[44px] justify-center" onPress={() => setSourcesOpen(v => !v)}><Text className="text-fg text-sm">{railItems.length} {railLabel.toLowerCase()} {sourcesOpen ? '⌃' : '⌄'}</Text></Pressable> : null}
+            {message.content ? <Pressable accessibilityRole="button" className="min-h-[44px] justify-center" onPress={() => { void Clipboard.setStringAsync(message.content.replace(CITE_RE, '')).then(() => setCopyLabel('Copied')).catch(() => setCopyLabel('Copy failed, retry')); }}><Text className="text-muted text-sm">{copyLabel}</Text></Pressable> : null}
+            {onRetry ? <Pressable disabled={retryDisabled} accessibilityRole="button" accessibilityState={{ disabled: retryDisabled }} className="min-h-[44px] justify-center" onPress={onRetry}><Text className="text-fg text-sm">Retry</Text></Pressable> : null}
+          </View>
+          {sourcesOpen ? <CitedItemsRail items={railItems} label={railLabel} /> : null}
+        </View>
       ) : null}
     </View>
   );

@@ -34,11 +34,6 @@ const Sparkle: React.FC = () => {
   return <MaterialCommunityIcons name="creation" size={11} color={colors.accent} />;
 };
 
-const FALLBACK_TAKEAWAYS = [
-  'Enrichment surfaced this item for further investigation.',
-  'Review the related links below to find canonical sources.',
-  'Add or accept suggested tags to keep your library tidy.',
-];
 
 type Props = {
   exploration: ItemExploration;
@@ -134,7 +129,7 @@ const EnrichedBody: React.FC<Props> = ({ exploration }) => {
     ? deep.key_findings
     : exploration.notes
       ? splitNotesIntoTakeaways(exploration.notes)
-      : FALLBACK_TAKEAWAYS;
+      : [];
 
   const sourceAnalysis: { key: string; val: string }[] = exploration.video_insights
     ? [
@@ -157,7 +152,8 @@ const EnrichedBody: React.FC<Props> = ({ exploration }) => {
     <View>
       {deep?.synthesis ? (
         <CollapsibleSection
-          label="Deep-Dive Synthesis"
+          label="Detailed analysis"
+          defaultOpen={false}
           trailingIcon={<Sparkle />}
           badge="AI"
         >
@@ -174,7 +170,7 @@ const EnrichedBody: React.FC<Props> = ({ exploration }) => {
         </CollapsibleSection>
       ) : null}
 
-      <CollapsibleSection
+      {keyTakeaways.length ? <CollapsibleSection
         label={deep?.key_findings?.length ? 'Key Findings from Links' : 'Key Takeaways'}
         trailingIcon={<Sparkle />}
         badge="AI"
@@ -221,10 +217,11 @@ const EnrichedBody: React.FC<Props> = ({ exploration }) => {
             </View>
           ))}
         </View>
-      </CollapsibleSection>
+      </CollapsibleSection> : null}
 
       <CollapsibleSection
-        label="Related Links"
+        label="Related sources"
+        defaultOpen={false}
         trailingIcon={<Sparkle />}
         badge={relatedLinks.length || undefined}
       >

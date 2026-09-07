@@ -5,7 +5,7 @@ import type { ViewMode } from '@/types';
 import { localSecureStore } from './secureStore';
 
 const VIEW_MODE_KEY = 'tryflowy.viewMode';
-const DEFAULT: ViewMode = 'grid';
+const DEFAULT: ViewMode = 'list';
 
 const isViewMode = (value: unknown): value is ViewMode =>
   value === 'grid' || value === 'list';

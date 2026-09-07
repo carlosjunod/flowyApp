@@ -10,6 +10,7 @@ type State = {
   phase: Phase;
   batch: ImportBatch | null;
   error: ApiError | null;
+  failedUrls: string[];
 };
 
 // The web app has no bulk-ingest endpoint — it loops single POST /api/ingest
@@ -31,7 +32,7 @@ const randomBatchId = (): string =>
 
 export const useBulkImport = () => {
   const qc = useQueryClient();
-  const [state, setState] = useState<State>({ phase: 'idle', batch: null, error: null });
+  const [state, setState] = useState<State>({ phase: 'idle', batch: null, error: null, failedUrls: [] });
   // Monotonic run id rather than a shared `cancelled` boolean. reset() must
   // abandon the run in flight while leaving the hook able to start a new one,
   // which a boolean cannot express: the old code set it true then immediately
@@ -53,6 +54,7 @@ export const useBulkImport = () => {
         runIdRef.current += 1;
         setState({
           phase: 'error',
+          failedUrls: [],
           batch: null,
           error: { code: 'INVALID_INPUT', message: 'No valid URLs to import' },
         });
@@ -62,6 +64,7 @@ export const useBulkImport = () => {
         runIdRef.current += 1;
         setState({
           phase: 'error',
+          failedUrls: [],
           batch: null,
           error: { code: 'INVALID_INPUT', message: `Max ${MAX_URLS} URLs per batch` },
         });
@@ -75,9 +78,11 @@ export const useBulkImport = () => {
       const total = urls.length;
       let processed = 0;
       let dead = 0;
+      const failedUrls: string[] = [];
       const publish = (done: boolean) =>
         setState({
           phase: done ? 'done' : 'polling',
+          failedUrls: [...failedUrls],
           batch: {
             id: batchId,
             status: done ? 'done' : 'processing',
@@ -90,6 +95,7 @@ export const useBulkImport = () => {
 
       setState({
         phase: 'submitting',
+        failedUrls: [],
         batch: { id: batchId, status: 'processing', processed: 0, dead_count: 0, total },
         error: null,
       });
@@ -102,7 +108,7 @@ export const useBulkImport = () => {
           if (!url) break;
           const res = await api.ingest({ type: 'url', raw_url: url });
           if (isStale()) return;
-          if (res.error) dead += 1;
+          if (res.error) { dead += 1; failedUrls.push(url); }
           processed += 1;
           publish(false);
         }
@@ -121,11 +127,12 @@ export const useBulkImport = () => {
   const reset = useCallback(() => {
     // Bumping the id abandons whatever is in flight without blocking the next run.
     runIdRef.current += 1;
-    setState({ phase: 'idle', batch: null, error: null });
+    setState({ phase: 'idle', batch: null, error: null, failedUrls: [] });
   }, []);
 
   return {
     phase: state.phase,
+    failedUrls: state.failedUrls,
     batch: state.batch,
     error: state.error,
     submit,

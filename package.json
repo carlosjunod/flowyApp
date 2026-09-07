@@ -8,7 +8,8 @@
     "android": "expo run:android",
     "web": "expo start --web",
     "prebuild": "expo prebuild",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:ui-models": "node scripts/test-ui-models.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/instrument-serif": "^0.4.1",

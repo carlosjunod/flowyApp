@@ -152,6 +152,8 @@ export type ChatMessage = {
   content: string;
   citations?: CitedItem[];
   streaming?: boolean;
+  interrupted?: boolean;
+  error?: string;
 };
 
 export type ApiErrorCode =

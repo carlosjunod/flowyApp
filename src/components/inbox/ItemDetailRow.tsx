@@ -27,20 +27,22 @@ export const ItemDetailRow: React.FC<Props> = ({ item }) => {
       selection.toggle(item.id);
       return;
     }
-    if (pending || errored) return;
     router.push(`/item/${item.id}`);
   };
 
   const handleLongPress = () => {
-    if (pending) return;
     if (!selection.mode) selection.enterWith(item.id);
     else selection.toggle(item.id);
   };
 
   return (
-    <Animated.View entering={FadeIn.duration(220)}>
+    <Animated.View entering={FadeIn.duration(180)}>
       <Pressable
-        disabled={pending && !selection.mode}
+        accessibilityRole={selection.mode ? 'checkbox' : 'button'}
+        accessibilityLabel={`${item.title ?? item.raw_url ?? 'Saved item'}${pending ? ', processing' : errored ? ', processing failed' : ''}`}
+        accessibilityState={{ checked: selection.mode ? selected : undefined }}
+        accessibilityActions={[{ name: 'longpress', label: 'Select item' }]}
+        onAccessibilityAction={event => { if (event.nativeEvent.actionName === 'longpress') handleLongPress(); }}
         onPress={handlePress}
         onLongPress={handleLongPress}
         delayLongPress={300}
@@ -69,7 +71,7 @@ export const ItemDetailRow: React.FC<Props> = ({ item }) => {
             style={{ fontFamily: 'Inter_600SemiBold' }}
             numberOfLines={1}
           >
-            {item.title ?? 'Untitled'}
+            {item.title ?? item.raw_url ?? (pending ? 'Preparing saved content…' : 'Saved item')}
           </Text>
           {item.summary ? (
             <Text className="text-sm text-muted" numberOfLines={2}>

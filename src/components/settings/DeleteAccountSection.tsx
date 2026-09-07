@@ -1,7 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 
+import { useChat } from '@/hooks/useChat';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useResolvedColors } from '@/lib/theme';
@@ -21,10 +22,12 @@ const DESTROYED = [
   'Every item you saved, with its summaries, tags and notes',
   'Every file you uploaded',
   'Your search index, digests and notifications',
+  'Chat history saved on this device',
 ];
 
 export const DeleteAccountSection: React.FC = () => {
   const { signOut } = useAuth();
+  const chat = useChat();
   const colors = useResolvedColors();
   const [open, setOpen] = useState(false);
   const [phrase, setPhrase] = useState('');
@@ -50,6 +53,7 @@ export const DeleteAccountSection: React.FC = () => {
     // Clears the PocketBase session AND the shared keychain entry, so the
     // share extension loses its session too rather than posting as a user
     // that no longer exists.
+    try { await chat.removeAccountHistory(); } catch { Alert.alert('Account deleted', 'Saved chats could not be removed from this device. Remove Flowy’s app data to clear local storage.'); }
     await signOut();
   };
 

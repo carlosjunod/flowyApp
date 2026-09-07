@@ -33,7 +33,7 @@ export const ItemCard: React.FC<Props> = ({ item }) => {
   const selection = useSelection();
   const selected = selection.selectedIds.has(item.id);
   const thumb = thumbnailFor(item);
-  const hasPhoto = thumb.kind === 'image' && Boolean(item.r2_key);
+  const hasPhoto = thumb.kind === 'image';
   const url = item.source_url ?? item.raw_url;
   const host = url ? hostOf(url) : null;
   const domainLabel = host ? stripWww(host) : null;
@@ -47,20 +47,22 @@ export const ItemCard: React.FC<Props> = ({ item }) => {
       selection.toggle(item.id);
       return;
     }
-    if (pending || errored) return;
     router.push(`/item/${item.id}`);
   };
 
   const handleLongPress = () => {
-    if (pending) return;
     if (!selection.mode) selection.enterWith(item.id);
     else selection.toggle(item.id);
   };
 
   return (
-    <Animated.View entering={FadeIn.duration(220)}>
+    <Animated.View entering={FadeIn.duration(180)}>
       <Pressable
-        disabled={pending && !selection.mode}
+        accessibilityRole={selection.mode ? 'checkbox' : 'button'}
+        accessibilityLabel={`${item.title ?? item.raw_url ?? 'Saved item'}${pending ? ', processing' : errored ? ', processing failed' : ''}`}
+        accessibilityState={{ checked: selection.mode ? selected : undefined }}
+        accessibilityActions={[{ name: 'longpress', label: 'Select item' }]}
+        onAccessibilityAction={event => { if (event.nativeEvent.actionName === 'longpress') handleLongPress(); }}
         onPress={handlePress}
         onLongPress={handleLongPress}
         delayLongPress={300}
@@ -111,8 +113,10 @@ export const ItemCard: React.FC<Props> = ({ item }) => {
             }}
             numberOfLines={2}
           >
-            {item.title ?? 'Untitled'}
+            {item.title ?? item.raw_url ?? (pending ? 'Preparing saved content…' : 'Saved item')}
           </Text>
+          {item.summary ? <Text className="text-muted text-sm" numberOfLines={2}>{item.summary}</Text> : null}
+          {pending || errored ? <Text className={errored ? 'text-danger text-sm' : 'text-muted text-sm'}>{errored ? 'Processing failed · Tap to retry' : 'Processing saved content…'}</Text> : null}
           <View className="flex-row items-end justify-between">
             <Text
               className="text-muted text-xs flex-1 pr-2"
@@ -123,7 +127,7 @@ export const ItemCard: React.FC<Props> = ({ item }) => {
             </Text>
             <Text
               className="text-muted"
-              style={{ fontFamily: 'InstrumentSerif_400Regular', fontSize: 18, letterSpacing: -0.3 }}
+              style={{ fontFamily: 'Inter_400Regular', fontSize: 12 }}
             >
               {monthDayLabel(item.created)}
             </Text>
@@ -155,7 +159,7 @@ const ImageLed: React.FC<LedProps> = ({
   selected,
   selectionMode,
 }) => (
-  <View className="relative" style={{ aspectRatio: 1.05 }}>
+  <View className="relative" style={{ aspectRatio: 1.6 }}>
     <Image
       source={{ uri: thumb.uri }}
       contentFit="cover"
@@ -241,61 +245,10 @@ type EditorialProps = {
   selectionMode: boolean;
 };
 
-const Editorial: React.FC<EditorialProps> = ({
-  item,
-  faviconUri,
-  domainLabel,
-  pending,
-  selected,
-  selectionMode,
-}) => (
-  <View
-    className="relative bg-surface px-4 pt-5 pb-4 gap-3"
-    style={{ aspectRatio: 1.05 }}
-  >
-    <View className="flex-row items-center gap-1.5">
-      {faviconUri ? (
-        <Image
-          source={{ uri: faviconUri }}
-          style={{ width: 14, height: 14, borderRadius: 3 }}
-          contentFit="contain"
-        />
-      ) : (
-        <Text className="text-base">{typeGlyph[item.type]}</Text>
-      )}
-      <Text
-        className="text-muted"
-        style={{ fontFamily: 'Inter_500Medium', fontSize: 11 }}
-        numberOfLines={1}
-      >
-        {domainLabel ?? item.type}
-      </Text>
-    </View>
-    <Text
-      className="text-fg flex-1"
-      style={{
-        fontFamily: 'InstrumentSerif_400Regular',
-        fontSize: 26,
-        lineHeight: 30,
-        letterSpacing: -0.3,
-      }}
-      numberOfLines={4}
-    >
-      {item.title ?? 'Untitled'}
-    </Text>
-    {selectionMode ? (
-      <View
-        className={`absolute top-2.5 right-2.5 w-6 h-6 rounded-full items-center justify-center border-2 ${
-          selected ? 'bg-accent border-accent' : 'border-border bg-card'
-        }`}
-      >
-        {selected ? <Feather name="check" size={14} color="#fff" /> : null}
-      </View>
-    ) : null}
-    {pending ? (
-      <View className="absolute inset-0 items-center justify-center">
-        <Spinner tint="muted" />
-      </View>
-    ) : null}
+const Editorial: React.FC<EditorialProps> = ({ item, faviconUri, domainLabel, selected, selectionMode }) => (
+  <View className="bg-surface px-3 pt-3 pb-2 flex-row items-center gap-2">
+    {faviconUri ? <Image source={{ uri: faviconUri }} style={{ width: 18, height: 18, borderRadius: 3 }} /> : <Text>{typeGlyph[item.type]}</Text>}
+    <Text className="text-muted text-xs flex-1" numberOfLines={1}>{domainLabel ?? item.type}</Text>
+    {selectionMode ? <Feather name={selected ? 'check-circle' : 'circle'} size={22} color={selected ? '#A74326' : '#6B6258'} /> : null}
   </View>
 );
