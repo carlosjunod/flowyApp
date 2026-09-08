@@ -1,8 +1,9 @@
 import { Feather } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, Text, View } from 'react-native';
+import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ChatHistoryDrawer } from '@/components/chat/ChatHistoryDrawer';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { ChatWindow } from '@/components/chat/ChatWindow';
 import { Button } from '@/components/ui/Button';
@@ -19,10 +20,10 @@ export default function ChatScreen() {
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
       <View className="flex-row items-center gap-2 px-4 py-2 border-b border-border">
         <Pressable onPress={() => setHistoryOpen(true)} accessibilityRole="button" accessibilityLabel="Chat history" className="w-11 h-11 justify-center items-center">
-          <Feather name="clock" size={20} color={colors.fg} />
+          <Feather name="sidebar" size={20} color={colors.fg} />
         </Pressable>
         <Text className="flex-1 text-fg font-semibold" numberOfLines={1}>{chat.active.messages.length ? chat.active.title : 'Chat'}</Text>
-        <Pressable onPress={chat.reset} disabled={!chat.ready} accessibilityRole="button" accessibilityLabel="New conversation" className="w-11 h-11 justify-center items-center">
+        <Pressable onPress={chat.reset} disabled={!chat.ready} accessibilityRole="button" accessibilityLabel="New chat" className="w-11 h-11 justify-center items-center">
           <Feather name="edit" size={20} color={colors.fg} />
         </Pressable>
       </View>
@@ -32,20 +33,28 @@ export default function ChatScreen() {
         <ChatWindow key={chat.active.id} messages={chat.messages} ready={chat.ready} onPromptTap={chat.send} onRetry={chat.retry} retryDisabled={!!chat.generatingId} />
         <ChatInput value={chat.draft} onChange={chat.setDraft} onSend={chat.send} pending={chat.pending} disabled={!chat.ready || !!chat.generatingId} onStop={chat.stop} />
       </KeyboardAvoidingView>
-      <Modal visible={historyOpen} presentationStyle="pageSheet" animationType="slide" onRequestClose={() => setHistoryOpen(false)}>
-        <SafeAreaView className="flex-1 bg-bg">
-          <View className="px-4 flex-row items-center justify-between"><Text className="text-xl text-fg font-semibold">Conversations</Text><Button title="Done" variant="ghost" onPress={() => setHistoryOpen(false)} /></View>
-          <Text className="px-4 py-2 text-sm text-muted">Saved on this device for your account.</Text>
-          <FlatList data={[...chat.snapshot.conversations].sort((a, b) => b.updated - a.updated)} keyExtractor={c => c.id} renderItem={({ item }) => (
-            <View className="flex-row items-center border-b border-border px-4">
-              <Pressable className="flex-1 py-4" accessibilityRole="button" accessibilityState={{ selected: item.id === chat.active.id }} onPress={() => { chat.select(item.id); setHistoryOpen(false); }}>
-                <Text className="text-fg font-medium" numberOfLines={2}>{item.title}</Text><Text className="text-xs text-muted pt-1">{item.id === chat.generatingId ? 'Preparing response…' : item.draft ? 'Draft' : new Date(item.updated).toLocaleDateString()}</Text>
+      <ChatHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)}>
+          <View className="px-3 py-2 flex-row items-center justify-between">
+            <Text style={{ fontFamily: 'InstrumentSerif_400Regular', fontSize: 28, color: colors.fg }} className="px-2">Flowy<Text style={{ color: colors.accent }}>.</Text></Text>
+            <Pressable className="w-11 h-11 items-center justify-center rounded-xl" accessibilityRole="button" accessibilityLabel="Close chat history" onPress={() => setHistoryOpen(false)}><Feather name="sidebar" size={21} color={colors.fg} /></Pressable>
+          </View>
+          <Pressable disabled={!chat.ready} accessibilityRole="button" className="mx-3 mb-6 px-3 py-3 flex-row items-center gap-3 rounded-xl" onPress={() => { chat.reset(); setHistoryOpen(false); }}>
+            <Feather name="edit" size={20} color={colors.fg} /><Text className="text-fg font-medium">New chat</Text>
+          </Pressable>
+          <Text accessibilityRole="header" className="px-6 pb-2 text-xs text-muted font-medium">Chats</Text>
+          <FlatList className="flex-1" contentContainerStyle={{ paddingHorizontal: 12 }} data={chat.snapshot.conversations.filter(c => c.messages.length || c.draft).sort((a, b) => b.updated - a.updated)} keyExtractor={c => c.id}
+            ListEmptyComponent={<Text className="px-3 py-4 text-sm text-muted">Your conversations will appear here.</Text>}
+            renderItem={({ item }) => (
+            <View className="flex-row items-center rounded-xl mb-1 pl-3" style={{ backgroundColor: item.id === chat.active.id ? colors.bg : 'transparent' }}>
+              <Pressable className="flex-1 py-3" accessibilityRole="button" accessibilityState={{ selected: item.id === chat.active.id }} onPress={() => { chat.select(item.id); setHistoryOpen(false); }}>
+                <Text className="text-fg text-sm" numberOfLines={1}>{item.title}</Text>
+                {item.id === chat.generatingId ? <Text className="text-xs text-muted pt-1">Preparing response…</Text> : item.draft ? <Text className="text-xs text-muted pt-1">Draft</Text> : null}
               </Pressable>
-              <Pressable className="w-11 h-11 items-center justify-center" accessibilityRole="button" accessibilityLabel={`Delete conversation ${item.title}`} onPress={() => Alert.alert('Delete conversation?', 'This removes it from this device.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => chat.deleteConversation(item.id) }])}><Feather name="trash-2" size={18} color={colors.muted} /></Pressable>
+              <Pressable className="w-11 h-11 items-center justify-center" accessibilityRole="button" accessibilityLabel={`Delete conversation ${item.title}`} onPress={() => Alert.alert('Delete conversation?', 'This removes it from this device.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => chat.deleteConversation(item.id) }])}><Feather name="trash-2" size={16} color={colors.muted} /></Pressable>
             </View>
           )} />
-        </SafeAreaView>
-      </Modal>
+          <Text className="px-6 py-4 text-xs text-muted">Saved on this device for your account.</Text>
+      </ChatHistoryDrawer>
     </SafeAreaView>
   );
 }

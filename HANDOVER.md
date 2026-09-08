@@ -1,5 +1,7 @@
 # FlowyApp — Parity Red-Priority Handover
 
+> **Chat navigation — 2026-09-08:** `app/(app)/chat.tsx` now opens a left history drawer (`src/components/chat/ChatHistoryDrawer.tsx`) with sidebar/compose icons, selected conversation styling and a New chat action. Close via backdrop, sidebar control, accessibility escape, Android Back or swipe left. Safe areas and reduced-motion preferences are respected. Drafts, active generation and confirmed conversation deletion are preserved. Typecheck, all 18 UI-model scenarios and the iOS Metro/Hermes export pass. Native gesture/VoiceOver behavior still needs simulator/device verification; the export is not a native binary build.
+
 > **Server retrieval update — 2026-09-08:** Flowy now consumes the existing chat history on its feature-flagged retrieval path, preserves richer extracted evidence, and generates stable `[[itemId]]` citations plus source/time URLs. The client still uses the same `text/plain` stream and `x-items` header; no native implementation or binary change is needed. Client typecheck and all 18 UI-model scenarios pass. No device E2E or production model-quality claim is made. Server deployment/reindex instructions: `../Flowy/docs/retrieval-quality-rollout.md`.
 
 
