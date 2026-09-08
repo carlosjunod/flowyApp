@@ -189,3 +189,18 @@ Severity tags from the original diagnostic; effort tags re-estimated.
 - Web AASA: `Flowy/apps/web/app/.well-known/apple-app-site-association/route.ts` (reads `APPLE_TEAM_ID` + `APPLE_CLIENT_ID`).
 - Web SIWA verifier: `Flowy/apps/web/lib/apple-auth.ts:38-47`.
 - Web bulk-add mirror: `Flowy/apps/web/components/inbox/BulkAddBookmarksButton.tsx` (concurrency 4, max 100, exact failure-handling pattern).
+
+## Semantic content templates V1 — 2026-09-08
+
+Implemented in the isolated `codex/content-templates` worktree alongside the server worktree `Flowy-content-templates`. `src/types/semantic.ts` mirrors the server/web validated envelope. Inbox cards, rows and detail rows preview list counts and resource names. `src/components/inbox/content/SemanticContent.tsx` renders list/entity/narrative content with 12-entry pagination, literal evidence, safe source/lookup links and YouTube timestamp actions, composed with existing medium/receipt renderers. Generic source text now renders Markdown. The detail research action is labelled “Find resource links” for semantic lists/entities.
+
+No native configuration, entitlement, API route or chat stream shape changed. Deploy the matching server/worker before enabling `CONTENT_TEMPLATES_ENABLED=1` for new ingestion. Clients safely ignore missing/invalid/unknown envelopes, so old records remain readable. Movie/GitHub lookups use the existing Explore action; other resource domains show source links only. The worker flag defaults off until real-corpus evaluation. Saved templates render even when the ingest flag is off. No production data or original checkout was changed.
+
+Validation: TypeScript and the existing 18 UI-model scenarios pass; iOS Metro/Hermes export passes. Web component fixture checks cover matching behaviors at 1440/768/390/320px. Native VoiceOver, Dynamic Type and real device interaction remain unvalidated; export is not device E2E.
+
+
+## Semantic content V1.1 — 2026-09-08
+
+The mirrored contract accepts optional extraction quality/progress and evidence origins while preserving old V1 records. Detail renders quality notices even for generic content, distinguishes incomplete reading from insufficient source text, labels caption/OCR/transcript evidence and offers “Continue extraction” through the existing Explore action. The worker checkpoints work and skips link lookup when continuing; no request shape or native capability changed. Original media and receipts remain in place. Source counts are classifier-reported with literal evidence, not keyword heuristics. The provider has not been evaluated against production content and no feature was deployed or enabled by this task.
+
+Validation for V1.1: TypeScript and all 18 existing UI model scenarios pass; iOS Metro/Hermes export succeeds. No native-device interaction was tested. Server regression suite: 133 tests across 14 files.
