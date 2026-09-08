@@ -28,6 +28,7 @@ const EXAMPLE_PROMPTS = [
 ] as const;
 
 export const ChatWindow: React.FC<Props> = ({ messages, onPromptTap, ready, onRetry, retryDisabled }) => {
+  const colors = useResolvedColors();
   const ref = useRef<FlatList<ChatMessageType>>(null);
   const following = useRef(true);
   const [showLatest, setShowLatest] = useState(false);
@@ -47,7 +48,7 @@ export const ChatWindow: React.FC<Props> = ({ messages, onPromptTap, ready, onRe
         onContentSizeChange={() => { if (following.current) ref.current?.scrollToEnd({ animated: false }); else setShowLatest(true); }}
         renderItem={({ item, index }) => <ChatMessage message={item} onRetry={index === messages.length - 1 ? onRetry : undefined} retryDisabled={retryDisabled} />}
         contentContainerStyle={{ paddingVertical: 8 }} />
-      {showLatest ? <Pressable accessibilityRole="button" onPress={() => { following.current = true; setShowLatest(false); ref.current?.scrollToEnd({ animated: false }); }} className="self-center rounded-full bg-primary px-4 py-3 mb-2"><Text className="text-bg">Latest response ↓</Text></Pressable> : null}
+      {showLatest ? <Pressable accessibilityRole="button" onPress={() => { following.current = true; setShowLatest(false); ref.current?.scrollToEnd({ animated: false }); }} className="self-center rounded-full bg-primary px-4 py-3 mb-2"><View className="flex-row items-center gap-2"><Text className="text-bg">Latest response</Text><Feather name="arrow-down" size={16} color={colors.bg} /></View></Pressable> : null}
     </View>
   );
 };

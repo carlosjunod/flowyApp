@@ -81,6 +81,25 @@ function streamQueue() {
 }
 const tick = () => new Promise(resolve => setImmediate(resolve));
 (async () => {
+  const citations = loader()('src/lib/chatCitations.ts');
+  const citationItems = [
+    { id: 'known', type: 'instagram', title: 'A long title', site_name: '   ', source_url: 'https://www.instagram.com/p/one' },
+    { id: 'another', type: 'file', title: 'Local document' },
+  ];
+  const prepared = citations.prepareCitations('First [[missing]] then [[known]] and again [[known]], finally [[another]].');
+  assert.deepEqual([...prepared.indexById], [['missing', 1], ['known', 2], ['another', 3]]);
+  assert.ok(prepared.content.includes('[2](item://known)'));
+  passed('Source numbering preserves repeated references and gaps for missing metadata');
+  assert.equal(citations.prepareCitations('Answer [[unfinished').content, 'Answer ');
+  assert.equal(citations.prepareCitations('Answer [[unfinished]').content, 'Answer ');
+  assert.equal(citations.prepareCitations('Answer [[known]]').content, 'Answer [1](item://known)');
+  passed('Streaming citations remain hidden until their token is complete');
+  assert.equal(citations.domainLabelForRef(citationItems[0]), 'instagram.com');
+  assert.equal(citations.domainLabelForRef(citationItems[1]), 'File');
+  assert.equal(citations.domainLabelForRef({ ...citationItems[0], source_url: 'bad url', raw_url: 'https://example.com/x' }), 'example.com');
+  passed('Source cards show publisher or domain instead of repeating the title');
+  assert.equal(citations.copyWithCitations('Saved [[known]]', citationItems), 'Saved [1] https://www.instagram.com/p/one');
+  passed('Copied answers retain their source references');
   const model = loader()('src/lib/chatModel.ts');
   const restored = model.restoreChat({ activeId: 'c', conversations: [{ id: 'c', title: 'Saved', draft: 'Draft ✨', updated: 1, messages: [{ id: 'a', role: 'assistant', content: 'Partial', streaming: true, citations: [{ id: 'valid', type: 'url', title: 'Source' }, { id: 'bad', type: 'url', title: {} }] }] }] });
   assert.equal(restored.conversations[0].messages[0].interrupted, true);

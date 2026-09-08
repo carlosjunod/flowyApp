@@ -1,3 +1,4 @@
+import { AppIcon } from '@/components/ui/AppIcon';
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Link, router } from "expo-router";
 import React, { useState } from "react";
@@ -108,7 +109,7 @@ export default function DigestListScreen() {
           renderItem={({ item }) => <DigestRow digest={item} />}
           ListEmptyComponent={
             <View className="items-center justify-center px-6 pt-16">
-              <Text className="text-5xl mb-3">📰</Text>
+              <View className="mb-3"><AppIcon name="file-text" size={40} /></View>
               <Text className="text-base text-muted text-center">
                 Nothing new to recap yet. Choose a weekly digest in settings
                 when you’re ready.

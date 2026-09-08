@@ -1,9 +1,11 @@
+import { itemTypeLabel } from '@/lib/itemIcons';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useMemo } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
-import { hostOf, thumbnailFor, typeGlyph } from '@/lib/thumbnails';
+import { hostOf, thumbnailFor } from '@/lib/thumbnails';
 import type { ChatMessage, CitedItem, Item } from '@/types';
 
 type Props = {
@@ -92,7 +94,7 @@ const MiniImageLedCard: React.FC<{ cited: CitedItem }> = ({ cited }) => {
             />
           ) : (
             <View className="flex-1 items-center justify-center">
-              <Text className="text-3xl">{thumb.glyph}</Text>
+              <AppIcon name={thumb.icon} size={30} />
             </View>
           )}
           {domainLabel ? (
@@ -127,7 +129,7 @@ const MiniImageLedCard: React.FC<{ cited: CitedItem }> = ({ cited }) => {
             style={{ fontFamily: 'Inter_600SemiBold', fontSize: 12, lineHeight: 15 }}
             numberOfLines={2}
           >
-            {cited.title ?? typeGlyph[cited.type]}
+            {cited.title ?? itemTypeLabel[cited.type]}
           </Text>
           {cited.category ? (
             <Text

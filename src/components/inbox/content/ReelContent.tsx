@@ -1,3 +1,4 @@
+import { AppIcon } from '@/components/ui/AppIcon';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -61,7 +62,7 @@ export const ReelContent: React.FC<{ item: Item }> = ({ item }) => {
           style={{ paddingHorizontal: 12, paddingVertical: 10 }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={{ fontSize: 14 }}>📸</Text>
+            <AppIcon name="instagram" size={14} />
             <Text
               className="text-fg"
               style={{ fontFamily: 'Inter_600SemiBold', fontSize: 12.5 }}

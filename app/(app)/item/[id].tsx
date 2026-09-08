@@ -1,3 +1,4 @@
+import { AppIcon } from '@/components/ui/AppIcon';
 import { readSemanticContent, canResumeSemantic } from '@/types/semantic';
 import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
@@ -36,7 +37,7 @@ import { ENV } from '@/lib/env';
 import { pb } from '@/lib/pb';
 import { relativeDate } from '@/lib/relativeDate';
 import { sourceChip } from '@/lib/sourceChip';
-import { hostOf, thumbnailFor, typeGlyph } from '@/lib/thumbnails';
+import { hostOf, thumbnailFor } from '@/lib/thumbnails';
 import { useResolvedColors } from '@/lib/theme';
 import type { Item } from '@/types';
 
@@ -58,6 +59,7 @@ const useRelatedItems = (item: Item | undefined) =>
   });
 
 export default function ItemDetailScreen() {
+  const goBack = () => { if (router.canGoBack()) router.back(); else router.replace('/inbox'); };
   const params = useLocalSearchParams<{ id: string }>();
   const id = params.id;
   const { data: item, isLoading, error } = useItemById(id);
@@ -89,7 +91,7 @@ export default function ItemDetailScreen() {
         <Text className="text-base text-danger mb-4">
           This item could not be loaded. Check your connection or return to your inbox.
         </Text>
-        <Button title="Back" variant="secondary" onPress={() => router.back()} />
+        <Button title="Back" variant="secondary" onPress={goBack} />
       </SafeAreaView>
     );
   }
@@ -121,7 +123,7 @@ export default function ItemDetailScreen() {
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
       <View className="flex-row items-center justify-between px-4 py-3">
         <Pressable
-          onPress={() => router.back()}
+          onPress={goBack}
           hitSlop={8}
           accessibilityLabel="Back"
           accessibilityRole="button"
@@ -198,7 +200,7 @@ export default function ItemDetailScreen() {
                 />
               ) : (
                 <View className="flex-1 items-center justify-center">
-                  <Text className="text-6xl">{typeGlyph[item.type]}</Text>
+                  <AppIcon type={item.type} size={48} />
                 </View>
               )}
             </View>
@@ -338,7 +340,7 @@ export default function ItemDetailScreen() {
 
 
         <View>
-          <Pressable accessibilityRole="button" accessibilityState={{ expanded: tagsOpen }} className="min-h-[44px] justify-center" onPress={() => setTagsOpen(v => !v)}><Text className="text-muted font-medium">Tags ({item.tags?.length ?? 0}) {tagsOpen ? '⌃' : '⌄'}</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: tagsOpen }} className="min-h-[44px] justify-center" onPress={() => setTagsOpen(v => !v)}><View className="flex-row items-center gap-2"><Text className="text-muted font-medium">Tags ({item.tags?.length ?? 0})</Text><AppIcon name={tagsOpen ? 'chevron-up' : 'chevron-down'} size={16} /></View></Pressable>
           {tagsOpen ? <TagEditor item={item} /> : null}
         </View>
 
@@ -400,7 +402,7 @@ const RelatedCard: React.FC<{ item: Item }> = ({ item }) => {
             />
           ) : (
             <View className="flex-1 items-center justify-center">
-              <Text className="text-3xl">{thumb.glyph}</Text>
+              <AppIcon name={thumb.icon} size={30} />
             </View>
           )}
           {domainLabel ? (

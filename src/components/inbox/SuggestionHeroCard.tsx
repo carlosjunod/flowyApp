@@ -1,3 +1,4 @@
+import { AppIcon } from '@/components/ui/AppIcon';
 import { Image } from 'expo-image';
 import React, { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -101,7 +102,7 @@ export const SuggestionHeroCard: React.FC<Props> = ({ items, viewMode, onPress }
                     />
                   ) : (
                     <View className="flex-1 items-center justify-center">
-                      <Text className="text-white text-base">{t.glyph}</Text>
+                      <AppIcon name={t.icon} size={18} color="#FFFFFF" />
                     </View>
                   )}
                 </View>

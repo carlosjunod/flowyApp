@@ -1,3 +1,5 @@
+import { Feather } from '@expo/vector-icons';
+import { copyWithCitations, prepareCitations, ITEM_PROTOCOL } from '@/lib/chatCitations';
 import * as Clipboard from 'expo-clipboard';
 import { useIsFocused } from '@react-navigation/native';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -13,33 +15,6 @@ import { CitedItemsRail, InlineItemChip } from './ItemChip';
 
 type Props = { message: ChatMessageType; onRetry?: () => void; retryDisabled?: boolean };
 
-const CITE_RE = /\[\[([A-Za-z0-9_-]+)\]\]/g;
-const ITEM_PROTO = 'item://';
-
-/**
- * Convert `[[id]]` placeholders into `[N](item://id)` markdown links, indexing
- * by first-occurrence so the same id reuses its index. The link is then
- * intercepted by the markdown `link` rule and rendered as an InlineItemChip.
- */
-function preprocessContent(text: string, items: CitedItem[]): { content: string; indexById: Map<string, number> } {
-  if (!text) return { content: '', indexById: new Map() };
-  const seedIds = new Set(items.map((i) => i.id));
-  const indexById = new Map<string, number>();
-  let nextIdx = 1;
-  const content = text.replace(CITE_RE, (_match, id: string) => {
-    let idx = indexById.get(id);
-    if (idx === undefined) {
-      idx = nextIdx++;
-      indexById.set(id, idx);
-    }
-    // Even if the id wasn't in the items list, we still render a chip; it'll
-    // route to /item/:id which can show its own "not found" state.
-    void seedIds; // keep seedIds reference for future use (status badges)
-    return `[${idx}](${ITEM_PROTO}${id})`;
-  });
-  return { content, indexById };
-}
-
 export const ChatMessage: React.FC<Props> = ({ message, onRetry, retryDisabled }) => {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const focused = useIsFocused();
@@ -51,8 +26,8 @@ export const ChatMessage: React.FC<Props> = ({ message, onRetry, retryDisabled }
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 
   const { content, indexById } = useMemo(
-    () => (isUser ? { content: message.content, indexById: new Map() } : preprocessContent(message.content, items)),
-    [isUser, message.content, items],
+    () => (isUser ? { content: message.content, indexById: new Map() } : prepareCitations(message.content)),
+    [isUser, message.content],
   );
 
   // Items that actually got cited in the message body. Used to label the rail
@@ -68,15 +43,15 @@ export const ChatMessage: React.FC<Props> = ({ message, onRetry, retryDisabled }
   // Web parity: if no citations were emitted, surface up to 3 of the items the
   // LLM had context on as a "might be related" rail.
   const railItems = citedItems.length > 0 ? citedItems : items.slice(0, 3);
-  const railLabel = citedItems.length > 0 ? 'Sources' : 'Related content';
+  const railLabel = citedItems.length > 0 ? 'Sources' : 'Related saves';
 
   const userText = colors.bg;
   const markdownStyle = useMemo(
     () => ({
-      body: { color: isUser ? userText : colors.fg, fontSize: 16, fontFamily: 'Inter_400Regular' },
-      paragraph: { marginTop: 0, marginBottom: 6 },
+      body: { color: isUser ? userText : colors.fg, fontSize: 16, lineHeight: 25, fontFamily: 'Inter_400Regular' },
+      paragraph: { marginTop: 0, marginBottom: 10 },
       link: { color: isUser ? userText : colors.accent, fontWeight: '600' as const },
-      strong: { fontWeight: '700' as const },
+      strong: { fontFamily: 'Inter_600SemiBold', fontWeight: '600' as const },
       em: { fontStyle: 'italic' as const },
       heading1: { fontSize: 22, fontWeight: '700' as const, marginTop: 4, marginBottom: 6, color: isUser ? userText : colors.fg },
       heading2: { fontSize: 19, fontWeight: '700' as const, marginTop: 4, marginBottom: 6, color: isUser ? userText : colors.fg },
@@ -130,9 +105,7 @@ export const ChatMessage: React.FC<Props> = ({ message, onRetry, retryDisabled }
     [colors, isUser, userText],
   );
 
-  // Override the `link` rule so `item://` links become InlineItemChip pills
-  // with thumbnail + index + domain — same idiom as the web ChatMessage's
-  // `<a>` override. All other links get default behavior.
+  // Keep citation links as native Text spans so paragraph line metrics stay intact.
   const rules = useMemo(
     () => ({
       link: (
@@ -143,13 +116,13 @@ export const ChatMessage: React.FC<Props> = ({ message, onRetry, retryDisabled }
         onLinkPress?: (url: string) => boolean,
       ) => {
         const href = (node.attributes?.href as string | undefined) ?? '';
-        if (href.startsWith(ITEM_PROTO)) {
-          const id = href.slice(ITEM_PROTO.length);
+        if (href.startsWith(ITEM_PROTOCOL)) {
+          const id = href.slice(ITEM_PROTOCOL.length);
           return (
             <InlineItemChip
               key={node.key}
               id={id}
-              ref={byId.get(id)}
+              item={byId.get(id)}
               index={indexById.get(id)}
             />
           );
@@ -171,11 +144,11 @@ export const ChatMessage: React.FC<Props> = ({ message, onRetry, retryDisabled }
   );
 
   const onLinkPress = (url: string): boolean => {
-    if (url.startsWith(ITEM_PROTO)) {
-      router.push(`/item/${url.slice(ITEM_PROTO.length)}`);
+    if (url.startsWith(ITEM_PROTOCOL)) {
+      router.push(`/item/${url.slice(ITEM_PROTOCOL.length)}`);
       return false;
     }
-    return true;
+    return /^(https?:|mailto:)/i.test(url);
   };
 
 
@@ -193,13 +166,32 @@ export const ChatMessage: React.FC<Props> = ({ message, onRetry, retryDisabled }
       </View>
       {!isUser && (message.error || message.interrupted) ? <Text accessibilityRole="alert" className="text-danger text-sm py-2">{message.error ?? 'Response stopped. You can retry when ready.'}</Text> : null}
       {!isUser && !message.streaming ? (
-        <View className="w-full">
-          <View className="flex-row flex-wrap items-center gap-3">
-            {railItems.length ? <Pressable accessibilityRole="button" accessibilityState={{ expanded: sourcesOpen }} className="min-h-[44px] justify-center" onPress={() => setSourcesOpen(v => !v)}><Text className="text-fg text-sm">{railItems.length} {railLabel.toLowerCase()} {sourcesOpen ? '⌃' : '⌄'}</Text></Pressable> : null}
-            {message.content ? <Pressable accessibilityRole="button" className="min-h-[44px] justify-center" onPress={() => { void Clipboard.setStringAsync(message.content.replace(CITE_RE, '')).then(() => setCopyLabel('Copied')).catch(() => setCopyLabel('Copy failed, retry')); }}><Text className="text-muted text-sm">{copyLabel}</Text></Pressable> : null}
-            {onRetry ? <Pressable disabled={retryDisabled} accessibilityRole="button" accessibilityState={{ disabled: retryDisabled }} className="min-h-[44px] justify-center" onPress={onRetry}><Text className="text-fg text-sm">Retry</Text></Pressable> : null}
+        <View className="w-full" style={{ paddingTop: 4 }}>
+          <View className="flex-row flex-wrap items-center gap-2">
+            {message.content ? (
+              <Pressable accessibilityRole="button" accessibilityLabel={copyLabel} className="min-h-[44px] flex-row items-center gap-2 px-2 rounded-lg active:bg-surface"
+                onPress={() => { void Clipboard.setStringAsync(copyWithCitations(message.content, items)).then(() => setCopyLabel('Copied')).catch(() => setCopyLabel('Copy failed, retry')); }}>
+                <Feather name={copyLabel === 'Copied' ? 'check' : 'copy'} size={14} color={colors.muted} accessible={false} />
+                <Text className="text-muted text-xs" accessibilityLiveRegion="polite">{copyLabel}</Text>
+              </Pressable>
+            ) : null}
+            {onRetry ? (
+              <Pressable disabled={retryDisabled} accessibilityRole="button" accessibilityLabel="Retry response" accessibilityState={{ disabled: retryDisabled }} className="min-h-[44px] flex-row items-center gap-2 px-2 rounded-lg active:bg-surface" style={{ opacity: retryDisabled ? 0.4 : 1 }} onPress={onRetry}>
+                <Feather name="rotate-cw" size={14} color={colors.muted} accessible={false} />
+                <Text className="text-muted text-xs">Retry</Text>
+              </Pressable>
+            ) : null}
           </View>
-          {sourcesOpen ? <CitedItemsRail items={railItems} label={railLabel} /> : null}
+          {railItems.length ? (
+            <View style={{ paddingTop: 4 }}>
+              <Pressable accessibilityRole="button" accessibilityLabel={`${railLabel}, ${railItems.length}`} accessibilityState={{ expanded: sourcesOpen }}
+                className="self-start min-h-[44px] flex-row items-center gap-2 px-2 rounded-lg active:bg-surface" onPress={() => setSourcesOpen(value => !value)}>
+                <Feather name={sourcesOpen ? 'chevron-down' : 'chevron-right'} size={16} color={colors.muted} accessible={false} />
+                <Text className="text-muted text-sm">{railLabel} · {railItems.length}</Text>
+              </Pressable>
+              {sourcesOpen ? <CitedItemsRail items={railItems} indexById={indexById} /> : null}
+            </View>
+          ) : null}
         </View>
       ) : null}
     </View>

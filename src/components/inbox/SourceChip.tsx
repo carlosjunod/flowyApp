@@ -1,3 +1,4 @@
+import { AppIcon } from '@/components/ui/AppIcon';
 import React from 'react';
 import { Text, View } from 'react-native';
 
@@ -39,7 +40,7 @@ export const SourceChip: React.FC<{ chip: SourceChipData }> = ({ chip }) => {
         borderColor: borderColor ?? 'transparent',
       }}
     >
-      <Text style={{ fontSize: 11 }}>{chip.icon}</Text>
+      <AppIcon name={chip.icon} size={12} color={fg} />
       <Text
         style={{
           fontFamily: 'Inter_600SemiBold',

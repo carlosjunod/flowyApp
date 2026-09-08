@@ -25,7 +25,7 @@ function placeholderColor(idx: number): string {
   return `hsl(${h}, 55%, 28%)`;
 }
 
-const SLIDE_EMOJIS = ['🖼', '✨', '📷', '🎞', '🌀', '💡', '🎨', '📐'] as const;
+
 
 /**
  * Instagram Carousel renderer — one main slide at a time with prev/next nav,
@@ -112,7 +112,8 @@ export const CarouselContent: React.FC<{ item: Item }> = ({ item }) => {
         onPress={() => setShowAI((v) => !v)}
         accessibilityRole="button"
         accessibilityState={{ expanded: showAI }}
-        style={({ pressed }) => [
+        className="active:opacity-70"
+            style={[
           {
             flexDirection: 'row',
             alignItems: 'center',
@@ -126,7 +127,7 @@ export const CarouselContent: React.FC<{ item: Item }> = ({ item }) => {
             borderTopRightRadius: 10,
             borderBottomLeftRadius: showAI ? 0 : 10,
             borderBottomRightRadius: showAI ? 0 : 10,
-            opacity: pressed ? 0.85 : 1,
+
           },
         ]}
       >
@@ -254,7 +255,8 @@ const MainSlide: React.FC<{
             onPress={onPrev}
             accessibilityLabel="Previous slide"
             hitSlop={6}
-            style={({ pressed }) => [
+            className="active:opacity-70"
+            style={[
               {
                 position: 'absolute',
                 top: '50%',
@@ -266,7 +268,7 @@ const MainSlide: React.FC<{
                 backgroundColor: 'rgba(255,255,255,0.18)',
                 alignItems: 'center',
                 justifyContent: 'center',
-                opacity: pressed ? 0.7 : 1,
+
               },
             ]}
           >
@@ -278,7 +280,8 @@ const MainSlide: React.FC<{
             onPress={onNext}
             accessibilityLabel="Next slide"
             hitSlop={6}
-            style={({ pressed }) => [
+            className="active:opacity-70"
+            style={[
               {
                 position: 'absolute',
                 top: '50%',
@@ -290,7 +293,7 @@ const MainSlide: React.FC<{
                 backgroundColor: 'rgba(255,255,255,0.18)',
                 alignItems: 'center',
                 justifyContent: 'center',
-                opacity: pressed ? 0.7 : 1,
+
               },
             ]}
           >
@@ -320,7 +323,7 @@ const SlideVideo: React.FC<{ uri: string; keyId?: string; size: number }> = ({ u
 
 const PlaceholderSlide: React.FC<{ idx: number }> = ({ idx }) => (
   <View style={{ alignItems: 'center', gap: 8 }}>
-    <Text style={{ fontSize: 40 }}>{SLIDE_EMOJIS[idx % SLIDE_EMOJIS.length]}</Text>
+    <Feather name="image" size={40} color="#FFFFFF" />
     <Text
       style={{
         fontFamily: 'Inter_500Medium',
@@ -354,21 +357,21 @@ const ThumbnailStrip: React.FC<{
       {slides.map((s, i) => {
         const url = r2UrlForKey(s.r2_key);
         const isActive = i === activeIdx;
-        const emoji = SLIDE_EMOJIS[i % SLIDE_EMOJIS.length];
         return (
           <Pressable
             key={`thumb-${s.index}-${s.r2_key ?? i}`}
             onPress={() => onSelect(i)}
             accessibilityLabel={`Slide ${i + 1}`}
             accessibilityState={{ selected: isActive }}
-            style={({ pressed }) => [
+            className="active:opacity-70"
+            style={[
               {
                 width: 48,
                 height: 48,
                 borderRadius: 6,
                 borderWidth: 2,
                 borderColor: isActive ? colors.accent : 'transparent',
-                opacity: pressed ? 0.85 : isActive ? 1 : 0.6,
+                opacity: isActive ? 1 : 0.6,
                 alignItems: 'center',
                 justifyContent: 'center',
                 overflow: 'hidden',
@@ -378,7 +381,7 @@ const ThumbnailStrip: React.FC<{
           >
             {url ? (
               s.kind === 'video' ? (
-                <Text style={{ fontSize: 18 }}>🎬</Text>
+                <Feather name="film" size={18} color={colors.muted} />
               ) : (
                 <Image
                   source={{ uri: url }}
@@ -387,7 +390,7 @@ const ThumbnailStrip: React.FC<{
                 />
               )
             ) : (
-              <Text style={{ fontSize: 18 }}>{emoji}</Text>
+              <Feather name={s.kind === 'video' ? 'film' : 'image'} size={18} color="#FFFFFF" />
             )}
           </Pressable>
         );

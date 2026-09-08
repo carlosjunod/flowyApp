@@ -1,3 +1,4 @@
+import { AppIcon } from '@/components/ui/AppIcon';
 import { Feather } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -262,7 +263,7 @@ const EmptyState: React.FC<{
         : 'your filters';
     return (
       <View className="items-center justify-center px-6 pt-16">
-        <Text className="text-5xl mb-3">🔍</Text>
+        <View className="mb-3"><AppIcon name="search" size={40} /></View>
         <Text className="text-base text-muted text-center mb-3">
           No items match {what}.
         </Text>
@@ -281,7 +282,7 @@ const EmptyState: React.FC<{
   }
   return (
     <View className="items-center justify-center px-6 pt-16">
-      <Text className="text-5xl mb-3">📥</Text>
+      <View className="mb-3"><AppIcon name="inbox" size={40} /></View>
       <Text className="text-xl text-fg font-semibold mb-2">Keep something worth revisiting</Text>
       <Text className="text-base text-muted text-center mb-5">Save a link here, or choose Share → Flowy from another app to save links, images and files.</Text>
       <Button title="Save your first link" onPress={onSave} />

@@ -54,8 +54,8 @@ For Mac Catalyst: open `ios/Tryflowy.xcworkspace`, select the Tryflowy target, a
 │   ├── (auth)/_layout.tsx
 │   ├── (auth)/login.tsx
 │   ├── (app)/_layout.tsx             # tab bar / sidebar
-│   ├── (app)/inbox.tsx
-│   ├── (app)/chat.tsx
+│   ├── (app)/(tabs)/inbox.tsx
+│   ├── (app)/(tabs)/chat.tsx
 │   └── (app)/item/[id].tsx
 ├── src/
 │   ├── components/

@@ -1,3 +1,4 @@
+import { AppIcon } from '@/components/ui/AppIcon';
 import { Image } from 'expo-image';
 import React from 'react';
 import { Text, View } from 'react-native';
@@ -28,7 +29,7 @@ export const Thumbnail: React.FC<Props> = ({ item, className, rounded = 'md' }) 
   }
   return (
     <View className={`${shape} bg-card items-center justify-center ${className ?? ''}`}>
-      <Text className="text-3xl">{thumb.glyph}</Text>
+      <AppIcon name={thumb.icon} size={30} />
     </View>
   );
 };

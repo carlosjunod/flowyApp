@@ -324,7 +324,7 @@ const ChapterList: React.FC<{
             opacity: 0.75,
           }}
         >
-          📍 No chapters extracted for this video.
+          No chapters extracted for this video.
         </Text>
       </View>
     );
@@ -463,7 +463,7 @@ const TranscriptView: React.FC<{
           opacity: content ? 1 : 0.75,
         }}
       >
-        {content || '✨ No transcript captured yet.'}
+        {content || 'No transcript captured yet.'}
       </Text>
     </View>
   );

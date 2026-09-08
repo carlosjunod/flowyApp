@@ -1,8 +1,9 @@
+import type { ItemIconName } from './itemIcons';
 import type { ContentType } from './contentType';
 import type { Item, ItemType } from '@/types';
 
 export type SourceChip = {
-  icon: string;
+  icon: ItemIconName;
   label: string;
   variant?: 'default' | 'dark' | 'green';
 };
@@ -19,58 +20,58 @@ export type SourceChip = {
 export function sourceChip(item: Item, contentType: ContentType): SourceChip {
   if (contentType === 'carousel') {
     const n = item.media?.length ?? 0;
-    return { icon: '📸', label: `Instagram Carousel · ${n} slide${n === 1 ? '' : 's'}` };
+    return { icon: 'instagram', label: `Instagram Carousel · ${n} slide${n === 1 ? '' : 's'}` };
   }
   if (contentType === 'youtube') {
-    return { icon: '▶️', label: 'YouTube Video', variant: 'dark' };
+    return { icon: 'youtube', label: 'YouTube Video', variant: 'dark' };
   }
   if (contentType === 'reel') {
-    return { icon: '📸', label: 'Instagram Reel' };
+    return { icon: 'instagram', label: 'Instagram Reel' };
   }
   if (contentType === 'receipt') {
-    return { icon: '🧾', label: 'Receipt', variant: 'green' };
+    return { icon: 'file-text', label: 'Receipt', variant: 'green' };
   }
 
   switch (item.type as ItemType) {
     case 'instagram':
-      return { icon: '📸', label: 'Instagram Post' };
+      return { icon: 'instagram', label: 'Instagram Post' };
     case 'youtube':
-      return { icon: '▶️', label: 'YouTube', variant: 'dark' };
+      return { icon: 'youtube', label: 'YouTube', variant: 'dark' };
     case 'url':
-      return { icon: '📰', label: item.site_name || 'Article' };
+      return { icon: 'file-text', label: item.site_name || 'Article' };
     case 'screenshot':
-      return { icon: '🖼', label: 'Screenshot' };
+      return { icon: 'image', label: 'Screenshot' };
     case 'video':
-      return { icon: '🎬', label: 'Video' };
+      return { icon: 'film', label: 'Video' };
     case 'pdf':
-      return { icon: '📄', label: 'PDF' };
+      return { icon: 'file-text', label: 'PDF' };
     case 'receipt':
-      return { icon: '🧾', label: 'Receipt', variant: 'green' };
+      return { icon: 'file-text', label: 'Receipt', variant: 'green' };
     case 'audio':
-      return { icon: '🎧', label: 'Audio' };
+      return { icon: 'headphones', label: 'Audio' };
     case 'screen_recording':
-      return { icon: '📹', label: 'Recording' };
+      return { icon: 'video', label: 'Recording' };
     case 'tiktok':
-      return { icon: '🎵', label: 'TikTok' };
+      return { icon: 'music', label: 'TikTok' };
     case 'facebook':
-      return { icon: '📘', label: 'Facebook' };
+      return { icon: 'facebook', label: 'Facebook' };
     case 'reddit':
-      return { icon: '👽', label: 'Reddit' };
+      return { icon: 'message-circle', label: 'Reddit' };
     case 'pinterest':
-      return { icon: '📌', label: 'Pinterest' };
+      return { icon: 'bookmark', label: 'Pinterest' };
     case 'twitter':
-      return { icon: '🐦', label: 'Tweet' };
+      return { icon: 'twitter', label: 'Tweet' };
     case 'linkedin':
-      return { icon: '💼', label: 'LinkedIn' };
+      return { icon: 'linkedin', label: 'LinkedIn' };
     case 'dribbble':
-      return { icon: '🏀', label: 'Dribbble' };
+      return { icon: 'dribbble', label: 'Dribbble' };
     case 'drive':
-      return { icon: '📁', label: 'Drive' };
+      return { icon: 'folder', label: 'Drive' };
     case 'file':
-      return { icon: '📎', label: 'File' };
+      return { icon: 'paperclip', label: 'File' };
     case 'email':
-      return { icon: '✉️', label: 'Email' };
+      return { icon: 'mail', label: 'Email' };
     default:
-      return { icon: '📎', label: 'Item' };
+      return { icon: 'paperclip', label: 'Item' };
   }
 }

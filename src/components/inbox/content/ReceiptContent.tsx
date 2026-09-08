@@ -1,3 +1,4 @@
+import { AppIcon } from '@/components/ui/AppIcon';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -211,7 +212,7 @@ const LineItemsTable: React.FC<{ data: ReceiptData }> = ({ data }) => {
           <TotalsRow label="Subtotal" amount={formatCurrency(data.subtotal)} muted />
           {data.discountAmount && data.discountAmount > 0 ? (
             <TotalsRow
-              label={`🏷 ${data.discountLabel ?? 'Discount'}`}
+              label={data.discountLabel ?? 'Discount'}
               amount={`-${formatCurrency(data.discountAmount)}`}
               variant="discount"
             />
@@ -286,6 +287,7 @@ const TotalsRow: React.FC<{
         paddingVertical: 6,
       }}
     >
+      {isDiscount ? <View style={{ marginRight: 6 }}><AppIcon name="tag" size={12} color={tint} /></View> : null}
       <Text
         className={isDiscount ? '' : muted ? 'text-muted' : 'text-fg'}
         style={{
@@ -546,7 +548,7 @@ const SpendingInsights: React.FC<{ data: ReceiptData }> = ({ data }) => {
                 justifyContent: 'center',
               }}
             >
-              <Text style={{ fontSize: 11 }}>💡</Text>
+              <AppIcon name="info" size={12} />
             </View>
             <Text
               className="text-fg"

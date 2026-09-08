@@ -1,3 +1,5 @@
+import { itemTypeLabel } from '@/lib/itemIcons';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { SemanticPreview } from './content/SemanticContent';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -8,7 +10,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { Shimmer } from '@/components/ui/Shimmer';
 import { Spinner } from '@/components/ui/Spinner';
-import { hostOf, thumbnailFor, typeGlyph } from '@/lib/thumbnails';
+import { hostOf, thumbnailFor } from '@/lib/thumbnails';
 import { useSelection } from '@/lib/selection';
 import type { Item } from '@/types';
 
@@ -125,7 +127,7 @@ export const ItemCard: React.FC<Props> = ({ item }) => {
               numberOfLines={1}
               style={{ fontFamily: 'Inter_400Regular' }}
             >
-              {item.category ?? typeGlyph[item.type]}
+              {item.category ?? itemTypeLabel[item.type]}
             </Text>
             <Text
               className="text-muted"
@@ -249,7 +251,7 @@ type EditorialProps = {
 
 const Editorial: React.FC<EditorialProps> = ({ item, faviconUri, domainLabel, selected, selectionMode }) => (
   <View className="bg-surface px-3 pt-3 pb-2 flex-row items-center gap-2">
-    {faviconUri ? <Image source={{ uri: faviconUri }} style={{ width: 18, height: 18, borderRadius: 3 }} /> : <Text>{typeGlyph[item.type]}</Text>}
+    {faviconUri ? <Image source={{ uri: faviconUri }} style={{ width: 18, height: 18, borderRadius: 3 }} /> : <AppIcon type={item.type} size={18} />}
     <Text className="text-muted text-xs flex-1" numberOfLines={1}>{domainLabel ?? item.type}</Text>
     {selectionMode ? <Feather name={selected ? 'check-circle' : 'circle'} size={22} color={selected ? '#A74326' : '#6B6258'} /> : null}
   </View>

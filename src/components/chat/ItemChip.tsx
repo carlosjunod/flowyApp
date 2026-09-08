@@ -1,228 +1,102 @@
+import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Image } from 'expo-image';
 import React, { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { ENV } from '@/lib/env';
+import { domainLabelForRef } from '@/lib/chatCitations';
+import { itemTypeIcon } from '@/lib/itemIcons';
 import { useResolvedColors } from '@/lib/theme';
-import { hostOf } from '@/lib/thumbnails';
+import { extractYoutubeId, hostOf } from '@/lib/thumbnails';
 import type { CitedItem } from '@/types';
 
-const stripWww = (h: string) => h.replace(/^www\./, '');
+export { domainLabelForRef } from '@/lib/chatCitations';
 
-/**
- * Returns the best available thumbnail URL for a chat-cited item. Priority:
- *   1. r2_key (uploaded media)
- *   2. og_image (link unfurl image)
- *   3. domain favicon as last-resort visual cue
- */
-export function thumbnailUrlForRef(ref: CitedItem): string | null {
-  if (ref.r2_key) return `${ENV.R2_PUBLIC_URL}/${ref.r2_key}`;
-  if (ref.og_image) return ref.og_image;
-  const u = ref.source_url ?? ref.raw_url;
-  if (u) {
-    const host = hostOf(u);
-    if (host)
-      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`;
+export function thumbnailUrlForRef(item: CitedItem): string | null {
+  if (item.r2_key) return `${ENV.R2_PUBLIC_URL}/${item.r2_key}`;
+  if (item.type === 'youtube') {
+    const id = extractYoutubeId(item.source_url || item.raw_url || '');
+    if (id) return `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
   }
-  return null;
+  if (item.og_image) return item.og_image;
+  const host = hostOf(item.source_url || item.raw_url || '');
+  return host ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128` : null;
 }
 
-export function domainLabelForRef(ref: CitedItem): string {
-  if (ref.title) return ref.title;
-  if (ref.site_name) return ref.site_name;
-  const u = ref.source_url ?? ref.raw_url;
-  if (u) {
-    const host = hostOf(u);
-    if (host) return stripWww(host);
-  }
-  return ref.id.slice(0, 6);
-}
-
-type InlineProps = {
-  ref?: CitedItem;
-  id: string;
-  index?: number;
-};
-
-/**
- * Inline pill rendered for `item://` links inside markdown — small, baseline-
- * aligned, tappable to open the item detail. Maps to apps/web/components/chat/
- * ItemChip.tsx's inline chip (without the long-press menu — RN users get the
- * "Reload/Delete" actions from the item detail screen instead).
- */
-export const InlineItemChip: React.FC<InlineProps> = ({ ref, id, index }) => {
+/** Native Text spans keep citations on the paragraph baseline; no inline View/image. */
+export function InlineItemChip({ item, id, index }: { item?: CitedItem; id: string; index?: number }) {
   const colors = useResolvedColors();
-  const [thumbErr, setThumbErr] = useState(false);
-  const label = ref ? domainLabelForRef(ref) : 'Source';
-  const thumb = ref ? thumbnailUrlForRef(ref) : null;
-
   return (
-    <Pressable
+    <Text
       onPress={() => router.push(`/item/${id}`)}
       accessibilityRole="link"
-      accessibilityLabel={`Open ${label}`}
-      hitSlop={8}
-      style={({ pressed }) => [
-        {
-          flexDirection: 'row',
-          alignItems: 'center',
-          alignSelf: 'flex-start',
-          gap: 4,
-          paddingHorizontal: 6,
-          paddingVertical: 7,
-          borderRadius: 999,
-          borderWidth: 1,
-          borderColor: colors.accent + '4D',
-          backgroundColor: colors.accent + '22',
-          opacity: pressed ? 0.8 : 1,
-        },
-      ]}
+      accessibilityLabel={`Open source ${index ?? ''}: ${item?.title?.trim() || 'Saved source'}`}
+      suppressHighlighting={false}
+      style={{ fontFamily: 'Inter_600SemiBold', fontSize: 12, color: colors.fg, backgroundColor: colors.surface }}
     >
-      {thumb && !thumbErr ? (
-        <Image
-          source={{ uri: thumb }}
-          style={{ width: 12, height: 12, borderRadius: 2 }}
-          contentFit="cover"
-          onError={() => setThumbErr(true)}
-        />
-      ) : null}
-      {typeof index === 'number' ? (
-        <Text
-          style={{
-            fontFamily: 'Inter_600SemiBold',
-            fontSize: 11,
-            color: colors.accent,
-          }}
-        >
-          [{index}]
-        </Text>
-      ) : null}
-      <Text
-        numberOfLines={1}
-        style={{
-          fontFamily: 'Inter_500Medium',
-          fontSize: 11,
-          color: colors.accent,
-          maxWidth: 160,
-        }}
-      >
-        {typeof index === 'number' ? 'Source' : label}
-      </Text>
-    </Pressable>
+      {`\u00a0[${index ?? '?'}]\u00a0`}
+    </Text>
   );
-};
+}
 
-type RailProps = {
-  items: CitedItem[];
-  label: string;
-};
-
-/**
- * Horizontal item rail that follows an assistant message. Shows actual cited
- * items when available, otherwise a "Might be related" fallback (first 3 items
- * the LLM had in context). Mirrors apps/web/components/chat/ChatMessage.tsx
- * rail behavior.
- */
-export const CitedItemsRail: React.FC<RailProps> = ({ items, label }) => {
-  const colors = useResolvedColors();
-  if (items.length === 0) return null;
+/** One readable column on phones; two columns when the actual container allows it. */
+export function CitedItemsRail({ items, indexById }: { items: CitedItem[]; indexById: Map<string, number> }) {
+  const [width, setWidth] = useState(0);
+  const { fontScale } = useWindowDimensions();
+  const twoColumns = width >= 620 * Math.max(1, fontScale);
+  if (!items.length) return null;
   return (
-    <View style={{ marginTop: 8, gap: 6 }}>
-      <Text
-        style={{
-          fontFamily: 'Inter_600SemiBold',
-          fontSize: 10.5,
-          letterSpacing: 0.8,
-          textTransform: 'uppercase',
-          color: colors.muted,
-        }}
-      >
-        {label}
-      </Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-        {items.map((it, i) => (
-          <RailChip key={it.id} ref={it} index={i + 1} />
-        ))}
-      </View>
+    <View onLayout={event => setWidth(event.nativeEvent.layout.width)} style={styles.rail}>
+      {items.map(item => (
+        <SourceCard key={item.id} item={item} index={indexById.get(item.id)} width={twoColumns ? (width - 12) / 2 : undefined} />
+      ))}
     </View>
   );
-};
+}
 
-const RailChip: React.FC<{ ref: CitedItem; index: number }> = ({ ref, index }) => {
+function SourceCard({ item, index, width }: { item: CitedItem; index?: number; width?: number }) {
   const colors = useResolvedColors();
-  const [thumbErr, setThumbErr] = useState(false);
-  const thumb = thumbnailUrlForRef(ref);
-  const label = domainLabelForRef(ref);
-
+  const [pressed, setPressed] = useState(false);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const thumb = thumbnailUrlForRef(item);
+  const title = item.title?.trim() || 'Untitled save';
   return (
     <Pressable
-      onPress={() => router.push(`/item/${ref.id}`)}
+      onPress={() => router.push(`/item/${item.id}`)}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
       accessibilityRole="link"
-      accessibilityLabel={`Open ${label}`}
-      style={({ pressed }) => [
-        {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 8,
-          paddingLeft: 6,
-          paddingRight: 10,
-          paddingVertical: 8,
-          borderRadius: 10,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.card,
-          maxWidth: 220,
-          opacity: pressed ? 0.85 : 1,
-        },
-      ]}
+      accessibilityLabel={`Open ${index ? `source ${index}` : 'saved item'}: ${title}, ${domainLabelForRef(item)}`}
+      style={[styles.card, {
+        width: width ?? '100%', borderColor: pressed ? colors.accent : colors.border,
+        backgroundColor: pressed ? colors.surface : colors.card,
+      }]}
     >
-      <View
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: 6,
-          backgroundColor: colors.surface,
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'hidden',
-        }}
-      >
-        {thumb && !thumbErr ? (
-          <Image
-            source={{ uri: thumb }}
-            style={{ width: '100%', height: '100%' }}
-            contentFit="cover"
-            onError={() => setThumbErr(true)}
-          />
-        ) : (
-          <Text style={{ fontSize: 14, color: colors.muted }}>·</Text>
-        )}
+      <View style={[styles.thumbnail, { backgroundColor: colors.surface }]} accessible={false}>
+        {thumb && thumb !== failedUrl ? (
+          <Image source={{ uri: thumb }} style={StyleSheet.absoluteFill} contentFit="cover" onError={() => setFailedUrl(thumb)} />
+        ) : <Feather name={itemTypeIcon[item.type] || 'file'} size={20} color={colors.muted} />}
       </View>
-      <View style={{ flex: 1 }}>
-        <Text
-          numberOfLines={1}
-          style={{
-            fontFamily: 'Inter_600SemiBold',
-            fontSize: 11.5,
-            color: colors.fg,
-          }}
-        >
-          [{index}] {label}
+      <View style={styles.description}>
+        <Text numberOfLines={2} style={[styles.title, { color: colors.fg }]}>
+          {index ? <Text style={{ color: colors.accent }}>{`[${index}]  `}</Text> : null}{title}
         </Text>
-        {ref.category ? (
-          <Text
-            numberOfLines={1}
-            style={{
-              fontFamily: 'Inter_400Regular',
-              fontSize: 10.5,
-              color: colors.muted,
-            }}
-          >
-            {ref.category}
-          </Text>
-        ) : null}
+        <View style={styles.source}>
+          <Feather name="link" size={12} color={colors.muted} accessible={false} />
+          <Text numberOfLines={1} style={[styles.domain, { color: colors.muted }]}>{domainLabelForRef(item)}</Text>
+        </View>
       </View>
     </Pressable>
   );
-};
+}
+
+const styles = StyleSheet.create({
+  rail: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, width: '100%', paddingTop: 4 },
+  card: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, minHeight: 96 },
+  thumbnail: { width: 44, height: 44, borderRadius: 8, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  description: { flex: 1, minWidth: 0, gap: 8 },
+  title: { fontFamily: 'Inter_500Medium', fontSize: 14, lineHeight: 20 },
+  source: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  domain: { fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 16, flexShrink: 1 },
+});

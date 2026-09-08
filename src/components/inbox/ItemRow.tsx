@@ -1,3 +1,4 @@
+import { AppIcon } from '@/components/ui/AppIcon';
 import { SemanticPreview } from './content/SemanticContent';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -6,7 +7,7 @@ import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
-import { hostOf, thumbnailFor, typeGlyph } from '@/lib/thumbnails';
+import { hostOf, thumbnailFor } from '@/lib/thumbnails';
 import { useSelection } from '@/lib/selection';
 import type { Item } from '@/types';
 
@@ -111,7 +112,7 @@ export const ItemRow: React.FC<Props> = ({ item }) => {
               style={{ width: 40, height: 40 }}
             />
           ) : (
-            <Text className="text-lg">{thumb.glyph}</Text>
+            <AppIcon name={thumb.icon} size={20} />
           )}
           {item.media && item.media.length > 1 ? (
             <View className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-accent items-center justify-center">

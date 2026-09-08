@@ -1,6 +1,7 @@
-import type { Item, ItemType } from '@/types';
+import type { Item } from '@/types';
 
 import { ENV } from './env';
+import { itemTypeIcon, type ItemIconName } from './itemIcons';
 
 const YOUTUBE_ID_RE =
   /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/;
@@ -18,31 +19,9 @@ export const hostOf = (url: string): string | null => {
   }
 };
 
-export const typeGlyph: Record<ItemType, string> = {
-  url: '🔗',
-  screenshot: '🖼️',
-  youtube: '▶',
-  video: '🎬',
-  receipt: '🧾',
-  pdf: '📄',
-  audio: '🎧',
-  reddit: '👽',
-  instagram: '📸',
-  screen_recording: '🎥',
-  pinterest: '📌',
-  dribbble: '🏀',
-  linkedin: '💼',
-  twitter: '🐦',
-  tiktok: '🎵',
-  facebook: '📘',
-  drive: '📁',
-  file: '📎',
-  email: '✉️',
-};
-
 export type Thumb =
   | { kind: 'image'; uri: string }
-  | { kind: 'glyph'; glyph: string };
+  | { kind: 'icon'; icon: ItemIconName };
 
 export const thumbnailFor = (item: Item): Thumb => {
   if (item.r2_key) {
@@ -62,5 +41,5 @@ export const thumbnailFor = (item: Item): Thumb => {
       };
     }
   }
-  return { kind: 'glyph', glyph: typeGlyph[item.type] };
+  return { kind: 'icon', icon: itemTypeIcon[item.type] };
 };
