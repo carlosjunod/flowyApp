@@ -247,6 +247,7 @@ export type DigestContent = {
   timezone?: string;
   quality_mode?: 'ai' | 'fallback';
   quality_reason?: string;
+  selection?: {total:number;pending:number;selected:number;carryover_item_ids:string[]};
   sections: DigestSection[];
   window_start: string;
   window_end: string;

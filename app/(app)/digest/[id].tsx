@@ -39,7 +39,12 @@ export default function DigestDetailScreen() {
   useFocusEffect(
     useCallback(() => {
       const mark = () => {
-        if (query.data && id && AppState.currentState === "active")
+        if (
+          query.data &&
+          query.data.status !== "source_removed" &&
+          id &&
+          AppState.currentState === "active"
+        )
           void api.readDigest(id);
       };
       const frame = requestAnimationFrame(mark),
@@ -110,7 +115,8 @@ export default function DigestDetailScreen() {
       >
         <View className="gap-1">
           <Text className="text-xs uppercase text-muted">
-            {relativeDate(digest.generated_at)}
+            {digest.cadence} · {relativeDate(digest.generated_at)} ·{" "}
+            {digest.content.timezone}
           </Text>
           <Text
             className="text-3xl text-fg"
@@ -119,12 +125,26 @@ export default function DigestDetailScreen() {
               letterSpacing: -0.5,
             }}
           >
-            {digest.content.title || "Your digest"}
+            {digest.status === "source_removed"
+              ? "Report unavailable"
+              : digest.content.title || "Your digest"}
           </Text>
+          {digest.content.window_start && (
+            <Text className="text-sm text-muted">
+              {new Date(digest.content.window_start).toLocaleDateString(
+                undefined,
+                { timeZone: digest.content.timezone },
+              )}{" "}
+              —{" "}
+              {new Date(digest.content.window_end).toLocaleDateString(
+                undefined,
+                { timeZone: digest.content.timezone },
+              )}
+            </Text>
+          )}
           <Text className="text-sm text-muted">
             {digest.items_count} {digest.items_count === 1 ? "item" : "items"}{" "}
-            across {digest.categories_count}{" "}
-            {digest.categories_count === 1 ? "category" : "categories"}
+            in the period
           </Text>
         </View>
         {digest.content.tldr && (
@@ -204,6 +224,18 @@ export default function DigestDetailScreen() {
                   })}
                 </View>
               ),
+            )}
+            {digest.content.selection && (
+              <Text className="text-sm text-muted">
+                {digest.content.selection.selected} selected from{" "}
+                {digest.content.selection.total} items in the period.
+                {digest.content.selection.pending > 0
+                  ? " Some saves are still processing and may appear in a later digest."
+                  : ""}
+                {digest.content.selection.carryover_item_ids.length > 0
+                  ? " Includes earlier saves that are ready now."
+                  : ""}
+              </Text>
             )}
             {digest.content.quality_mode === "fallback" && (
               <Text className="text-muted">
