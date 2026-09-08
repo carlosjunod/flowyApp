@@ -1,3 +1,4 @@
+import { SemanticPreview } from './content/SemanticContent';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -115,6 +116,7 @@ export const ItemCard: React.FC<Props> = ({ item }) => {
           >
             {item.title ?? item.raw_url ?? (pending ? 'Preparing saved content…' : 'Saved item')}
           </Text>
+          <SemanticPreview item={item} />
           {item.summary ? <Text className="text-muted text-sm" numberOfLines={2}>{item.summary}</Text> : null}
           {pending || errored ? <Text className={errored ? 'text-danger text-sm' : 'text-muted text-sm'}>{errored ? 'Processing failed · Tap to retry' : 'Processing saved content…'}</Text> : null}
           <View className="flex-row items-end justify-between">

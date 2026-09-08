@@ -3,6 +3,7 @@ import React from 'react';
 import { getContentType, type ContentType } from '@/lib/contentType';
 import type { Item } from '@/types';
 
+import { SemanticContent } from './SemanticContent';
 import { CarouselContent } from './CarouselContent';
 import { GenericContent } from './GenericContent';
 import { ReceiptContent } from './ReceiptContent';
@@ -22,6 +23,10 @@ export const ContentRenderer: React.FC<{ item: Item; contentType?: ContentType }
 }) => {
   const type = contentType ?? getContentType(item);
 
+  return <><SemanticContent item={item} /><OriginalContent item={item} type={type} /></>;
+};
+
+function OriginalContent({ item, type }: { item: Item; type: ContentType }) {
   switch (type) {
     case 'carousel':
       return <CarouselContent item={item} />;

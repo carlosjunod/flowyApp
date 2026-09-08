@@ -1,3 +1,4 @@
+import { readSemanticContent, canResumeSemantic } from '@/types/semantic';
 import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
@@ -317,6 +318,8 @@ export default function ItemDetailScreen() {
             answers NOT_READY otherwise), so still gate on status. */}
         {item.status === 'ready' ? (
           <ExploreCTA
+            resumeMode={canResumeSemantic(readSemanticContent(item.structured_content))}
+            resourceMode={['list', 'entity'].includes(readSemanticContent(item.structured_content)?.layout ?? '')}
             exploration={item.exploration}
             isReceipt={item.type === 'receipt'}
             onPress={() => {

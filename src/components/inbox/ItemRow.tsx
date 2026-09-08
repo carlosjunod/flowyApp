@@ -1,3 +1,4 @@
+import { SemanticPreview } from './content/SemanticContent';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -131,6 +132,7 @@ export const ItemRow: React.FC<Props> = ({ item }) => {
           >
             {item.title ?? item.raw_url ?? (pending ? 'Preparing saved content…' : 'Saved item')}
           </Text>
+          <SemanticPreview item={item} compact />
           <Text
             className="text-muted"
             style={{ fontFamily: 'Inter_400Regular', fontSize: 12 }}

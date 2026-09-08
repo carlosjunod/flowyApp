@@ -10,6 +10,8 @@ import type { ItemExploration } from '@/types';
 type Props = {
   exploration?: ItemExploration;
   isReceipt?: boolean;
+  resourceMode?: boolean;
+  resumeMode?: boolean;
   /**
    * Starts the server exploration action for the item.
    */
@@ -31,7 +33,7 @@ const pickVariant = (exploration: ItemExploration | undefined): Variant => {
 /**
  * Displays the actual exploration state. Motion is reserved for active work.
  */
-export const ExploreCTA: React.FC<Props> = ({ exploration, isReceipt, onPress }) => {
+export const ExploreCTA: React.FC<Props> = ({ exploration, isReceipt, resourceMode, resumeMode, onPress }) => {
   const colors = useResolvedColors();
   const variant = pickVariant(exploration);
 
@@ -77,6 +79,10 @@ export const ExploreCTA: React.FC<Props> = ({ exploration, isReceipt, onPress })
     label = isReceipt ? 'Retry analysis' : 'Retry exploration';
     renderIcon = () => <Feather name="rotate-ccw" size={14} color={fg} />;
   }
+
+  if (resourceMode && variant !== 'exploring') { label = 'Find resource links'; disabled = false; }
+
+  if (resumeMode) { label = variant === 'exploring' ? 'Reading saved content…' : 'Continue extraction'; disabled = variant === 'exploring'; }
 
   return (
     <View style={{ borderRadius: 14 }}>

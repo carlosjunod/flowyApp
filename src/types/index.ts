@@ -111,7 +111,7 @@ export type Item = {
    * when `type === 'receipt'`). Stored as JSON in PocketBase. Renderers narrow
    * via `type` before reading.
    */
-  structured_content?: unknown;
+  structured_content?: import('./semantic').SemanticContentV1 | import('./receipt').ReceiptData | Record<string, unknown>;
   /** R2 URLs of the original uploaded media (e.g. the receipt photo). */
   original_media_urls?: string[];
   /**

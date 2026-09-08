@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import Markdown from 'react-native-markdown-display';
+import { safeSemanticUrl } from '@/types/semantic';
 import { Pressable, Text, View } from 'react-native';
 
 import { useResolvedColors } from '@/lib/theme';
@@ -60,18 +62,9 @@ export const GenericContent: React.FC<{ item: Item }> = ({ item }) => {
           padding: 14,
         }}
       >
-        <Text selectable
-          style={{
-            fontFamily: 'Inter_400Regular',
-            fontSize: 15,
-            lineHeight: 21,
-            color: colors.fg,
-            fontStyle: active ? 'normal' : 'italic',
-            opacity: active ? 1 : 0.7,
-          }}
-        >
+        <Markdown onLinkPress={url => Boolean(safeSemanticUrl(url))} style={{ body: { color: colors.fg, fontSize: 15, lineHeight: 22 }, link: { color: colors.fg }, code_inline: { color: colors.fg }, code_block: { color: colors.fg }, fence: { color: colors.fg } }}>
           {active || emptyLabel}
-        </Text>
+        </Markdown>
       </View>
     </View>
   );
