@@ -72,6 +72,8 @@ export default function ItemDetailScreen() {
   const [actionsOpen, setActionsOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [noteExpanded, setNoteExpanded] = useState(false);
+  const [noteCanExpand, setNoteCanExpand] = useState(false);
 
   if (isLoading) {
     return (
@@ -241,6 +243,23 @@ export default function ItemDetailScreen() {
           </Pressable>
         ) : null}
 
+
+        {item.notes?.trim() ? (
+          <View className="rounded-2xl border border-border bg-surface p-4 gap-3">
+            <View className="flex-row items-center gap-2">
+              <Feather name="edit-3" size={14} color={colors.accent} />
+              <Text className="text-muted text-xs font-medium">YOUR NOTE</Text>
+            </View>
+            <Text selectable className="text-fg text-base leading-6" numberOfLines={noteExpanded ? undefined : 5} onTextLayout={({ nativeEvent }) => { if (!noteExpanded) setNoteCanExpand(nativeEvent.lines.length >= 5); }}>
+              {item.notes}
+            </Text>
+            {noteCanExpand ? (
+              <Pressable onPress={() => setNoteExpanded(value => !value)} accessibilityRole="button" accessibilityState={{ expanded: noteExpanded }} className="min-h-[44px] justify-center">
+                <Text className="text-accent font-medium">{noteExpanded ? 'Show less' : 'Read full note'}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
 
         {contentType === 'receipt' ? <ContentRenderer item={item} contentType={contentType} /> : null}
         {item.summary ? (

@@ -12,6 +12,7 @@ const DEFAULTS = {
   appGroup: 'group.app.tryflowy',
   extensionName: 'ShareExtension',
   apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://tryflowy.app',
+  pbBaseUrl: process.env.EXPO_PUBLIC_PB_URL || 'https://pb.tryflowy.app',
 };
 
 function resolveProps(props) {
@@ -20,6 +21,7 @@ function resolveProps(props) {
     appGroup: p.appGroup || DEFAULTS.appGroup,
     extensionName: p.extensionName || DEFAULTS.extensionName,
     apiBaseUrl: p.apiBaseUrl || DEFAULTS.apiBaseUrl,
+    pbBaseUrl: p.pbBaseUrl || DEFAULTS.pbBaseUrl,
   };
 }
 
@@ -65,15 +67,10 @@ function withShareExtensionSources(config, props) {
         [`${props.extensionName}.entitlements`]: renderEntitlements(props),
       };
 
-      const repoSwift = path.join(
-        projectRoot,
-        'ios',
-        props.extensionName,
-        'ShareViewController.swift',
+      fs.copyFileSync(
+        require.resolve('@expo-google-fonts/instrument-serif/400Regular/InstrumentSerif_400Regular.ttf'),
+        path.join(targetDir, 'InstrumentSerif_400Regular.ttf'),
       );
-      if (fs.existsSync(repoSwift)) {
-        files['ShareViewController.swift'] = fs.readFileSync(repoSwift, 'utf8');
-      }
 
       for (const [name, content] of Object.entries(files)) {
         fs.writeFileSync(path.join(targetDir, name), content);
@@ -104,7 +101,23 @@ function withShareExtensionTarget(config, props) {
     enableMacCatalystOnMainTarget(project);
     const targetName = props.extensionName;
     const teamId = cfg.ios && cfg.ios.appleTeamId;
-    if (project.findTargetKey(targetName)) return cfg;
+    // Expo projects do not always have the Resources group expected by xcode.
+    if (!project.pbxGroupByName('Resources')) {
+      const resources = project.pbxCreateGroup('Resources');
+      project.addToPbxGroup(resources, project.getFirstProject().firstProject.mainGroup);
+    }
+    // xcode keeps quotes on newly-added targets and removes them on parse.
+    // Normalize both forms so repeated prebuilds cannot embed a second extension.
+    const existingTarget = Object.entries(project.pbxNativeTargetSection()).find(
+      ([, target]) => target && typeof target === 'object' &&
+        String(target.name || '').replace(/"/g, '') === targetName,
+    )?.[0];
+    if (existingTarget) {
+      if (!project.hasFile(`${targetName}/InstrumentSerif_400Regular.ttf`)) {
+        project.addResourceFile(`${targetName}/InstrumentSerif_400Regular.ttf`, { target: existingTarget });
+      }
+      return cfg;
+    }
 
     const mainBundleId =
       (cfg.ios && cfg.ios.bundleIdentifier) ||
@@ -126,6 +139,7 @@ function withShareExtensionTarget(config, props) {
       { target: targetUuid },
       groupKey,
     );
+    project.addResourceFile(`${targetName}/InstrumentSerif_400Regular.ttf`, { target: targetUuid });
     // Info.plist is wired via INFOPLIST_FILE, not as a resource
 
     const configurations = project.pbxXCBuildConfigurationSection();
@@ -179,6 +193,8 @@ function renderInfoPlist(props) {
   <string>${props.apiBaseUrl}</string>
   <key>APP_GROUP</key>
   <string>${props.appGroup}</string>
+  <key>PB_BASE_URL</key>
+  <string>${props.pbBaseUrl}</string>
   <key>NSExtension</key>
   <dict>
     <key>NSExtensionAttributes</key>

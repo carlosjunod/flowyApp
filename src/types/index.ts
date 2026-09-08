@@ -76,6 +76,7 @@ export type ItemExploration = {
   primary_link?: ExplorationLink;
   candidates: ExplorationCandidate[];
   video_insights?: ExplorationVideoInsights;
+  notes?: string;
   last_explored_at: string;
   error_msg?: string;
   deep_analysis?: ExplorationDeepAnalysis;
