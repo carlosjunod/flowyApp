@@ -3,6 +3,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 
 import type { ApiError, AuthSession } from '@/types';
 
+import { unlinkPushDevice } from './pushDevice';
 import { ENV } from './env';
 import { hydratePbAuth, pb } from './pb';
 import { sharedSecureStore } from './secureStore';
@@ -47,7 +48,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(toUser(pb.authStore.model));
       setReady(true);
     })();
+    let previousAccount = pb.authStore.model?.id;
     const unsubscribe = pb.authStore.onChange(() => {
+      const nextAccount = pb.authStore.model?.id;
+      if (nextAccount !== previousAccount) queryClient.clear();
+      previousAccount = nextAccount;
       setUser(toUser(pb.authStore.model));
     });
     return () => {
@@ -86,6 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   const signOut = useCallback(async () => {
+    try { await unlinkPushDevice(); } catch { /* Persisted revocation is retried on the next foreground. */ }
     pb.authStore.clear();
     await sharedSecureStore.removeItem(ENV.AUTH_KEY);
     queryClient.clear();

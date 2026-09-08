@@ -1,6 +1,7 @@
-import type { ChatMessage } from '../types';
+import type { ChatMessage, DigestChatContext } from '../types';
 
 export type Conversation = {
+  digestContext?: DigestChatContext;
   id: string;
   title: string;
   updated: number;
@@ -43,7 +44,9 @@ export function restoreChat(value: unknown): ChatSnapshot {
         }) : [],
       });
     }
-    conversations.push({ id: c.id, title: typeof c.title === 'string' ? c.title : 'Conversation', updated: typeof c.updated === 'number' ? c.updated : Date.now(), draft: typeof c.draft === 'string' ? c.draft : '', messages });
+    const ctx = c.digestContext as Partial<DigestChatContext> | undefined;
+    const digestContext: DigestChatContext | undefined = ctx && typeof ctx.digestId === 'string' && /^[a-z0-9]{15}$/.test(ctx.digestId) && (ctx.scope === 'digest' || ctx.scope === 'items') && (ctx.itemIds === undefined || (Array.isArray(ctx.itemIds) && ctx.itemIds.length <= 50 && ctx.itemIds.every(id => typeof id === 'string' && /^[a-z0-9]{15}$/.test(id)))) ? ctx as DigestChatContext : undefined;
+    conversations.push({ digestContext, id: c.id, title: typeof c.title === 'string' ? c.title : 'Conversation', updated: typeof c.updated === 'number' ? c.updated : Date.now(), draft: typeof c.draft === 'string' ? c.draft : '', messages });
   }
   if (!conversations.length) return emptyChat();
   return { activeId: typeof raw.activeId === 'string' && ids.has(raw.activeId) ? raw.activeId : conversations[0]!.id, conversations };

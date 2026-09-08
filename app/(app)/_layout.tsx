@@ -61,7 +61,7 @@ function AppTabs() {
       <Tabs.Screen
         name="digest"
         options={{
-          title: 'Daily',
+          title: 'Digests',
           tabBarIcon: ({ color, size }) => (
             <Feather name="sunrise" size={size ?? 20} color={color} />
           ),

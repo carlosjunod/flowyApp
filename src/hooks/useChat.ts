@@ -3,7 +3,7 @@ import { AppState } from 'react-native';
 
 import { chatStream } from '@/lib/api';
 import { chatStorage } from '@/lib/chatStorage';
-import { chatId, emptyChat, newConversation, restoreChat, retryTurn, type ChatSnapshot } from '@/lib/chatModel';
+import { chatId, emptyChat, newConversation, restoreChat, retryTurn, type ChatSnapshot, type Conversation } from '@/lib/chatModel';
 import type { ChatMessage } from '@/types';
 
 export function useChatState(accountId: string) {
@@ -95,7 +95,7 @@ export function useChatState(accountId: string) {
     };
     try {
       const context = history.filter(m => !m.error && !m.interrupted && !!m.content).map(m => ({ role: m.role, content: m.content }));
-      for await (const event of chatStream(trimmed, context, run.controller.signal)) {
+      for await (const event of chatStream(trimmed, context, run.controller.signal, conversation.digestContext)) {
         if (generation.current !== run || !live.current) break;
         if (event.type === 'token') updateMessage(m => ({ ...m, content: m.content + event.value }));
         else if (event.type === 'sources') updateMessage(m => ({ ...m, citations: event.citations }));
@@ -124,6 +124,13 @@ export function useChatState(accountId: string) {
     send: (text: string) => send(text), stop,
     retry: () => { const turn = retryTurn(state.current.conversations.find(c => c.id === state.current.activeId)?.messages ?? []); if (turn) void send(turn.question, turn.history); },
     select: (id: string) => change(current => current.conversations.some(c => c.id === id) ? { ...current, activeId: id } : current),
+    startDigest: (digestId: string, itemIds?: string[]) => {
+      if (!ready) return;
+      stop();
+      const conversation: Conversation = {...newConversation(), title: 'About your digest', draft: itemIds ? 'Help me understand this source.' : 'What should I remember from this digest?', digestContext: {digestId, itemIds, scope: itemIds ? 'items' : 'digest'}};
+      change(current => ({...current, activeId: conversation.id, conversations: [conversation, ...current.conversations]}));
+      void persist();
+    },
     reset: () => {
       if (!ready) return;
       stop();

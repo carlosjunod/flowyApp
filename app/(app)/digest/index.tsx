@@ -1,29 +1,33 @@
-import { useQuery } from '@tanstack/react-query';
-import { Link, router } from 'expo-router';
-import React from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { Link, router } from "expo-router";
+import React, { useState } from "react";
+import { FlatList, Pressable, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Spinner } from '@/components/ui/Spinner';
-import { api } from '@/lib/api';
-import { useAuth } from '@/lib/auth';
-import { relativeDate } from '@/lib/relativeDate';
-import type { Digest } from '@/types';
+import { Spinner } from "@/components/ui/Spinner";
+import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { relativeDate } from "@/lib/relativeDate";
+import type { Digest } from "@/types";
 
 export default function DigestListScreen() {
   const { user } = useAuth();
-  const query = useQuery<Digest[], Error>({
-    queryKey: ['digests', user?.id],
+  const [cadence, setCadence] = useState<"daily" | "weekly" | undefined>(),
+    [read, setRead] = useState<"read" | "new" | undefined>();
+  const query = useInfiniteQuery({
+    queryKey: ["digests", user?.id, cadence, read],
     enabled: !!user?.id,
-    queryFn: async () => {
-      const res = await api.listDigests();
-      if (res.error) throw new Error(res.error.message);
-      return res.data;
-    },
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) =>
+      api.listDigestPage(pageParam, {
+        ...(cadence ? { cadence } : {}),
+        ...(read ? { read } : {}),
+      }),
+    getNextPageParam: (page) => page.nextCursor,
   });
 
   return (
-    <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-bg" edges={["top"]}>
       <View className="flex-row items-center justify-between px-4 pt-2 pb-3">
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <Text className="text-accent text-base">← Back</Text>
@@ -37,32 +41,95 @@ export default function DigestListScreen() {
       <View className="px-4 pb-3">
         <Text
           className="text-3xl text-fg"
-          style={{ fontFamily: 'InstrumentSerif_400Regular', letterSpacing: -0.5 }}
+          style={{
+            fontFamily: "InstrumentSerif_400Regular",
+            letterSpacing: -0.5,
+          }}
         >
-          Daily digests
+          Digests
         </Text>
-        <Text className="text-sm text-muted mt-1">A summary of what you saved each day.</Text>
+        <Text className="text-sm text-muted mt-1">
+          A few ideas worth keeping from what you saved.
+        </Text>
       </View>
 
+      <View className="px-4 flex-row gap-4">
+        <Pressable
+          accessibilityRole="button"
+          className="min-h-11 justify-center"
+          onPress={() =>
+            setCadence(
+              cadence === undefined
+                ? "weekly"
+                : cadence === "weekly"
+                  ? "daily"
+                  : undefined,
+            )
+          }
+        >
+          <Text className="text-accent">Cadence: {cadence || "All"}</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          className="min-h-11 justify-center"
+          onPress={() =>
+            setRead(
+              read === undefined ? "new" : read === "new" ? "read" : undefined,
+            )
+          }
+        >
+          <Text className="text-accent">Status: {read || "All"}</Text>
+        </Pressable>
+      </View>
       {query.isLoading ? (
         <Spinner className="mt-12" size="large" />
       ) : query.error ? (
         <View className="px-6 pt-12 items-center">
           <Text className="text-danger">{query.error.message}</Text>
+          <Pressable
+            accessibilityRole="button"
+            className="min-h-11 justify-center"
+            onPress={() => {
+              void query.refetch();
+            }}
+          >
+            <Text className="text-accent">Retry</Text>
+          </Pressable>
         </View>
       ) : (
         <FlatList
-          data={query.data ?? []}
+          data={query.data?.pages.flatMap((page) => page.items) ?? []}
           keyExtractor={(d) => d.id}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32, gap: 8 }}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingBottom: 32,
+            gap: 8,
+          }}
           renderItem={({ item }) => <DigestRow digest={item} />}
           ListEmptyComponent={
             <View className="items-center justify-center px-6 pt-16">
               <Text className="text-5xl mb-3">📰</Text>
               <Text className="text-base text-muted text-center">
-                No digests yet. Once enabled, they generate daily at your chosen time.
+                Nothing new to recap yet. Choose a weekly digest in settings
+                when you’re ready.
               </Text>
             </View>
+          }
+          ListFooterComponent={
+            query.hasNextPage ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={query.isFetchingNextPage}
+                onPress={() => {
+                  void query.fetchNextPage();
+                }}
+                className="min-h-11 justify-center"
+              >
+                <Text className="text-accent">
+                  {query.isFetchingNextPage ? "Loading…" : "Load more"}
+                </Text>
+              </Pressable>
+            ) : null
           }
           refreshing={query.isRefetching}
           onRefresh={() => query.refetch()}
@@ -78,13 +145,17 @@ const DigestRow: React.FC<{ digest: Digest }> = ({ digest }) => (
       style={({ pressed }) => [pressed && { opacity: 0.85 }]}
       className="rounded-xl border border-border bg-card p-4"
     >
-      <Text className="text-xs uppercase text-muted">{relativeDate(digest.generated_at)}</Text>
+      <Text className="text-xs uppercase text-muted">
+        {digest.cadence || "daily"} · {relativeDate(digest.generated_at)} ·{" "}
+        {digest.first_opened_at ? "Read" : "New"}
+      </Text>
       <Text
         className="text-lg text-fg mt-1"
-        style={{ fontFamily: 'InstrumentSerif_400Regular' }}
+        style={{ fontFamily: "InstrumentSerif_400Regular" }}
       >
-        {digest.categories_count} {digest.categories_count === 1 ? 'category' : 'categories'} ·{' '}
-        {digest.items_count} {digest.items_count === 1 ? 'item' : 'items'}
+        {digest.content.title || "Your digest"} · {digest.categories_count}{" "}
+        {digest.categories_count === 1 ? "category" : "categories"} ·{" "}
+        {digest.items_count} {digest.items_count === 1 ? "item" : "items"}
       </Text>
     </Pressable>
   </Link>

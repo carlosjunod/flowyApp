@@ -17,6 +17,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+import { DigestInvitation } from '@/components/digest/DigestInvitation';
 import { BulkImportSheet } from '@/components/inbox/BulkImportSheet';
 import { FilterBar } from '@/components/inbox/FilterBar';
 import { ItemCard } from '@/components/inbox/ItemCard';
@@ -129,6 +130,7 @@ export default function InboxScreen() {
           <Pressable onPress={() => setBulkOpen(true)} accessibilityRole="button" accessibilityLabel="Save a link" className="h-11 rounded-full bg-primary px-4 justify-center"><Text className="text-bg font-semibold">{captureStatus === 'working' ? 'Saving…' : captureStatus === 'done' ? 'Saved' : 'Save'}</Text></Pressable>
         </View>
       </View>
+      {user && items.length > 0 ? <DigestInvitation key={user.id} userId={user.id} /> : null}
       <BulkImportSheet onStatusChange={setCaptureStatus} visible={bulkOpen} onClose={() => setBulkOpen(false)} />
       <FilterBar
         search={searchInput}

@@ -1,3 +1,4 @@
+import type { DigestChatContext } from '@/types';
 import type {
   AliasData,
   ApiError,
@@ -9,6 +10,7 @@ import type {
   CitedItem,
   Digest,
   DigestSettings,
+  DigestPreferences,
   IngestPayload,
   IngestResponse,
   Item,
@@ -188,13 +190,24 @@ export const api = {
       body: JSON.stringify({ confirmation }),
     }),
 
+  readDigest: (id: string) => request<Record<string, never>>(`/api/digest/${id}/read`, {method:'POST'}),
+
   listDigests: () => request<Digest[]>('/api/digest'),
+  listDigestPage: async (cursor:string|null, filters:{cadence?:'daily'|'weekly';read?:'read'|'new'}={}):Promise<{items:Digest[];nextCursor:string|null}> => {
+    const params=new URLSearchParams(filters);if(cursor)params.set('cursor',cursor);
+    const response=await fetch(ENV.API_BASE_URL+'/api/digest?'+params.toString(),{headers:jsonHeaders()});
+    if(!response.ok)throw new Error('Could not load reports. Check your connection and retry.');
+    const body=await response.json() as {data:Digest[];nextCursor:string|null};return {items:body.data,nextCursor:body.nextCursor};
+  },
+  digestFeedback: (id:string,target:string,value:'useful'|'not_useful'|'not_interested'|null)=>request(`/api/digest/${id}/feedback`,{method:'POST',body:JSON.stringify({target,value})}),
+  digestItemOpened: (id:string,target:string)=>request(`/api/digest/${id}/events`,{method:'POST',body:JSON.stringify({name:'digest_item_opened',target})}),
+  testDigestEmail: (id:string)=>request(`/api/digest/${id}/test-email`,{method:'POST'}),
 
   getDigest: (id: string) => request<Digest>(`/api/digest/${id}`),
 
   getDigestSettings: () => request<DigestSettings>('/api/digest/settings'),
 
-  patchDigestSettings: (patch: Partial<DigestSettings>) =>
+  patchDigestSettings: (patch: Partial<DigestPreferences> & { expected_revision: number }) =>
     request<DigestSettings>('/api/digest/settings', {
       method: 'PATCH',
       body: JSON.stringify(patch),
@@ -216,13 +229,14 @@ export async function* chatStream(
   message: string,
   history: { role: 'user' | 'assistant'; content: string }[],
   signal?: AbortSignal,
+  digestContext?: DigestChatContext,
 ): AsyncGenerator<ChatStreamEvent, void, void> {
   let res: Response;
   try {
     res = await fetch(`${ENV.API_BASE_URL}/api/chat`, {
       method: 'POST',
       headers: jsonHeaders(),
-      body: JSON.stringify({ message, history }),
+      body: JSON.stringify({ message, history, digestContext }),
       signal,
     });
   } catch (err) {

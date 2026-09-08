@@ -189,3 +189,13 @@ Severity tags from the original diagnostic; effort tags re-estimated.
 - Web AASA: `Flowy/apps/web/app/.well-known/apple-app-site-association/route.ts` (reads `APPLE_TEAM_ID` + `APPLE_CLIENT_ID`).
 - Web SIWA verifier: `Flowy/apps/web/lib/apple-auth.ts:38-47`.
 - Web bulk-add mirror: `Flowy/apps/web/components/inbox/BulkAddBookmarksButton.tsx` (concurrency 4, max 100, exact failure-handling pattern).
+
+## 2026-09-08 — Daily/weekly digests
+
+Server integration is in sibling Flowy branch `codex/digest-pricing-integration` after pricing merge `03c75ce`. The user explicitly approved a fresh start: server migration 29 clears historical digests/old settings but preserves items and billing. Ship the matching server and native client together; no V1 settings compatibility/backfill is required.
+
+Native now renders TLDR first, full cited report/source actions, feedback, paginated history and weekly/daily settings. Free is weekly only; paid shares one report/day, enforced on the server. Optional digest chat context persists per conversation and opens an editable draft without sending. Push registration uses the authenticated `/api/push/device` boundary, exact typed report/item intents wait through session restoration/login, persisted response dedup prevents reopening on foreground, and account changes clear query caches. One current device per account is supported. A scoped revocation capability permits retrying unlink after offline logout without keeping the account's full token.
+
+See `docs/DIGESTS.md` for settings, API contracts and mandatory physical-device acceptance. No new native dependency or config capability was added. Type/model tests do not establish receipt on a physical device or correct APNs/EAS credentials; those remain explicit release gates. No production messages or migrations were performed.
+
+Digest follow-up validation: native typecheck and 21 UI model/hook scenarios pass. The inbox invitation, cadence/read history filters and serialized push registration are documented in `docs/DIGESTS.md`; physical push and real email remain release gates.

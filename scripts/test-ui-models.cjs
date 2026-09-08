@@ -198,5 +198,38 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   runner.close();
   assert.ok(writes.every(w => w.account === 'account-a'));
   passed('Unmount persistence scoped to account');
+  const {notificationIntent}=loader()('src/lib/notificationIntent.ts');
+  assert.deepEqual(notificationIntent('response',{type:'digest',digestId:'abcdefghijklmno',deliveryId:'delivery1234567'}),{key:'delivery1234567',path:'/digest/abcdefghijklmno'});
+  assert.equal(notificationIntent('response',{type:'digest',digestId:'../../account'}),null);
+  assert.equal(notificationIntent('response',{type:'external',digestId:'abcdefghijklmno',url:'https://example.test'}),null);
+  assert.equal(notificationIntent('response',{type:'item',itemId:'abcdefghijklmno',url:'https://evil.test'}).path,'/item/abcdefghijklmno');
+  passed('Push intents accept only typed internal IDs and dedupe by delivery');
+  const {restoreChat:restoreDigestChat,newConversation:newDigestConversation}=loader()('src/lib/chatModel.ts');
+  const scoped={...newDigestConversation(),digestContext:{digestId:'abcdefghijklmno',scope:'digest'}};
+  assert.deepEqual(restoreDigestChat({activeId:scoped.id,conversations:[scoped]}).conversations[0].digestContext,scoped.digestContext);
+  const unsafe={...scoped,digestContext:{digestId:'../../secret',scope:'digest'}};
+  assert.equal(restoreDigestChat({activeId:unsafe.id,conversations:[unsafe]}).conversations[0].digestContext,undefined);
+  passed('Saved digest chat context validates IDs');
+  const intentRunner=hookRunner(),intentStore=memoryStore(),destinations=[];
+  let intentAuth={user:null,ready:false},intentSegments=['(auth)'],responseListener;
+  const coldResponse={notification:{request:{identifier:'cold-response',content:{data:{type:'digest',digestId:'abcdefghijklmno',deliveryId:'delivery1234567'}}}}};
+  const useIntent=loader({
+    react:intentRunner.react,
+    'react-native':{Linking:{addEventListener:()=>({remove(){}}),getInitialURL:async()=>null}},
+    'expo-notifications':{addNotificationResponseReceivedListener:callback=>{responseListener=callback;return{remove(){}};},getLastNotificationResponseAsync:async()=>coldResponse,clearLastNotificationResponseAsync:async()=>{}},
+    'expo-router':{router:{push:path=>destinations.push(path),replace:path=>destinations.push(path)},useRootNavigationState:()=>({key:'ready'}),useSegments:()=>intentSegments},
+    '@/lib/auth':{useAuth:()=>intentAuth},
+    '@/lib/secureStore':{sharedSecureStore:intentStore},
+  })('src/hooks/useNotificationIntent.ts').useNotificationIntent;
+  intentRunner.render(useIntent);await tick();await tick();intentRunner.render(useIntent);
+  assert.deepEqual(destinations,[],'cold push waits for session restoration');
+  intentAuth={user:null,ready:true};intentRunner.render(useIntent);assert.equal(destinations.at(-1),'/login');
+  intentAuth={user:{id:'account-a'},ready:true};intentSegments=['(app)'];intentRunner.render(useIntent);await tick();
+  assert.equal(destinations.at(-1),'/digest/abcdefghijklmno');
+  const navigations=destinations.length;
+  responseListener(coldResponse);await tick();intentRunner.render(useIntent);
+  assert.equal(destinations.length,navigations,'same response is consumed once');
+  assert.equal(intentStore.values.has('flowy.notification.pending'),false);
+  intentRunner.close();passed('Cold push waits through login and consumes the exact destination once');
   console.log(`PASS: ${scenarios.length} UI model regression scenarios.\n${scenarios.map(name => `  ✓ ${name}`).join('\n')}`);
 })().catch(error => { console.error(error); process.exitCode = 1; });

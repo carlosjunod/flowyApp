@@ -76,7 +76,6 @@ export type ItemExploration = {
   primary_link?: ExplorationLink;
   candidates: ExplorationCandidate[];
   video_insights?: ExplorationVideoInsights;
-  notes?: string;
   last_explored_at: string;
   error_msg?: string;
   deep_analysis?: ExplorationDeepAnalysis;
@@ -91,6 +90,7 @@ export type Item = {
   title?: string;
   summary?: string;
   content?: string;
+  notes?: string;
   tags: string[];
   category?: string;
   status: ItemStatus;
@@ -233,13 +233,29 @@ export type DigestSection = {
   item_ids: string[];
 };
 
+export type DigestBlock = { id: string; text: string; source_item_ids: string[] };
+
 export type DigestContent = {
+  version?: 2;
+  title?: string;
+  tldr?: { bullets: DigestBlock[] };
+  ideas?: DigestBlock[];
+  themes?: DigestBlock[];
+  highlights?: DigestBlock[];
+  connections?: DigestBlock[];
+  cadence?: 'daily' | 'weekly';
+  timezone?: string;
+  quality_mode?: 'ai' | 'fallback';
+  quality_reason?: string;
   sections: DigestSection[];
   window_start: string;
   window_end: string;
 };
 
 export type Digest = {
+  cadence?: 'daily'|'weekly'; first_opened_at?: string; status?: string;
+  feedback?: {target:string;value:string}[];
+  sources?: {id:string;title?:string;source_url?:string;raw_url?:string}[];
   id: string;
   user: string;
   generated_at: string;
@@ -250,9 +266,21 @@ export type Digest = {
   updated: string;
 };
 
+export type DigestPreferences = {
+  timezone: string; locale: 'en' | 'es';
+  daily_enabled: boolean; daily_local_time: string; daily_push_enabled: boolean; daily_email_enabled: boolean;
+  weekly_enabled: boolean; weekly_day: number; weekly_local_time: string; weekly_push_enabled: boolean; weekly_email_enabled: boolean;
+  paused_until: string | null; excluded_types: string[]; excluded_categories: string[];
+};
+
 export type DigestSettings = {
-  digest_enabled: boolean;
-  digest_time: string;
+  version?: 2; revision?: number; settings?: DigestPreferences;
+  canEnableDaily?: boolean; effectivePlan?: string; quotaResetsAt?: string;
+  capabilities?: { enabled: boolean; push: boolean; email: boolean };
+  emailAddress?:string; emailSuppressed?:boolean; reportQuota?:{used:number;limit:number;window:string};
+  emailVerified?: boolean; hasPushDevice?: boolean;
+  next?: { cadence: string; enabled: boolean; next_run_at: string }[];
+
 };
 
 export type BulkActionFailure = {
@@ -267,3 +295,5 @@ export type BulkActionResult = {
 };
 
 export type BulkActionPayload = { ids: string[] };
+
+export type DigestChatContext = {digestId: string; scope: "digest" | "items"; itemIds?: string[]};
