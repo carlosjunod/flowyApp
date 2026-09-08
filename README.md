@@ -146,3 +146,20 @@ npm run prebuild     # re-apply config plugins to ios/
 - Removed the nonfunctional AI suggestion hero from Inbox and removed the fixed-tag suggestion renderer (`src/components/inbox/TagSuggestions.tsx`). No artificial takeaways are supplied when analysis data is missing.
 - `scripts/test-ui-models.cjs` runs 18 regression scenarios for search parameters/cache isolation, history restoration, draft/retry behavior, early citations, stale stream protection, and atomic/account-scoped local storage. This is model validation, not a simulator or device UI test.
 - Verified locally: `npm run typecheck`, `npm run test:ui-models`, and `git diff --check`. Native visual checks (keyboard, VoiceOver, Dynamic Type, real network suspension, 390pt and tablet layouts) remain device validation; no native E2E success is claimed.
+
+
+## TestFlight — integrated September 7–8 build
+
+Run from this repository after pulling `main`:
+
+```bash
+npx eas-cli@latest build --platform ios --profile production --auto-submit
+```
+
+`production` uses remote build numbering with `autoIncrement`, the production Flowy endpoints and App Store Connect app `6762985360` (native bundle `app.tryflowy.client`). EAS builds the current source and submits the result to TestFlight. Apple/EAS credentials must be available to the signed-in Expo account. This command does not submit an App Store release for review.
+
+This integration includes the September 7–8 inbox/chat/history and retrieval compatibility work, daily/weekly digest readers and settings, semantic content templates V1/V1.1, and the animated share extension with system appearance, tags, notes and sign-in recovery. Generated `ios/` and `android/` remain excluded; EAS regenerates native code using the committed plugins and Swift template.
+
+Matching server code is integrated into sibling `Flowy/main`. Server migrations, digest configuration and `CONTENT_TEMPLATES_ENABLED` are separate rollout steps described in its `docs/digest-rollout.md` and `docs/content-templates-proposal.md`; bundling this client does not activate those services. Physical-device push, real email and AI quality evaluation remain pending.
+
+Integration validation: Expo TypeScript, all 21 UI model scenarios, iOS Metro/Hermes export, and the compiled simulator share-extension harness pass. The native share-extension target also passed a clean prebuild/build before integration; this merge retains the same native template/plugin implementation.
