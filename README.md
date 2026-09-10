@@ -170,3 +170,19 @@ This integration includes the September 7–8 inbox/chat/history and retrieval c
 Matching server code is integrated into sibling `Flowy/main`. Server migrations, digest configuration and `CONTENT_TEMPLATES_ENABLED` are separate rollout steps described in its `docs/digest-rollout.md` and `docs/content-templates-proposal.md`; bundling this client does not activate those services. Physical-device push, real email and AI quality evaluation remain pending.
 
 Integration validation: Expo TypeScript, all 21 UI model scenarios, iOS Metro/Hermes export, and the compiled simulator share-extension harness pass. The native share-extension target also passed a clean prebuild/build before integration; this merge retains the same native template/plugin implementation.
+
+
+### Chat presentation (2026-09-10)
+
+New responses reveal in short word groups with at most one second of presentation
+catch-up after receipt completes. `src/hooks/useChatReveal.ts` mirrors the web
+hook; storage and subsequent requests always use the original received text.
+Restored conversations show immediately. Stop/error, leaving the screen,
+backgrounding, Reduce Motion and screen readers flush the presentation queue.
+`src/hooks/useChatMotion.ts` observes native accessibility and app state.
+Flowy uses a small branded avatar and unboxed answers; questions retain a soft
+bubble. The 44pt latest-message arrow overlays the list without reserving a row,
+and follows the composer when the keyboard changes the available height.
+The integrated send/stop control is orange when enabled and neutral when empty.
+`themeColors.chatSend` / `onChatSend` preserve contrast without changing the
+light theme's existing text/link accent. No preview-only replay control ships.

@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChatHistoryDrawer } from '@/components/chat/ChatHistoryDrawer';
@@ -9,12 +9,25 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { ChatWindow } from '@/components/chat/ChatWindow';
 import { Button } from '@/components/ui/Button';
 import { useChat } from '@/hooks/useChat';
+import { useChatReveal } from '@/hooks/useChatReveal';
+import { useChatMotion } from '@/hooks/useChatMotion';
 import { useResolvedColors } from '@/lib/theme';
 
 export default function ChatScreen() {
   const chat = useChat();
   const colors = useResolvedColors();
   const focused = useIsFocused();
+  const motion = useChatMotion();
+  const last = chat.messages[chat.messages.length - 1];
+  const reveal = useChatReveal({
+    id: `${chat.active.id}:${last?.id}`, content: last?.content ?? '',
+    active: Boolean(last?.streaming), enabled: focused && motion && last?.role === 'assistant',
+    cancelled: Boolean(last?.error || last?.interrupted),
+  });
+  const messages = useMemo(() => chat.messages.map(message => message === last && message.role === 'assistant'
+    ? { ...message, content: reveal.content, streaming: Boolean(message.streaming || reveal.revealing) } : message),
+    [chat.messages, last, reveal.content, reveal.revealing]);
+  const stop = () => { reveal.finish(); chat.stop(); };
   const [historyOpen, setHistoryOpen] = useState(false);
   useEffect(() => { chat.setVisible(focused); return () => chat.setVisible(false); }, [focused]);
   return (
@@ -32,8 +45,8 @@ export default function ChatScreen() {
       {chat.storageError ? <View className="px-4 py-2"><Text accessibilityRole="alert" className="text-danger text-sm">{chat.storageError}</Text><Button title={chat.ready ? 'Retry saving' : 'Retry loading'} variant="ghost" onPress={chat.retryStorage} /></View> : null}
       {chat.generatingId && !chat.pending ? <View className="px-4 py-2 flex-row items-center"><Pressable className="flex-1 py-2" onPress={() => chat.select(chat.generatingId!)}><Text className="text-muted text-sm">A response is being prepared in another chat. View</Text></Pressable><Button title="Stop" variant="ghost" onPress={chat.stop} /></View> : null}
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ChatWindow key={chat.active.id} messages={chat.messages} ready={chat.ready} onPromptTap={chat.send} onRetry={chat.retry} retryDisabled={!!chat.generatingId} />
-        <ChatInput value={chat.draft} onChange={chat.setDraft} onSend={chat.send} pending={chat.pending} disabled={!chat.ready || !!chat.generatingId} onStop={chat.stop} />
+        <ChatWindow key={chat.active.id} messages={messages} ready={chat.ready} onPromptTap={chat.send} onRetry={chat.retry} retryDisabled={!!chat.generatingId || reveal.revealing} />
+        <ChatInput value={chat.draft} onChange={chat.setDraft} onSend={chat.send} pending={chat.pending || reveal.revealing} disabled={!chat.ready || !!chat.generatingId} onStop={stop} />
       </KeyboardAvoidingView>
       <ChatHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)}>
           <View className="px-3 py-2 flex-row items-center justify-between">
