@@ -63,3 +63,5 @@ Main integration (2026-09-10): preserves personalization and progressive chat
 presentation. The history migration is 31 (30 already belongs to personalization).
 All 32 combined native scenarios, native TypeScript and iOS Hermes export pass;
 paired server validation passes 100 targeted cases and real PB/two-browser checks.
+
+Production failure correction (2026-09-10): ordinary persisted chats were rejected with `INVALID_DIGEST_CONTEXT` because PocketBase serialized an absent digest context as null. The paired server omits optional fields and accepts stored null as absence while preserving valid digest ownership checks. Native failed-answer text now asks to retry without incorrectly blaming connectivity.

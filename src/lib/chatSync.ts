@@ -42,7 +42,7 @@ export function nativeMessage(m: HistoryMessage): ChatMessage {
     interrupted: m.status === 'interrupted' || m.status === 'stopped',
     error:
       m.status === 'error'
-        ? 'This response could not be completed. Retry when connected.'
+        ? 'This response could not be completed. Please try again.'
         : undefined,
     citations: (m.items || []).map((i) => ({
       id: i.id,
