@@ -1,11 +1,9 @@
 import { Feather } from '@expo/vector-icons';
 import { copyWithCitations, prepareCitations, ITEM_PROTOCOL } from '@/lib/chatCitations';
 import * as Clipboard from 'expo-clipboard';
-import { useIsFocused } from '@react-navigation/native';
-import { useReducedMotion } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import Markdown, { renderRules, type ASTNode } from 'react-native-markdown-display';
 
 import { useResolvedColors } from '@/lib/theme';
@@ -15,10 +13,8 @@ import { CitedItemsRail, InlineItemChip } from './ItemChip';
 
 type Props = { message: ChatMessageType; onRetry?: () => void; retryDisabled?: boolean };
 
-export const ChatMessage: React.FC<Props> = ({ message, onRetry, retryDisabled }) => {
+export const ChatMessage = React.memo(function ChatMessage({ message, onRetry, retryDisabled }: Props) {
   const [sourcesOpen, setSourcesOpen] = useState(false);
-  const focused = useIsFocused();
-  const reducedMotion = useReducedMotion();
   const [copyLabel, setCopyLabel] = useState('Copy');
   const colors = useResolvedColors();
   const isUser = message.role === 'user';
@@ -45,7 +41,7 @@ export const ChatMessage: React.FC<Props> = ({ message, onRetry, retryDisabled }
   const railItems = citedItems.length > 0 ? citedItems : items.slice(0, 3);
   const railLabel = citedItems.length > 0 ? 'Sources' : 'Related saves';
 
-  const userText = colors.bg;
+  const userText = colors.fg;
   const markdownStyle = useMemo(
     () => ({
       body: { color: isUser ? userText : colors.fg, fontSize: 16, lineHeight: 25, fontFamily: 'Inter_400Regular' },
@@ -53,30 +49,30 @@ export const ChatMessage: React.FC<Props> = ({ message, onRetry, retryDisabled }
       link: { color: isUser ? userText : colors.accent, fontWeight: '600' as const },
       strong: { fontFamily: 'Inter_600SemiBold', fontWeight: '600' as const },
       em: { fontStyle: 'italic' as const },
-      heading1: { fontSize: 22, fontWeight: '700' as const, marginTop: 4, marginBottom: 6, color: isUser ? userText : colors.fg },
-      heading2: { fontSize: 19, fontWeight: '700' as const, marginTop: 4, marginBottom: 6, color: isUser ? userText : colors.fg },
-      heading3: { fontSize: 17, fontWeight: '600' as const, marginTop: 4, marginBottom: 6, color: isUser ? userText : colors.fg },
+      heading1: { fontSize: 22, fontWeight: '700' as const, marginTop: 14, marginBottom: 8, color: isUser ? userText : colors.fg },
+      heading2: { fontSize: 19, fontWeight: '700' as const, marginTop: 14, marginBottom: 8, color: isUser ? userText : colors.fg },
+      heading3: { fontSize: 17, fontWeight: '600' as const, marginTop: 14, marginBottom: 8, color: isUser ? userText : colors.fg },
       bullet_list: { marginTop: 2, marginBottom: 6 },
       ordered_list: { marginTop: 2, marginBottom: 6 },
       list_item: { marginBottom: 2 },
       blockquote: {
-        borderLeftWidth: 3,
-        borderLeftColor: isUser ? '#FFFFFF80' : colors.accent,
-        paddingLeft: 10,
+        borderWidth: 1,
+        borderColor: colors.border,
+        padding: 10,
         marginVertical: 4,
         backgroundColor: 'transparent',
       },
       code_inline: {
-        backgroundColor: isUser ? '#FFFFFF26' : colors.surface,
-        color: isUser ? '#FFFFFF' : colors.fg,
+        backgroundColor: colors.surface,
+        color: colors.fg,
         borderRadius: 4,
         paddingHorizontal: 4,
         fontFamily: 'Menlo',
         fontSize: 14,
       },
       code_block: {
-        backgroundColor: isUser ? '#FFFFFF14' : colors.surface,
-        color: isUser ? '#FFFFFF' : colors.fg,
+        backgroundColor: colors.surface,
+        color: colors.fg,
         padding: 10,
         borderRadius: 8,
         fontFamily: 'Menlo',
@@ -84,8 +80,8 @@ export const ChatMessage: React.FC<Props> = ({ message, onRetry, retryDisabled }
         marginVertical: 4,
       },
       fence: {
-        backgroundColor: isUser ? '#FFFFFF14' : colors.surface,
-        color: isUser ? '#FFFFFF' : colors.fg,
+        backgroundColor: colors.surface,
+        color: colors.fg,
         padding: 10,
         borderRadius: 8,
         fontFamily: 'Menlo',
@@ -94,13 +90,13 @@ export const ChatMessage: React.FC<Props> = ({ message, onRetry, retryDisabled }
       },
       table: {
         borderWidth: 1,
-        borderColor: isUser ? '#FFFFFF40' : colors.border,
+        borderColor: colors.border,
         borderRadius: 6,
         marginVertical: 6,
       },
-      th: { flex: 1, padding: 6, backgroundColor: isUser ? '#FFFFFF20' : colors.surface },
-      td: { flex: 1, padding: 6, borderColor: isUser ? '#FFFFFF40' : colors.border },
-      hr: { backgroundColor: isUser ? '#FFFFFF40' : colors.border, height: 1, marginVertical: 6 },
+      th: { flex: 1, padding: 6, backgroundColor: colors.surface },
+      td: { flex: 1, padding: 6, borderColor: colors.border },
+      hr: { backgroundColor: colors.border, height: 1, marginVertical: 6 },
     }),
     [colors, isUser, userText],
   );
@@ -153,13 +149,15 @@ export const ChatMessage: React.FC<Props> = ({ message, onRetry, retryDisabled }
 
 
   return (
-    <View className={`px-4 py-2 ${isUser ? 'items-end' : 'items-start'}`}>
-      <View
-        className={`${isUser ? 'max-w-[88%]' : 'w-full'} rounded-2xl px-4 py-3 ${
-          isUser ? 'bg-primary' : 'bg-card border border-border'
-        }`}
-      >
-        {message.streaming && !content ? <View accessibilityLiveRegion="polite" className="flex-row items-center gap-2">{focused && !reducedMotion ? <ActivityIndicator color={colors.muted} size="small" /> : null}<Text className="text-muted">Preparing response…</Text></View> : null}
+    <View className={`px-4 py-3 ${isUser ? 'items-end' : 'items-start'}`}>
+      {!isUser ? <View className="mb-3 flex-row flex-wrap items-center gap-2.5">
+        <View accessible={false} style={{ width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}>
+          <Text accessible={false} style={{ fontFamily: 'InstrumentSerif_400Regular', fontSize: 26, lineHeight: 30, color: colors.accent }}>f.</Text>
+        </View>
+        <Text className="text-fg text-sm font-medium">Flowy <Text className="text-muted text-xs">· AI</Text></Text>
+        {message.streaming ? <Text accessibilityLiveRegion="polite" className="text-muted text-xs">{content ? 'Writing…' : 'Preparing response…'}</Text> : null}
+      </View> : null}
+      <View className={isUser ? 'max-w-[88%] rounded-2xl rounded-br-md bg-surface px-4 py-3' : 'w-full'}>
         <Markdown style={markdownStyle} rules={rules} onLinkPress={onLinkPress}>
           {content}
         </Markdown>
@@ -196,4 +194,4 @@ export const ChatMessage: React.FC<Props> = ({ message, onRetry, retryDisabled }
       ) : null}
     </View>
   );
-};
+});

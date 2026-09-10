@@ -8,17 +8,18 @@ export const ChatInput: React.FC<Props> = ({ value, onChange, onSend, pending, d
   const colors = useResolvedColors();
   const canSend = !disabled && !!value.trim();
   return (
-    <View className="border-t border-border bg-bg px-4 pt-2 pb-3">
-      <View className="flex-row items-end gap-2">
+    <View className="bg-bg px-4 pt-2 pb-3">
+      <View className="flex-row items-end gap-2 rounded-[26px] border border-border bg-card p-1.5">
         <TextInput accessibilityLabel="Message" value={value} onChangeText={onChange}
           placeholder="Ask about your saved content…" placeholderTextColor={colors.muted} multiline
-          className="flex-1 min-h-[44px] max-h-32 rounded-xl border border-border bg-card px-3 py-2 text-fg" />
+          style={{ fontSize: 16, lineHeight: 24 }}
+          className="flex-1 min-h-[44px] max-h-32 rounded-xl px-3 py-2.5 text-fg" />
         <Pressable onPress={() => pending ? onStop() : onSend(value)} disabled={!pending && !canSend}
           accessibilityRole="button" accessibilityLabel={pending ? 'Stop response' : 'Send message'}
           accessibilityState={{ disabled: !pending && !canSend }}
-          style={({ pressed }) => ({ opacity: !pending && !canSend ? 0.4 : pressed ? 0.75 : 1 })}
-          className="h-11 w-11 items-center justify-center rounded-full bg-primary">
-          <Feather name={pending ? 'square' : 'arrow-up'} size={20} color={colors.bg} />
+          style={({ pressed }) => ({ backgroundColor: pending || canSend ? colors.chatSend : colors.surface, opacity: pressed ? 0.8 : 1 })}
+          className="h-11 w-11 items-center justify-center rounded-full">
+          <Feather name={pending ? 'square' : 'arrow-up'} size={20} color={pending || canSend ? colors.onChatSend : colors.muted} />
         </Pressable>
       </View>
       {disabled && !pending ? <Text className="text-xs text-muted pt-2">Finish or stop the other response before sending.</Text> : null}
