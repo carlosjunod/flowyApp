@@ -14,6 +14,8 @@ import type {
   IngestPayload,
   IngestResponse,
   Item,
+  PersonalizationProfile,
+  PersonalizationInput,
 } from '@/types';
 
 import { ENV } from './env';
@@ -95,9 +97,33 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResu
   }
 }
 
+/** Bind profile calls to their originating session, including late responses. */
+async function personalizationRequest(
+  accountId: string,
+  init: RequestInit = {},
+): Promise<ApiResult<PersonalizationProfile>> {
+  const token = pb.authStore.token;
+  const sameSession = () => !!token && pb.authStore.model?.id === accountId && pb.authStore.token === token;
+  const sessionError: ApiResult<PersonalizationProfile> = {
+    data: null, error: { code: 'UNAUTHORIZED', message: 'Your session changed. Please reopen personalization.' },
+  };
+  if (!sameSession()) return sessionError;
+  const result = await request<PersonalizationProfile>('/api/profile/personalization', {
+    ...init, headers: { ...init.headers, Authorization: `Bearer ${token}` },
+  });
+  return sameSession() ? result : sessionError;
+}
+
 export type ItemsResponse = { items: Item[]; page: number; perPage: number; totalItems: number; totalPages: number; categories: string[] };
 
 export const api = {
+  getPersonalization: (accountId: string, signal?: AbortSignal) =>
+    personalizationRequest(accountId, { signal }),
+  savePersonalization: (accountId: string, profile: PersonalizationInput) =>
+    personalizationRequest(accountId, { method: 'PUT', body: JSON.stringify(profile) }),
+  clearPersonalization: (accountId: string, revision: number) =>
+    personalizationRequest(accountId, { method: 'DELETE', body: JSON.stringify({ revision }) }),
+
   listItems: (params: { q?: string; category?: string; sort?: string; direction?: string; page?: number; perPage?: number }) => {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== "") query.set(key, String(value));

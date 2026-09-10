@@ -81,6 +81,98 @@ function streamQueue() {
 }
 const tick = () => new Promise(resolve => setImmediate(resolve));
 (async () => {
+  const profileModel = loader()('src/lib/personalization.ts');
+  const emptyProfile = { occupation: '', currentFocus: '', preferences: '', enabled: false, onboardingDismissed: false, revision: 0, updatedAt: null };
+  const savedProfile = { ...emptyProfile, occupation: 'Developer', currentFocus: 'Building Flowy', enabled: true, onboardingDismissed: true, revision: 2, updatedAt: '2026-09-10T00:00:00Z' };
+  assert.equal(profileModel.shouldInvitePersonalization(emptyProfile), true);
+  assert.equal(profileModel.shouldInvitePersonalization({ ...emptyProfile, onboardingDismissed: true }), false);
+  assert.equal(profileModel.shouldInvitePersonalization({ ...savedProfile, enabled: false, onboardingDismissed: false }), false);
+  assert.equal(profileModel.hasPersonalization({ ...emptyProfile, occupation: '  ' }), false);
+  assert.deepEqual(profileModel.normalizePersonalization({ ...profileModel.personalizationDraft(savedProfile), occupation: ' Developer ', preferences: ' Keep it concise\n' }), { occupation: 'Developer', currentFocus: 'Building Flowy', preferences: 'Keep it concise', enabled: true, onboardingDismissed: true, revision: 2 });
+  assert.match(profileModel.personalizationError({ code: 'PERSONALIZATION_CONFLICT' }), /edits are still here/);
+  assert.equal(profileModel.initialPersonalizationDraft({ ...emptyProfile, onboardingDismissed: true, revision: 1 }).enabled, true, 'returning after dismissal should offer enabled setup');
+  assert.equal(profileModel.initialPersonalizationDraft({ ...savedProfile, enabled: false }).enabled, false, 'existing paused answers stay paused');
+  for (const code of ['INVALID_PERSONALIZATION', 'BODY_TOO_LARGE', 'INVALID_BODY']) assert.match(profileModel.personalizationError({ code }), /character limits/);
+  passed('Personalization invitation respects dismissals, paused profiles and trimmed explicit answers');
+
+  const profileAuth = { token: 'token-a', model: { id: 'account-a' } };
+  const profileApi = loader({ './env': { ENV: { API_BASE_URL: 'https://fixture.invalid' } }, './pb': { pb: { authStore: profileAuth } } })('src/lib/api.ts').api;
+  const originalFetch = global.fetch;
+  const profileRequests = [];
+  let releaseProfile;
+  global.fetch = async (url, init) => {
+    profileRequests.push({ url, init });
+    return new Promise(resolve => { releaseProfile = body => resolve(new Response(JSON.stringify(body), { status: 200 })); });
+  };
+  try {
+    const wrongAccount = await profileApi.getPersonalization('account-b');
+    assert.equal(wrongAccount.error.code, 'UNAUTHORIZED');
+    assert.equal(profileRequests.length, 0);
+    const inFlight = profileApi.savePersonalization('account-a', profileModel.personalizationDraft(savedProfile));
+    assert.equal(profileRequests[0].init.headers.Authorization, 'Bearer token-a');
+    assert.deepEqual(JSON.parse(profileRequests[0].init.body), profileModel.personalizationDraft(savedProfile));
+    profileAuth.model = { id: 'account-b' }; profileAuth.token = 'token-b';
+    releaseProfile({ data: savedProfile, error: null });
+    assert.equal((await inFlight).error.code, 'UNAUTHORIZED', 'late old-session profile must be discarded');
+    const clearing = profileApi.clearPersonalization('account-b', 8);
+    assert.equal(profileRequests.at(-1).init.method, 'DELETE');
+    assert.deepEqual(JSON.parse(profileRequests.at(-1).init.body), { revision: 8 });
+    releaseProfile({ data: { ...emptyProfile, revision: 9, onboardingDismissed: true }, error: null });
+    assert.equal((await clearing).data.revision, 9);
+  } finally { global.fetch = originalFetch; }
+  passed('Personalization REST captures session, rejects cross-account results and sends CAS revisions');
+
+  const profileRunner = hookRunner();
+  let profileQuery;
+  const profileCacheWrites = [];
+  const cancelKeys = [];
+  let saveCount = 0;
+  let releaseSave;
+  const queryClient = { cancelQueries: async ({ queryKey }) => cancelKeys.push(queryKey), setQueryData: (key, data) => profileCacheWrites.push({ key, data }) };
+  const profileModule = loader({
+    react: profileRunner.react,
+    '@tanstack/react-query': { useQuery: options => { profileQuery = options; return { data: savedProfile }; }, useQueryClient: () => queryClient },
+    '@/lib/pb': { pb: { authStore: profileAuth } },
+    '@/lib/api': { api: {
+      getPersonalization: async () => ({ data: savedProfile, error: null }),
+      savePersonalization: async () => { saveCount++; return new Promise(resolve => { releaseSave = resolve; }); },
+      clearPersonalization: async () => ({ data: { ...emptyProfile, revision: 3, onboardingDismissed: true }, error: null }),
+    } },
+  })('src/hooks/usePersonalization.ts');
+  profileAuth.model = { id: 'account-a' };
+  let profileHook = profileRunner.render(() => profileModule.usePersonalization('account-a'));
+  assert.deepEqual(profileQuery.queryKey, ['personalization', 'account-a']);
+  assert.equal((await profileQuery.queryFn({ signal: new AbortController().signal })).occupation, 'Developer');
+  const firstSave = profileHook.save(profileModel.personalizationDraft(savedProfile));
+  const duplicateSave = profileHook.save(profileModel.personalizationDraft(savedProfile));
+  await tick();
+  assert.equal(saveCount, 1);
+  assert.equal(await duplicateSave, null);
+  releaseSave({ data: null, error: { code: 'PERSONALIZATION_CONFLICT', status: 409 } });
+  assert.equal(await firstSave, null);
+  profileHook = profileRunner.render(() => profileModule.usePersonalization('account-a'));
+  assert.equal(profileHook.mutationError.code, 'PERSONALIZATION_CONFLICT');
+  assert.equal(profileCacheWrites.length, 0, 'conflict cannot replace the saved profile with a draft');
+  passed('Personalization mutations prevent duplicate saves and preserve cache on revision conflict');
+  const secondSave = profileHook.save(profileModel.personalizationDraft(savedProfile));
+  await tick();
+  profileAuth.model = { id: 'account-b' };
+  profileHook = profileRunner.render(() => profileModule.usePersonalization('account-b'));
+  releaseSave({ data: savedProfile, error: null });
+  assert.equal(await secondSave, null);
+  assert.equal(profileCacheWrites.length, 0, 'late save cannot repopulate a signed-out account cache');
+  profileHook = profileRunner.render(() => profileModule.usePersonalization('account-b'));
+  assert.equal(profileHook.pending, false);
+  assert.equal(profileHook.mutationError, null);
+  assert.deepEqual(profileQuery.queryKey, ['personalization', 'account-b']);
+  await profileHook.clear(2);
+  assert.deepEqual(profileCacheWrites.at(-1).key, ['personalization', 'account-b']);
+  assert.equal(profileCacheWrites.at(-1).data.enabled, false);
+  assert.equal(profileCacheWrites.at(-1).data.onboardingDismissed, true);
+  assert.ok(cancelKeys.every(key => key[0] === 'personalization'));
+  profileRunner.close();
+  passed('Personalization account switch drops stale saves; clear publishes disabled dismissed profile');
+
   const citations = loader()('src/lib/chatCitations.ts');
   const citationItems = [
     { id: 'known', type: 'instagram', title: 'A long title', site_name: '   ', source_url: 'https://www.instagram.com/p/one' },

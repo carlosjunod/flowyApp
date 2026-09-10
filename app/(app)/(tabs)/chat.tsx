@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChatHistoryDrawer } from '@/components/chat/ChatHistoryDrawer';
+import { PersonalizationInvitation } from '@/components/personalization/PersonalizationInvitation';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { ChatWindow } from '@/components/chat/ChatWindow';
 import { Button } from '@/components/ui/Button';
@@ -18,6 +19,7 @@ export default function ChatScreen() {
   useEffect(() => { chat.setVisible(focused); return () => chat.setVisible(false); }, [focused]);
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
+      <PersonalizationInvitation />
       <View className="flex-row items-center gap-2 px-4 py-2 border-b border-border">
         <Pressable onPress={() => setHistoryOpen(true)} accessibilityRole="button" accessibilityLabel="Chat history" className="w-11 h-11 justify-center items-center">
           <Feather name="sidebar" size={20} color={colors.fg} />
