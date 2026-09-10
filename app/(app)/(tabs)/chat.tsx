@@ -27,11 +27,14 @@ export default function ChatScreen() {
           <Feather name="edit" size={20} color={colors.fg} />
         </Pressable>
       </View>
-      {chat.storageError ? <View className="px-4 py-2"><Text accessibilityRole="alert" className="text-danger text-sm">{chat.storageError}</Text><Button title={chat.ready ? 'Retry saving' : 'Retry loading'} variant="ghost" onPress={chat.retryStorage} /></View> : null}
+      {chat.storageError ? <View className="px-4 py-2"><Text accessibilityRole="alert" className="text-danger text-sm">{chat.storageError}</Text><Button title={chat.ready ? 'Retry sync' : 'Retry loading'} variant="ghost" onPress={chat.retryStorage} /></View> : null}
+      {chat.localOnly && !chat.storageError ? <View className="px-4 py-2"><Text className="text-muted text-sm">Chat sync is not available yet. New chats are saved on this device.</Text><Button title="Check sync" variant="ghost" onPress={chat.refresh} /></View> : null}
       {chat.generatingId && !chat.pending ? <View className="px-4 py-2 flex-row items-center"><Pressable className="flex-1 py-2" onPress={() => chat.select(chat.generatingId!)}><Text className="text-muted text-sm">A response is being prepared in another chat. View</Text></Pressable><Button title="Stop" variant="ghost" onPress={chat.stop} /></View> : null}
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {chat.active.before ? <Button title="Load earlier messages" variant="ghost" onPress={chat.loadOlder} /> : null}
+        {!chat.generatingId && chat.active.pending ? <Text className="px-4 py-2 text-muted text-sm">A response is being prepared on another device…</Text> : null}
         <ChatWindow key={chat.active.id} messages={chat.messages} ready={chat.ready} onPromptTap={chat.send} onRetry={chat.retry} retryDisabled={!!chat.generatingId} />
-        <ChatInput value={chat.draft} onChange={chat.setDraft} onSend={chat.send} pending={chat.pending} disabled={!chat.ready || !!chat.generatingId} onStop={chat.stop} />
+        <ChatInput value={chat.draft} onChange={chat.setDraft} onSend={chat.send} pending={chat.pending} preparing={chat.preparingId === chat.active.id} disabled={!chat.ready || !!chat.generatingId} onStop={chat.stop} />
       </KeyboardAvoidingView>
       <ChatHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)}>
           <View className="px-3 py-2 flex-row items-center justify-between">
@@ -42,7 +45,7 @@ export default function ChatScreen() {
             <Feather name="edit" size={20} color={colors.fg} /><Text className="text-fg font-medium">New chat</Text>
           </Pressable>
           <Text accessibilityRole="header" className="px-6 pb-2 text-xs text-muted font-medium">Chats</Text>
-          <FlatList className="flex-1" contentContainerStyle={{ paddingHorizontal: 12 }} data={chat.snapshot.conversations.filter(c => c.messages.length || c.draft).sort((a, b) => b.updated - a.updated)} keyExtractor={c => c.id}
+          <FlatList className="flex-1" contentContainerStyle={{ paddingHorizontal: 12 }} data={chat.snapshot.conversations.filter(c => c.messages.length || c.messageCount || c.draft).sort((a, b) => b.updated - a.updated)} keyExtractor={c => c.id}
             ListEmptyComponent={<Text className="px-3 py-4 text-sm text-muted">Your conversations will appear here.</Text>}
             renderItem={({ item }) => (
             <View className="flex-row items-center rounded-xl mb-1 pl-3" style={{ backgroundColor: item.id === chat.active.id ? colors.bg : 'transparent' }}>
@@ -50,10 +53,10 @@ export default function ChatScreen() {
                 <Text className="text-fg text-sm" numberOfLines={1}>{item.title}</Text>
                 {item.id === chat.generatingId ? <Text className="text-xs text-muted pt-1">Preparing response…</Text> : item.draft ? <Text className="text-xs text-muted pt-1">Draft</Text> : null}
               </Pressable>
-              <Pressable className="w-11 h-11 items-center justify-center" accessibilityRole="button" accessibilityLabel={`Delete conversation ${item.title}`} onPress={() => Alert.alert('Delete conversation?', 'This removes it from this device.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => chat.deleteConversation(item.id) }])}><Feather name="trash-2" size={16} color={colors.muted} /></Pressable>
+              <Pressable className="w-11 h-11 items-center justify-center" accessibilityRole="button" accessibilityLabel={`Delete conversation ${item.title}`} onPress={() => Alert.alert('Delete conversation?', 'This removes it from all your devices.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => chat.deleteConversation(item.id) }])}><Feather name="trash-2" size={16} color={colors.muted} /></Pressable>
             </View>
           )} />
-          <Text className="px-6 py-4 text-xs text-muted">Saved on this device for your account.</Text>
+          <Text className="px-6 py-4 text-xs text-muted">{chat.syncing ? 'Syncing chats…' : chat.synced ? 'Chats saved to your account. Drafts stay on this device.' : 'Local copy available. Connect to sync your chats.'}</Text>
       </ChatHistoryDrawer>
     </SafeAreaView>
   );

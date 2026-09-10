@@ -24,6 +24,7 @@ function loader(mocks = {}) {
       return require(id);
     };
     const source = ts.transpileModule(fs.readFileSync(absolute, 'utf8'), {
+      fileName: absolute,
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX },
     }).outputText;
     mod._compile(source, absolute);
@@ -157,7 +158,37 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   const runner = hookRunner();
   const streams = [];
   const writes = [];
-  const { useChatState } = loader({ react: runner.react, 'react-native': { AppState: { addEventListener: () => ({ remove() {} }) } }, '@/lib/chatStorage': { chatStorage: { read: async () => null, write: async (account, snapshot) => { writes.push({ account, snapshot }); } } }, '@/lib/api': { chatStream: () => { const stream = streamQueue(); streams.push(stream); return stream; } } })('src/hooks/useChat.ts');
+  const remoteChats = new Map();
+  const chatApi = {
+    async chatHistoryRequest(op) {
+      if (op.op === 'list') return {data:{conversations:[...remoteChats.values()].map(({messages,...c})=>c),next:null},error:null};
+      if (op.op === 'import') {
+        if (!remoteChats.has(op.conversation.id)) remoteChats.set(op.conversation.id,{...op.conversation,revision:1,messageCount:op.conversation.messages.length,pending:false,deleted:false});
+        return {data:structuredClone(remoteChats.get(op.conversation.id)),error:null};
+      }
+      const c = remoteChats.get(op.id);
+      if (!c) return {data:null,error:{code:'NOT_FOUND'}};
+      if (op.op === 'get') return {data:{conversation:{...c,messages:undefined},messages:structuredClone(c.messages),before:null},error:null};
+      if (op.op === 'stop') {c.pending=false;c.revision++;const m=c.messages.find(m=>m.id===op.requestId);if(m)m.status='stopped';}
+      if (op.op === 'delete') {c.deleted=true;c.messages=[];c.revision++;}
+      return {data:c,error:null};
+    },
+    async *chatStream(question, history, signal, digestContext, turn) {
+      const stream=streamQueue();streams.push(stream);
+      const c=remoteChats.get(turn.conversationId);
+      c.pending=true;c.revision++;
+      c.messages.push({id:turn.userMessageId,role:'user',content:question,status:'complete'});
+      const m={id:turn.requestId,role:'assistant',content:'',status:'streaming',items:[]};c.messages.push(m);c.messageCount=c.messages.length;
+      for await(const e of stream) {
+        if(signal.aborted)break;
+        if(e.type==='sources')m.items=e.citations.map(i=>({...i,source_url:i.source_url || null}));
+        if(e.type==='token')m.content+=e.value;
+        if(e.type==='done'){m.status='complete';c.pending=false;c.revision++;}
+        yield e;
+      }
+    },
+  };
+  const { useChatState } = loader({ react: runner.react, 'react-native': { AppState: { currentState:'active',addEventListener: () => ({ remove() {} }) } }, './chatStorage': { chatStorage: { read: async () => null, write: async (account, snapshot) => { writes.push({ account, snapshot }); },remove:async()=>{} } }, './api':chatApi })('src/hooks/useChat.ts');
   let chat = runner.render(() => useChatState('account-a'));
   assert.equal(chat.ready, false);
   await tick();
@@ -168,6 +199,7 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   passed('Account draft state');
   const first = chat.send('Question one');
   chat.send('Double tap');
+  await tick();
   assert.equal(streams.length, 1, 'synchronous generation guard prevents duplicate sends');
   passed('Duplicate send prevention');
   chat = runner.render(() => useChatState('account-a'));
@@ -182,7 +214,9 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   assert.equal(chat.messages[1].interrupted, true);
   passed('Stop preserves partial turn');
   assert.equal(chat.pending, false);
+  await tick();
   const second = chat.send('Question two');
+  await tick();
   streams[0].push({ type: 'token', value: 'STALE' });
   await first;
   chat = runner.render(() => useChatState('account-a'));
@@ -207,16 +241,69 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   chat = runner.render(() => useChatState('account-a'));
   assert.equal(chat.messages.at(-1).content, 'New response');
   chat.retry();
+  await tick();
   assert.equal(streams.length, 3);
   chat = runner.render(() => useChatState('account-a'));
-  assert.equal(chat.messages.filter(m => m.content === 'Question two').length, 1, 'retry replaces turn without duplicating question');
-  passed('Retry replaces only current turn');
+  assert.equal(chat.messages.filter(m => m.content === 'Question two').length, 2, 'retry appends an explicit new attempt while preserving the old answer');
+  passed('Retry preserves previous attempts in shared history');
   chat.stop();
   streams[2].finish();
   await tick();
   runner.close();
   assert.ok(writes.every(w => w.account === 'account-a'));
   passed('Unmount persistence scoped to account');
+  const originalFetch=global.fetch;
+  let sentTurn;
+  global.fetch=async(_url,init)=>{sentTurn=JSON.parse(init.body).turn;return new Response('Answer',{headers:{'x-items':JSON.stringify([{id:'source',type:'url',title:'Saved source',category:null,source_url:null,r2_key:null}])}});};
+  try {
+    const apiLoader=loader({'./env':{ENV:{API_BASE_URL:'https://fixture.test'}},'./pb':{pb:{authStore:{token:'fixture'}}}});
+    const apiModule=apiLoader('src/lib/api.ts'),events=[];
+    const turn={conversationId:'c',revision:1,requestId:'r',userMessageId:'u'};
+    for await(const event of apiModule.chatStream('Question',[],undefined,undefined,turn))events.push(event);
+    assert.deepEqual(sentTurn,turn);
+    assert.equal(events.find(e=>e.type==='sources').citations[0].title,'Saved source');
+    assert.equal(events.find(e=>e.type==='sources').citations[0].source_url,undefined);
+    passed('Native stream sends persisted turn IDs and normalizes nullable source metadata');
+    global.fetch=async()=>new Response('<html>404: route missing</html>',{status:404,headers:{'content-type':'text/html'}});
+    assert.equal((await apiModule.chatHistoryRequest({op:'list'})).error.code,'CHAT_HISTORY_UNAVAILABLE');
+    global.fetch=async()=>Response.json({error:'CHAT_DELETED'},{status:404});
+    assert.equal((await apiModule.chatHistoryRequest({op:'get',id:'deleted'})).error.code,'CHAT_DELETED');
+    global.fetch=async()=>Response.json({error:'NOT_FOUND'},{status:404});
+    assert.equal((await apiModule.chatHistoryRequest({op:'get',id:'missing'})).error.code,'NOT_FOUND');
+    passed('Native history distinguishes an undeployed route from typed missing and deleted chats');
+  } finally {global.fetch=originalFetch;}
+  const localRunner=hookRunner();
+  let localSnapshot=null;
+  const localBodies=[];
+  global.fetch=async(url,init)=>{
+    if(url.endsWith('/api/chat/history'))return new Response('<html>Not found</html>',{status:404});
+    localBodies.push(JSON.parse(init.body));
+    return new Response('Local saved answer',{headers:{'x-items':'[]'}});
+  };
+  try {
+    const {useChatState:useLocalChat}=loader({
+      react:localRunner.react,
+      'react-native':{AppState:{currentState:'active',addEventListener:()=>({remove(){}})}},
+      './env':{ENV:{API_BASE_URL:'https://fixture.test'}},
+      './pb':{pb:{authStore:{token:'fixture'}}},
+      './chatStorage':{chatStorage:{read:async()=>null,write:async(_user,value)=>{localSnapshot=structuredClone(value);},remove:async()=>{}}},
+    })('src/hooks/useChat.ts');
+    let localChat=localRunner.render(()=>useLocalChat('empty-account'));
+    await tick();
+    localChat=localRunner.render(()=>useLocalChat('empty-account'));
+    assert.equal(localChat.localOnly,true);
+    assert.equal(localChat.storageError,null);
+    await localChat.send('First new question');
+    localChat=localRunner.render(()=>useLocalChat('empty-account'));
+    assert.equal(localChat.pending,false);
+    assert.equal(localChat.messages.at(-1).content,'Local saved answer');
+    assert.equal(localSnapshot.conversations[0].messages.at(-1).content,'Local saved answer');
+    assert.equal(localBodies[0].turn,undefined);
+    assert.deepEqual(localBodies[0].history,[]);
+    await localChat.send('Follow up');
+    assert.deepEqual(localBodies[1].history,[{role:'user',content:'First new question'},{role:'assistant',content:'Local saved answer'}]);
+    passed('Empty-device chat sends through the existing endpoint and keeps local follow-up history');
+  } finally {global.fetch=originalFetch;localRunner.close();}
   const {notificationIntent}=loader()('src/lib/notificationIntent.ts');
   assert.deepEqual(notificationIntent('response',{type:'digest',digestId:'abcdefghijklmno',deliveryId:'delivery1234567'}),{key:'delivery1234567',path:'/digest/abcdefghijklmno'});
   assert.equal(notificationIntent('response',{type:'digest',digestId:'../../account'}),null);

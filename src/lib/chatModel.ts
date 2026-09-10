@@ -1,6 +1,13 @@
 import type { ChatMessage, DigestChatContext } from '../types';
 
 export type Conversation = {
+  recovery?: {requestId: string; content: string; status: 'stopped' | 'interrupted'};
+  revision?: number;
+  messageCount?: number;
+  before?: number | null;
+  loaded?: boolean;
+  pending?: boolean;
+  deleting?: boolean;
   digestContext?: DigestChatContext;
   id: string;
   title: string;
@@ -33,7 +40,7 @@ export function restoreChat(value: unknown): ChatSnapshot {
       if (!candidateMessage || typeof candidateMessage !== 'object') continue;
       const m = candidateMessage as Record<string, unknown>;
       if (typeof m.id !== 'string' || (m.role !== 'user' && m.role !== 'assistant') || typeof m.content !== 'string') continue;
-      messages.push({ id: m.id, role: m.role, content: m.content,
+      messages.push({ sequence: typeof m.sequence === 'number' ? m.sequence : undefined, historyStatus: ['preparing','streaming','complete','stopped','error','interrupted'].includes(String(m.historyStatus)) ? m.historyStatus as ChatMessage['historyStatus'] : undefined, id: m.id, role: m.role, content: m.content,
         streaming: false,
         interrupted: m.streaming === true || m.interrupted === true,
         error: typeof m.error === 'string' ? m.error : undefined,
@@ -46,7 +53,9 @@ export function restoreChat(value: unknown): ChatSnapshot {
     }
     const ctx = c.digestContext as Partial<DigestChatContext> | undefined;
     const digestContext: DigestChatContext | undefined = ctx && typeof ctx.digestId === 'string' && /^[a-z0-9]{15}$/.test(ctx.digestId) && (ctx.scope === 'digest' || ctx.scope === 'items') && (ctx.itemIds === undefined || (Array.isArray(ctx.itemIds) && ctx.itemIds.length <= 50 && ctx.itemIds.every(id => typeof id === 'string' && /^[a-z0-9]{15}$/.test(id)))) ? ctx as DigestChatContext : undefined;
-    conversations.push({ digestContext, id: c.id, title: typeof c.title === 'string' ? c.title : 'Conversation', updated: typeof c.updated === 'number' ? c.updated : Date.now(), draft: typeof c.draft === 'string' ? c.draft : '', messages });
+    const rec=c.recovery as Partial<NonNullable<Conversation['recovery']>> | undefined;
+    const recovery=rec && typeof rec.requestId==='string' && typeof rec.content==='string' && (rec.status==='stopped' || rec.status==='interrupted') ? rec as Conversation['recovery'] : undefined;
+    conversations.push({ recovery, revision: typeof c.revision === 'number' ? c.revision : undefined, messageCount: typeof c.messageCount === 'number' ? c.messageCount : undefined, before: typeof c.before === 'number' ? c.before : null, loaded: false, pending: false, deleting: c.deleting === true, digestContext, id: c.id, title: typeof c.title === 'string' ? c.title : 'Conversation', updated: typeof c.updated === 'number' ? c.updated : Date.now(), draft: typeof c.draft === 'string' ? c.draft : '', messages });
   }
   if (!conversations.length) return emptyChat();
   return { activeId: typeof raw.activeId === 'string' && ids.has(raw.activeId) ? raw.activeId : conversations[0]!.id, conversations };

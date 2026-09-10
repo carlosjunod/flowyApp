@@ -1,3 +1,4 @@
+import type { ChatTurn, HistoryOperation } from './chatContract';
 import type { DigestChatContext } from '@/types';
 import type {
   AliasData,
@@ -42,14 +43,16 @@ const jsonHeaders = (): Record<string, string> => ({
 
 type ErrorBody = { error?: string; message?: string };
 
-const parseError = async (res: Response): Promise<ApiError> => {
+const parseError = async (res: Response, historyRequest = false): Promise<ApiError> => {
   let code: ApiErrorCode = codeFromStatus(res.status);
   let message = res.statusText || 'Request failed';
   let rawBody: string | undefined;
+  let hasErrorCode = false;
   try {
     rawBody = await res.text();
     const body = (rawBody ? JSON.parse(rawBody) : {}) as ErrorBody;
-    if (body.error) {
+    if (typeof body.error === 'string' && body.error) {
+      hasErrorCode = true;
       code = (body.error as ApiErrorCode) ?? code;
       message = body.error;
     } else if (body.message) {
@@ -58,12 +61,15 @@ const parseError = async (res: Response): Promise<ApiError> => {
   } catch {
     // keep defaults
   }
+  if (historyRequest && res.status === 404 && !hasErrorCode) {
+    code = 'CHAT_HISTORY_UNAVAILABLE';
+    message = 'Chat history is not available on this server.';
+  }
   console.log('[api] error response', {
     url: res.url,
     status: res.status,
     code,
     message,
-    rawBody,
   });
   return { code, message, status: res.status };
 };
@@ -76,7 +82,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResu
       ...init,
       headers: { ...jsonHeaders(), ...(init.headers ?? {}) },
     });
-    if (!res.ok) return { data: null, error: await parseError(res) };
+    if (!res.ok) return { data: null, error: await parseError(res, path === '/api/chat/history') };
     const body = (await res.json()) as { data?: T };
     const data = (body.data ?? (body as unknown as T)) as T;
     return { data, error: null };
@@ -230,13 +236,14 @@ export async function* chatStream(
   history: { role: 'user' | 'assistant'; content: string }[],
   signal?: AbortSignal,
   digestContext?: DigestChatContext,
+  turn?: ChatTurn,
 ): AsyncGenerator<ChatStreamEvent, void, void> {
   let res: Response;
   try {
     res = await fetch(`${ENV.API_BASE_URL}/api/chat`, {
       method: 'POST',
       headers: jsonHeaders(),
-      body: JSON.stringify({ message, history, digestContext }),
+      body: JSON.stringify({ message, history, digestContext, turn }),
       signal,
     });
   } catch (err) {
@@ -260,7 +267,16 @@ export async function* chatStream(
       // Validate the shape, don't just cast it. Any syntactically valid
       // non-array (`{}`, `null`, `"x"`) would otherwise reach `.map()` in
       // ChatMessage and crash the whole conversation view.
-      const parsed: unknown = JSON.parse(header);
+      const raw: unknown = JSON.parse(header);
+      // Server metadata uses null for absent fields; native renderers use undefined.
+      const parsed: unknown = Array.isArray(raw) ? raw.map(value => {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+        const normalized = {...value} as Record<string, unknown>;
+        for (const key of ['title','category','source_url','raw_url','r2_key','og_image','site_name']) {
+          if (normalized[key] === null) delete normalized[key];
+        }
+        return normalized;
+      }) : raw;
       // Checking `id` alone is not enough: these fields are rendered straight
       // into <Text>, so an object-valued `title` or `category` throws
       // "Objects are not valid as a React child" and takes the chat down.
@@ -271,6 +287,7 @@ export async function* chatStream(
             const o = c as Record<string, unknown>;
             return (
               typeof o.id === 'string' &&
+              typeof o.type === 'string' &&
               isStringOrAbsent(o.title) &&
               isStringOrAbsent(o.category) &&
               isStringOrAbsent(o.source_url) &&
@@ -292,6 +309,7 @@ export async function* chatStream(
     return;
   }
   const decoder = new TextDecoder();
+  try {
   while (true) {
     const { value, done } = await reader.read();
     if (done) break;
@@ -301,4 +319,10 @@ export async function* chatStream(
   const tail = decoder.decode();
   if (tail) yield { type: 'token', value: tail };
   yield { type: 'done', citations };
+  } finally {
+    if (signal?.aborted) await reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
 }
+
+export const chatHistoryRequest = <T>(operation: HistoryOperation, signal?: AbortSignal): Promise<ApiResult<T>> => request<T>('/api/chat/history', {method:'POST',body:JSON.stringify(operation),signal});

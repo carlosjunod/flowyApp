@@ -44,6 +44,29 @@ npx expo run:ios
 
 For Mac Catalyst: open `ios/Tryflowy.xcworkspace`, select the Tryflowy target, and run on **My Mac (Mac Catalyst)**. `SUPPORTS_MACCATALYST=YES` is already set by the `withShareExtension` config plugin.
 
+### Physical iPhone development
+
+This project uses Expo SDK 54. Expo Go for SDK 57 cannot open it on a physical
+iPhone; use the included `expo-dev-client` development build. Connect and trust
+the iPhone, enable Developer Mode, then run `npm run ios -- --device` to build
+and install. For later JavaScript changes, run
+`npm run start -- --dev-client --lan` and open the server in the installed Flowy
+development app. Keep the phone and Mac on the same network.
+
+Give each worktree its own `node_modules` directory. Linking the entire directory
+to another checkout makes Expo resolve `expo-router/entry` outside the project,
+which can produce an invalid development bundle URL. After replacing such a
+link, restart Metro with `--clear` and reopen the development app.
+
+Signing requires development profiles for both `app.tryflowy.client` and
+`app.tryflowy.client.ShareExtension`, including their existing App Group. If
+profiles are missing, Xcode can provision the generated workspace with automatic
+signing and `-allowProvisioningUpdates`; an unregistered device also requires
+`-allowProvisioningDeviceRegistration`. Keep generated `ios/` files uncommitted.
+For a local API, use the Mac's LAN address in `.env`; `localhost` on the phone
+refers to the phone itself. Testing synchronized history also requires the paired
+server's chat-history routes and PocketBase migration.
+
 ## Project layout
 
 ```
@@ -168,3 +191,17 @@ This integration includes the September 7–8 inbox/chat/history and retrieval c
 Matching server code is integrated into sibling `Flowy/main`. Server migrations, digest configuration and `CONTENT_TEMPLATES_ENABLED` are separate rollout steps described in its `docs/digest-rollout.md` and `docs/content-templates-proposal.md`; bundling this client does not activate those services. Physical-device push, real email and AI quality evaluation remain pending.
 
 Integration validation: Expo TypeScript, all 21 UI model scenarios, iOS Metro/Hermes export, and the compiled simulator share-extension harness pass. The native share-extension target also passed a clean prebuild/build before integration; this merge retains the same native template/plugin implementation.
+
+## Cross-device chat history
+
+Conversations and messages now sync through the account's PocketBase history API;
+drafts and active selection stay on each device. Deploy the paired server's
+migration 30/history endpoint before this client. See [docs/CHAT-HISTORY.md](docs/CHAT-HISTORY.md)
+for import, offline recovery, cancellation, pagination and release validation.
+
+Chat rollout compatibility: when the configured server has not deployed the
+history route, new unsynced chats still send through the existing chat endpoint
+and remain local, with a visible notice. They sync after the route is available.
+Previously synced chats never fall back to partial local context. Missing routes
+are distinct from confirmed deletions; connecting is cancellable and bounded to
+15 seconds per history request, and generation has a labeled Stop button.

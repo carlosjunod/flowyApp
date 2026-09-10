@@ -148,6 +148,8 @@ export type CitedItem = {
 export type ChatRole = 'user' | 'assistant';
 
 export type ChatMessage = {
+  sequence?: number;
+  historyStatus?: import('../lib/chatContract').HistoryStatus;
   id: string;
   role: ChatRole;
   content: string;
@@ -162,6 +164,7 @@ export type ApiErrorCode =
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
   | 'NOT_FOUND'
+  | 'CHAT_HISTORY_UNAVAILABLE'
   | 'ITEM_NOT_FOUND'
   | 'INVALID_INPUT'
   | 'INGEST_FAILED'
