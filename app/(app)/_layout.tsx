@@ -35,6 +35,7 @@ export function AppNavigator() {
         // Reserve the edge for back; horizontal media keeps the rest of the screen.
         fullScreenGestureEnabled: false,
       }} />
+      <Stack.Screen name="personalization" />
       <Stack.Screen name="digest-settings" />
       <Stack.Screen name="inbox-alias" />
     </Stack>

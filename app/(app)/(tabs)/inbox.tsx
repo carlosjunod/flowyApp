@@ -18,6 +18,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+import { PersonalizationInvitation } from '@/components/personalization/PersonalizationInvitation';
 import { DigestInvitation } from '@/components/digest/DigestInvitation';
 import { BulkImportSheet } from '@/components/inbox/BulkImportSheet';
 import { FilterBar } from '@/components/inbox/FilterBar';
@@ -115,6 +116,7 @@ export default function InboxScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
+      <PersonalizationInvitation />
       <View className="flex-row items-center justify-between px-4 pt-2 pb-1">
         <Text
           className="text-3xl text-fg"
