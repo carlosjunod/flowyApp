@@ -11,7 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
-import { registerPushForCurrentUser } from "@/hooks/usePushRegistration";
+import { PushNotificationSettings } from "@/components/settings/PushNotificationSettings";
 import type { DigestPreferences, DigestSettings } from "@/types";
 
 export default function DigestSettingsScreen() {
@@ -345,13 +345,7 @@ export default function DigestSettingsScreen() {
                 )}
               </View>
             )}
-            <Button
-              title="Enable device notifications"
-              variant="secondary"
-              onPress={() => {
-                void registerPushForCurrentUser(true).then(setMessage);
-              }}
-            />
+            <PushNotificationSettings />
             <Button
               title="Turn off digests"
               variant="secondary"

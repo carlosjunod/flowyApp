@@ -76,10 +76,14 @@ export function savePushDevice(account: string, token: string) {
       signal: AbortSignal.timeout(10000),
     });
     if (!response.ok) throw new Error("PUSH_REGISTRATION_FAILED");
-    const value = (await response.json()) as { data: { revocation: string } };
+    const value: unknown = await response.json();
+    const data = value && typeof value === "object" && "data" in value ? value.data : null;
+    if (!data || typeof data !== "object" || !("revocation" in data) ||
+        typeof data.revocation !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(data.revocation))
+      throw new Error("INVALID_PUSH_REGISTRATION");
     await sharedSecureStore.setItem(
       CURRENT,
-      JSON.stringify({ account, token, revocation: value.data.revocation }),
+      JSON.stringify({ account, token, revocation: data.revocation }),
     );
     if (pb.authStore.model?.id !== account) await unlink();
   });

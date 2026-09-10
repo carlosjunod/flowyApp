@@ -9,10 +9,13 @@ export function notificationIntent(
   if (!data || typeof data !== "object" || !key || key.length > 200)
     return null;
   const value = data as Record<string, unknown>;
+  // Accept notifications already sent by the pre-fix worker during rollout.
+  // Unknown explicit types never fall back to item navigation.
+  const type = value.type === undefined && typeof value.itemId === "string" ? "item" : value.type;
   const id =
-    value.type === "digest"
+    type === "digest"
       ? value.digestId
-      : value.type === "item"
+      : type === "item"
         ? value.itemId
         : null;
   if (typeof id !== "string" || !/^[a-z0-9]{15}$/.test(id)) return null;
@@ -22,6 +25,6 @@ export function notificationIntent(
       /^[a-z0-9]{15}$/.test(value.deliveryId)
         ? value.deliveryId
         : key,
-    path: value.type === "digest" ? `/digest/${id}` : `/item/${id}`,
+    path: type === "digest" ? `/digest/${id}` : `/item/${id}`,
   };
 }

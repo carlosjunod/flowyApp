@@ -29,3 +29,10 @@ For macOS (Mac Catalyst): in Xcode, target → Supported Destinations → add "M
 - **Bundle identifiers**: main app `app.tryflowy.client`, share extension `app.tryflowy.client.ShareExtension`. App Group `group.app.tryflowy`.
 - **Youtube/TikTok/Instagram host classification** in share extension: hostname suffix match against `youtube.com`, `youtu.be`, `tiktok.com`, `instagram.com`.
 - **Share extension networking**: uses `URLSession` default config; sets `Authorization: Bearer <token>` header from shared keychain. Base URL baked in at build time via `Info.plist` `API_BASE_URL` entry injected by the config plugin from `process.env.EXPO_PUBLIC_API_BASE_URL`.
+
+
+## Push release gates — 2026-09-10
+
+- **BLOCKER: physical delivery and signed native build remain unverified.** Use the new build on an owned test device/account to verify foreground/background/terminated item/report receipt and taps, denied-permission settings recovery, offline retry and account switching. Model tests, generated entitlements and Metro/Hermes exports do not establish physical APNs/FCM delivery.
+- **BLOCKER: real Android Firebase configuration and FCM V1 credential are unavailable in this isolated worktree.** Provide the matching `app.tryflowy.client` Firebase file using EAS file variable `GOOGLE_SERVICES_JSON`, and configure its server-side FCM V1 credential in the existing Expo project. Do not embed a service-account private key in the client.
+- Server rollout is coordinated through `Flowy/docs/push-notifications-rollout.md`. Production digest sends stay disabled until device acceptance. This task leaves isolated commits for later merge.

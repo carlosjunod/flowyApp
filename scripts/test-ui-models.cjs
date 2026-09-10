@@ -223,6 +223,84 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   assert.equal(notificationIntent('response',{type:'external',digestId:'abcdefghijklmno',url:'https://example.test'}),null);
   assert.equal(notificationIntent('response',{type:'item',itemId:'abcdefghijklmno',url:'https://evil.test'}).path,'/item/abcdefghijklmno');
   passed('Push intents accept only typed internal IDs and dedupe by delivery');
+  assert.equal(notificationIntent('legacy',{itemId:'abcdefghijklmno'}).path,'/item/abcdefghijklmno');
+  assert.equal(notificationIntent('legacy',{itemId:'../../account'}),null);
+  assert.equal(notificationIntent('unknown',{type:'external',itemId:'abcdefghijklmno'}),null);
+  passed('Previously sent item pushes remain navigable; unknown types stay rejected');
+  const permissionCalls = [];
+  let permission = {status:'undetermined',canAskAgain:true};
+  let tokenFailure = false, saveFailure = false;
+  const pushAuth = { model:{id:'account-a'}, token:'auth-a' };
+  const pushPlatform = {OS:'android'};
+  const register = loader({
+    react: {useEffect(){}},
+    'react-native':{Platform:pushPlatform,AppState:{addEventListener:()=>({remove(){}})}},
+    'expo-constants':{easConfig:{projectId:'test-project'}},
+    '@/lib/auth':{useAuth:()=>({user:pushAuth.model})},
+    '@/lib/pb':{pb:{authStore:pushAuth}},
+    '@/lib/pushDevice':{flushPushUnlinks:async()=>{},savePushDevice:async(account,token)=>{
+      permissionCalls.push(['save',account,token]); if(saveFailure)throw Error('server private error');
+    }},
+    'expo-notifications':{
+      AndroidImportance:{DEFAULT:3},
+      setNotificationChannelAsync:async()=>{permissionCalls.push('channel');},
+      getPermissionsAsync:async()=>{permissionCalls.push('permission');return permission;},
+      requestPermissionsAsync:async()=>{permissionCalls.push('prompt');return permission={status:'granted',canAskAgain:true};},
+      getExpoPushTokenAsync:async()=>{permissionCalls.push('token');if(tokenFailure)throw Error('private APNs data');return{data:'ExpoPushToken[test]'};},
+    },
+  })('src/hooks/usePushRegistration.ts').registerPushForCurrentUser;
+  assert.equal((await register(false)).status,'permission-required');
+  assert.deepEqual(permissionCalls,['channel','permission']);
+  passed('Automatic registration never requests permission or registers an unapproved token');
+  permissionCalls.length=0;
+  assert.equal((await register(true)).status,'registered');
+  assert.deepEqual(permissionCalls,['channel','permission','prompt','token',['save','account-a','ExpoPushToken[test]']]);
+  passed('Android creates its channel before permission and persists the approved device');
+  permission={status:'denied',canAskAgain:false};permissionCalls.length=0;
+  assert.equal((await register(true)).status,'settings-required');
+  assert.deepEqual(permissionCalls,['channel','permission']);
+  passed('Denied permission points to system settings without another prompt');
+  permission={status:'granted',canAskAgain:false};saveFailure=true;
+  const failedSave=await register(true);
+  assert.equal(failedSave.status,'error');assert.ok(failedSave.message.includes('could not finish setting up'));
+  assert.ok(!failedSave.message.includes('private'));
+  passed('Server registration failure is visible and never reports success');
+  saveFailure=false;tokenFailure=true;permissionCalls.length=0;
+  assert.equal((await register(true)).status,'error');
+  assert.ok(!permissionCalls.some(call=>Array.isArray(call)));
+  passed('Token acquisition failure does not save an invalid device');
+  tokenFailure=false;pushPlatform.OS='ios';permissionCalls.length=0;
+  assert.equal((await register(false)).status,'registered');
+  assert.ok(!permissionCalls.includes('channel')&&!permissionCalls.includes('prompt'));
+  passed('Granted iOS permission refreshes registration without prompting');
+  pushAuth.model=null;permissionCalls.length=0;
+  assert.equal((await register(true)).status,'error');assert.deepEqual(permissionCalls,[]);
+  passed('Signed-out users cannot register a device');
+  const deviceStore=memoryStore(),deviceRequests=[];
+  const deviceAuth={model:{id:'account-a'},token:'auth-a'};
+  let registrationReply={data:{revocation:'r'.repeat(43)}};
+  const originalDeviceFetch=globalThis.fetch;
+  globalThis.fetch=async(url,options)=>{
+    deviceRequests.push({url,method:options.method,body:JSON.parse(options.body)});
+    return {ok:true,json:async()=>registrationReply};
+  };
+  try {
+    const device=loader({
+      './pb':{pb:{authStore:deviceAuth}},'./env':{ENV:{API_BASE_URL:'https://test.invalid'}},
+      './secureStore':{sharedSecureStore:deviceStore},
+    })('src/lib/pushDevice.ts');
+    await device.savePushDevice('account-a','ExpoPushToken[test]');
+    assert.equal(JSON.parse(deviceStore.values.get('flowy.push.device')).revocation,'r'.repeat(43));
+    registrationReply={data:{}};
+    await assert.rejects(device.savePushDevice('account-a','ExpoPushToken[test]'),/INVALID_PUSH_REGISTRATION/);
+    assert.equal(JSON.parse(deviceStore.values.get('flowy.push.device')).revocation,'r'.repeat(43));
+    passed('Registration requires a valid revocation capability and preserves the previous one on malformed replies');
+    await device.unlinkPushDevice();
+    assert.equal(deviceRequests.at(-1).method,'DELETE');
+    assert.deepEqual(deviceRequests.at(-1).body,{revocation:'r'.repeat(43)});
+    assert.equal(deviceStore.values.has('flowy.push.device'),false);
+    passed('Logout unlinks only the stored registration capability');
+  } finally { globalThis.fetch=originalDeviceFetch; }
   const {restoreChat:restoreDigestChat,newConversation:newDigestConversation}=loader()('src/lib/chatModel.ts');
   const scoped={...newDigestConversation(),digestContext:{digestId:'abcdefghijklmno',scope:'digest'}};
   assert.deepEqual(restoreDigestChat({activeId:scoped.id,conversations:[scoped]}).conversations[0].digestContext,scoped.digestContext);

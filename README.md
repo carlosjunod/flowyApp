@@ -168,3 +168,12 @@ This integration includes the September 7–8 inbox/chat/history and retrieval c
 Matching server code is integrated into sibling `Flowy/main`. Server migrations, digest configuration and `CONTENT_TEMPLATES_ENABLED` are separate rollout steps described in its `docs/digest-rollout.md` and `docs/content-templates-proposal.md`; bundling this client does not activate those services. Physical-device push, real email and AI quality evaluation remain pending.
 
 Integration validation: Expo TypeScript, all 21 UI model scenarios, iOS Metro/Hermes export, and the compiled simulator share-extension harness pass. The native share-extension target also passed a clean prebuild/build before integration; this merge retains the same native template/plugin implementation.
+
+
+## Device notifications — 2026-09-10
+
+Settings → Notifications and Digest Settings now share the device registration control. Permission is requested only after tapping Enable notifications. A denied permission offers device settings; returning refreshes registration. Registration errors remain visible and report subscription choices stay separate. Item notifications open their exact item, including older messages already delivered before the typed-payload fix.
+
+Android builds can supply `GOOGLE_SERVICES_JSON` as an EAS file environment variable pointing to the Firebase `google-services.json` for `app.tryflowy.client`. The matching FCM V1 service-account credential belongs in Expo's server-side credentials, never in the app. The `expo-notifications` plugin uses the `default` channel. This configuration change requires a fresh native build.
+
+Run `npm run typecheck`, `npm run test:ui-models`, and `npm run test:push-contract -- /absolute/path/to/Flowy` against the paired server checkout. Clean prebuild and iOS/Android Metro/Hermes exports passed in isolated worktrees. A signed build and physical push acceptance are still required; see `docs/DIGESTS.md` and server `docs/push-notifications-rollout.md` before enabling production report sends.

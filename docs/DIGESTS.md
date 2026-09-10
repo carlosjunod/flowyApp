@@ -13,7 +13,7 @@ Reports show TLDR, grounded sections, sources, original HTTP(S) links, a chat dr
 - `app/(app)/digest/index.tsx`, `app/(app)/digest/[id].tsx`, `app/(app)/digest-settings.tsx`: existing screens evolved in place.
 - `src/lib/api.ts`, `src/types/index.ts`: revisioned V2 settings, cursor history, read/feedback/events/test email and optional chat context.
 - `src/hooks/useChat.ts`, `src/lib/chatModel.ts`: scoped editable conversation state; no automatic send on CTA.
-- `src/hooks/usePushRegistration.ts`: existing-permission registration on login/foreground/token rotation; permission prompt only after explicit settings action. Uses the existing EAS project ID. Replaces the obsolete `Constants.isDevice` gate.
+- `src/hooks/usePushRegistration.ts`: existing-permission registration on login/foreground/token rotation; permission prompt only after explicit settings action; Android creates its channel first and registration returns a typed, user-visible result. Uses the existing EAS project ID. Replaces the obsolete `Constants.isDevice` gate.
 - `src/lib/pushDevice.ts`: server registration, account-safe token reassignment and secure deferred revocation. It holds an unlink-only capability, not another account credential.
 - `src/hooks/useNotificationIntent.ts`, `src/lib/notificationIntent.ts`, `app/_layout.tsx`: cold/warm notification response, validated exact digest/item path, pending login intent and consumed-response dedup. Universal links only use known tryflowy.app paths. No arbitrary push URL navigation.
 - `src/lib/auth.ts`: account query-cache isolation; logout unlinks the current device and retries a stored revocation after connectivity returns.
@@ -23,7 +23,7 @@ The server owns plan/quota/channel capability. No local boolean or incoming noti
 
 ## Mandatory device run — not executed in this task
 
-Use a physical iPhone/Android device and an explicitly authorized own test account. Expo Go/simulator or an accepted Expo ticket does not satisfy this gate. Keep server staging user allowlist active. No new native dependency or config capability was added, so a clean prebuild was not required by these changes; still build the existing development/release target with valid EAS/APNs credentials and native bundle `app.tryflowy.client` (web Apple Services ID remains `app.tryflowy.app`).
+Use a physical iPhone/Android device and an explicitly authorized own test account. Expo Go/simulator or an accepted Expo ticket does not satisfy this gate. Keep server staging user allowlist active. The September 10 push follow-up configures a default Android channel and an optional Firebase config file; a clean prebuild was performed and a new native build is required. Build the existing development/release target with valid EAS/APNs credentials and native bundle `app.tryflowy.client` (web Apple Services ID remains `app.tryflowy.app`).
 
 1. Point app API/PB configuration to the authorized staging environment. Sign in, enable weekly and save; enable device notifications explicitly, then choose push. Confirm server has the current token and a valid subscription choice.
 2. Generate a synthetic owned report through the durable staging workflow. Record run/report/delivery IDs in the private acceptance log. Distinguish provider accepted/receipt delivered from physical arrival.
@@ -37,3 +37,13 @@ Use a physical iPhone/Android device and an explicitly authorized own test accou
 Local commands: `npm run typecheck`, `npm run test:ui-models`. Server `docs/digest-rollout.md` covers configuration, model/email costs, service-stack tests, screenshots, recovery and rollback. The native model tests and web phone-width screenshots are supporting evidence, not physical push acceptance.
 
 The inbox shows a dismissible weekly invitation only after a saved item and before any explicit settings revision. `src/components/digest/DigestInvitation.tsx` never changes consent. History filters use the same server cadence/read filters as web. Push device writes and deferred logout unlinks are serialized; foreground registration refreshes the server association even when the OS token is unchanged.
+
+
+## Push follow-up — 2026-09-10
+
+- `src/components/settings/PushNotificationSettings.tsx` is shared by general Settings and this screen. It exposes existing permission, explicit enable, OS settings for permanently denied permission, registration failures and retry. Foreground refresh follows returning from OS settings. Registering a device never changes digest consent.
+- `src/lib/notificationIntent.ts` accepts both `{type:"item",itemId}` and already-delivered legacy `{itemId}` messages with valid internal IDs. Unknown explicit types and arbitrary navigation remain rejected.
+- `src/lib/pushDevice.ts` validates the server's revocation capability before saving it, preserving the last usable registration on malformed responses.
+- `app.config.ts` uses the `default` notification channel and optional build-time `GOOGLE_SERVICES_JSON` file path. Supply the real matching Android Firebase file via EAS and the FCM V1 credential in Expo before Android release.
+- Validation: 35 model/hook scenarios, typecheck, real server/native item-payload contract checks, clean prebuild on iOS/Android and both Metro/Hermes exports passed. Physical notification receipt, signed native builds and visual/accessibility acceptance are pending.
+- Paired server branch: `codex/push-notifications-fix`; deployment/rollback checklist: `Flowy/docs/push-notifications-rollout.md`. Both branches remain isolated for later merge. Digest production flags were not changed.
