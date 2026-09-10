@@ -158,6 +158,7 @@ final class ShareViewController: UIViewController {
     touch.cancelsTouchesInView = false
     touch.delaysTouchesBegan = false
     view.addGestureRecognizer(touch)
+    view.addGestureRecognizer(ShareDismissPan(state: state) { [weak self] in self?.finish() })
     NotificationCenter.default.addObserver(self, selector: #selector(holdOpen), name: UIAccessibility.voiceOverStatusDidChangeNotification, object: nil)
     NotificationCenter.default.addObserver(self, selector: #selector(holdOpen), name: UIApplication.willResignActiveNotification, object: nil)
     controller.view.backgroundColor = .clear
@@ -564,6 +565,65 @@ private final class ShareTouchObserver: UIGestureRecognizer {
   }
 }
 
+// Recognize a deliberate downward pull only after the item has been saved.
+// UIKit arbitrates with nested scroll views before cancelling their touches.
+@MainActor
+private final class ShareDismissPan: UIPanGestureRecognizer, UIGestureRecognizerDelegate {
+  private let status: StatusState
+  private let onDismiss: () -> Void
+
+  init(state: StatusState, onDismiss: @escaping () -> Void) {
+    status = state
+    self.onDismiss = onDismiss
+    super.init(target: nil, action: nil)
+    addTarget(self, action: #selector(handlePan))
+    delegate = self
+    maximumNumberOfTouches = 1
+  }
+
+  func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+    guard status.canSwipeDismiss else { return false }
+    let speed = velocity(in: view)
+    guard speed.y > abs(speed.x) else { return false }
+    var touched = view?.hitTest(location(in: view), with: nil)
+    while let current = touched, current !== view {
+      if current is UITextView || current is UITextField || current is UIControl { return false }
+      if let scroll = current as? UIScrollView,
+         scroll.contentOffset.y > -scroll.adjustedContentInset.top + 1 { return false }
+      touched = current.superview
+    }
+    return true
+  }
+
+  func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                         shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+    // A downward pull at the top belongs to dismissal. Else shouldBegin rejects
+    // this recognizer and the scroll view continues normally.
+    guard let scroll = otherGestureRecognizer.view as? UIScrollView else { return false }
+    return otherGestureRecognizer === scroll.panGestureRecognizer
+  }
+
+  static func shouldDismiss(distance: CGFloat, velocity: CGFloat) -> Bool {
+    distance >= 96 || (distance >= 28 && velocity >= 700)
+  }
+
+  @objc private func handlePan() {
+    switch state {
+    case .began, .changed:
+      status.interact()
+      status.dismissDrag = max(0, translation(in: view).y)
+    case .ended:
+      if Self.shouldDismiss(distance: max(0, translation(in: view).y), velocity: velocity(in: view).y) {
+        status.swipeDismissal = true
+        onDismiss()
+      } else { status.resetDismissDrag() }
+    case .cancelled, .failed:
+      status.resetDismissDrag()
+    default: break
+    }
+  }
+}
+
 private struct ShareAnnotations: Decodable {
   var tags: [String]? = []
   var notes: String? = ""
@@ -603,6 +663,8 @@ private final class StatusState: ObservableObject {
   @Published var stage: Stage = .confirmation
   @Published var hasInteracted = false
   @Published var isDismissing = false
+  @Published var dismissDrag: CGFloat = 0
+  var swipeDismissal = false
   @Published var remaining: Double = 1
   @Published var countingDown = false
   @Published var source = "Your shared item"
@@ -616,6 +678,16 @@ private final class StatusState: ObservableObject {
   var original = ShareAnnotations()
   var onAutoDismiss: (() -> Void)?
   private var countdown: Task<Void, Never>?
+
+  var canSwipeDismiss: Bool {
+    state == .success && stage == .confirmation && !metadataBusy && !isDismissing
+  }
+
+  func resetDismissDrag() {
+    withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .spring(response: 0.28, dampingFraction: 0.86)) {
+      dismissDrag = 0
+    }
+  }
 
   func update(_ next: State) { stopCountdown(); state = next }
 
@@ -718,6 +790,9 @@ private struct StatusView: View {
         .allowsHitTesting(false)
         .accessibilityHidden(true)
       VStack(spacing: 0) {
+        Capsule().fill(muted.opacity(0.35))
+          .frame(width: 32, height: 4).padding(.top, 8)
+          .accessibilityHidden(true)
         progressTrack
         header
         if state.stage == .confirmation {
@@ -733,13 +808,15 @@ private struct StatusView: View {
     }
     .opacity(state.isDismissing ? 0 : 1)
     .scaleEffect(state.isDismissing && !reduceMotion ? 0.985 : 1)
-    .offset(y: state.isDismissing && !reduceMotion ? 4 : 0)
-    .animation(.easeOut(duration: 0.18), value: state.isDismissing)
     .allowsHitTesting(!state.isDismissing)
     .foregroundColor(ink)
     .tint(accent)
     .buttonStyle(SharePressStyle())
     .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+    .offset(y: reduceMotion ? 0 : state.isDismissing
+      ? (state.swipeDismissal ? UIScreen.main.bounds.height : 4)
+      : state.dismissDrag)
+    .animation(.easeOut(duration: 0.18), value: state.isDismissing)
     .onAppear {
       withAnimation(.easeOut(duration: reduceMotion ? 0.18 : 0.28)) { appeared = true }
     }

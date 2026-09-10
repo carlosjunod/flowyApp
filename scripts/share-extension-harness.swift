@@ -140,6 +140,26 @@ private extension ShareViewController {
   stable.interact()
   stable.stage = .tags
   check(stable.successTitle == chosenPhrase, "The phrase must stay fixed while interacting")
+  let swipe = StatusState()
+  check(!swipe.canSwipeDismiss, "Never swipe-dismiss an upload")
+  swipe.update(.success)
+  check(swipe.canSwipeDismiss, "Saved confirmation supports manual dismissal")
+  swipe.interact()
+  check(swipe.canSwipeDismiss, "Interaction cancels the timer, not manual dismissal")
+  swipe.stage = .notes
+  check(!swipe.canSwipeDismiss, "Swiping must not discard a note draft")
+  swipe.stage = .tags
+  check(!swipe.canSwipeDismiss, "Swiping must not discard a tag draft")
+  swipe.stage = .confirmation
+  swipe.metadataBusy = true
+  check(!swipe.canSwipeDismiss, "Do not dismiss during annotation writes")
+  check(!ShareDismissPan.shouldDismiss(distance: 20, velocity: 1500), "Tiny fast motions are not a dismissal")
+  check(!ShareDismissPan.shouldDismiss(distance: 70, velocity: 100), "Short pulls return to their starting position")
+  check(ShareDismissPan.shouldDismiss(distance: 110, velocity: 0), "A deliberate long pull dismisses")
+  check(ShareDismissPan.shouldDismiss(distance: 35, velocity: 800), "A deliberate downward flick dismisses")
+  swipe.dismissDrag = 55
+  swipe.resetDismissDrag()
+  check(swipe.dismissDrag == 0, "Cancelled pulls reset their translation")
   let touched = StatusState()
   touched.interact() // includes touches while the initial upload is running
   touched.update(.success)
@@ -188,7 +208,7 @@ private extension ShareViewController {
   try await Task.sleep(nanoseconds: 250_000_000)
   check(completions == 1, "Dismissal must complete exactly once")
   let result = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("share-checks.txt")
-  try "PASS: missing/expired authentication, annotation auth failure, server failure distinction, random non-repeating copy, stable copy, dismissal, countdown, touch cancellation, tag limits, ingest receipt, metadata merge, notes, failure draft, retry, unchanged save\n".write(to: result, atomically: true, encoding: .utf8)
+  try "PASS: swipe eligibility, distance/velocity thresholds, cancelled pull reset, missing/expired authentication, annotation auth failure, server failure distinction, random non-repeating copy, stable copy, dismissal, countdown, touch cancellation, tag limits, ingest receipt, metadata merge, notes, failure draft, retry, unchanged save\n".write(to: result, atomically: true, encoding: .utf8)
 }
 
 @main final class ShareHarnessApp: UIResponder, UIApplicationDelegate {
@@ -219,6 +239,7 @@ private extension ShareViewController {
     touch.cancelsTouchesInView = false
     touch.delaysTouchesBegan = false
     host.view.addGestureRecognizer(touch)
+    host.view.addGestureRecognizer(ShareDismissPan(state: state) { [weak self] in self?.close() })
     let window = UIWindow(frame: UIScreen.main.bounds)
     window.rootViewController = host
     self.window = window
