@@ -1,23 +1,38 @@
 import { Feather } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChatHistoryDrawer } from '@/components/chat/ChatHistoryDrawer';
+import { PersonalizationInvitation } from '@/components/personalization/PersonalizationInvitation';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { ChatWindow } from '@/components/chat/ChatWindow';
 import { Button } from '@/components/ui/Button';
 import { useChat } from '@/hooks/useChat';
+import { useChatReveal } from '@/hooks/useChatReveal';
+import { useChatMotion } from '@/hooks/useChatMotion';
 import { useResolvedColors } from '@/lib/theme';
 
 export default function ChatScreen() {
   const chat = useChat();
   const colors = useResolvedColors();
   const focused = useIsFocused();
+  const motion = useChatMotion();
+  const last = chat.messages[chat.messages.length - 1];
+  const reveal = useChatReveal({
+    id: `${chat.active.id}:${last?.id}`, content: last?.content ?? '',
+    active: Boolean(last?.streaming), enabled: focused && motion && last?.role === 'assistant',
+    cancelled: Boolean(last?.error || last?.interrupted),
+  });
+  const messages = useMemo(() => chat.messages.map(message => message === last && message.role === 'assistant'
+    ? { ...message, content: reveal.content, streaming: Boolean(message.streaming || reveal.revealing) } : message),
+    [chat.messages, last, reveal.content, reveal.revealing]);
+  const stop = () => { reveal.finish(); chat.stop(); };
   const [historyOpen, setHistoryOpen] = useState(false);
   useEffect(() => { chat.setVisible(focused); return () => chat.setVisible(false); }, [focused]);
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
+      <PersonalizationInvitation />
       <View className="flex-row items-center gap-2 px-4 py-2 border-b border-border">
         <Pressable onPress={() => setHistoryOpen(true)} accessibilityRole="button" accessibilityLabel="Chat history" className="w-11 h-11 justify-center items-center">
           <Feather name="sidebar" size={20} color={colors.fg} />
@@ -33,8 +48,8 @@ export default function ChatScreen() {
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {chat.active.before ? <Button title="Load earlier messages" variant="ghost" onPress={chat.loadOlder} /> : null}
         {!chat.generatingId && chat.active.pending ? <Text className="px-4 py-2 text-muted text-sm">A response is being prepared on another device…</Text> : null}
-        <ChatWindow key={chat.active.id} messages={chat.messages} ready={chat.ready} onPromptTap={chat.send} onRetry={chat.retry} retryDisabled={!!chat.generatingId} />
-        <ChatInput value={chat.draft} onChange={chat.setDraft} onSend={chat.send} pending={chat.pending} preparing={chat.preparingId === chat.active.id} disabled={!chat.ready || !!chat.generatingId} onStop={chat.stop} />
+        <ChatWindow key={chat.active.id} messages={messages} ready={chat.ready} onPromptTap={chat.send} onRetry={chat.retry} retryDisabled={!!chat.generatingId || reveal.revealing} />
+        <ChatInput value={chat.draft} onChange={chat.setDraft} onSend={chat.send} pending={chat.pending || reveal.revealing} preparing={chat.preparingId === chat.active.id} disabled={!chat.ready || !!chat.generatingId} onStop={stop} />
       </KeyboardAvoidingView>
       <ChatHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)}>
           <View className="px-3 py-2 flex-row items-center justify-between">

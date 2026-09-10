@@ -160,6 +160,10 @@ export type ChatMessage = {
 };
 
 export type ApiErrorCode =
+  | 'INVALID_PERSONALIZATION'
+  | 'BODY_TOO_LARGE'
+  | 'INVALID_BODY'
+  | 'PERSONALIZATION_CONFLICT'
   | 'NETWORK_ERROR'
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
@@ -302,3 +306,5 @@ export type BulkActionResult = {
 export type BulkActionPayload = { ids: string[] };
 
 export type DigestChatContext = {digestId: string; scope: "digest" | "items"; itemIds?: string[]};
+
+export * from './personalization';

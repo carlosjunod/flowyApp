@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { useResolvedColors } from '@/lib/theme';
@@ -32,12 +32,17 @@ export const ChatWindow: React.FC<Props> = ({ messages, onPromptTap, ready, onRe
   const ref = useRef<FlatList<ChatMessageType>>(null);
   const following = useRef(true);
   const [showLatest, setShowLatest] = useState(false);
+  const latestUserId = [...messages].reverse().find(message => message.role === 'user')?.id;
+  useEffect(() => { following.current = true; setShowLatest(false); }, [latestUserId]);
+  const follow = () => { if (following.current) ref.current?.scrollToEnd({ animated: false }); else setShowLatest(true); };
   if (!ready) return <View className="flex-1 items-center justify-center"><Spinner /><Text className="text-muted pt-3">Loading conversations…</Text></View>;
   if (messages.length === 0) return <WelcomeState onPromptTap={onPromptTap} />;
   return (
     <View className="flex-1">
       <FlatList ref={ref} data={messages} keyExtractor={m => m.id}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        onLayout={follow}
         onScrollBeginDrag={() => { following.current = false; }}
         onScroll={event => {
           const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
@@ -45,10 +50,15 @@ export const ChatWindow: React.FC<Props> = ({ messages, onPromptTap, ready, onRe
           following.current = nearEnd;
           setShowLatest(!nearEnd);
         }} scrollEventThrottle={100}
-        onContentSizeChange={() => { if (following.current) ref.current?.scrollToEnd({ animated: false }); else setShowLatest(true); }}
+        onContentSizeChange={follow}
         renderItem={({ item, index }) => <ChatMessage message={item} onRetry={index === messages.length - 1 ? onRetry : undefined} retryDisabled={retryDisabled} />}
         contentContainerStyle={{ paddingVertical: 8 }} />
-      {showLatest ? <Pressable accessibilityRole="button" onPress={() => { following.current = true; setShowLatest(false); ref.current?.scrollToEnd({ animated: false }); }} className="self-center rounded-full bg-primary px-4 py-3 mb-2"><View className="flex-row items-center gap-2"><Text className="text-bg">Latest response</Text><Feather name="arrow-down" size={16} color={colors.bg} /></View></Pressable> : null}
+      {showLatest ? <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, bottom: 12, alignItems: 'center', backgroundColor: 'transparent' }}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Go to latest" onPress={() => { following.current = true; setShowLatest(false); ref.current?.scrollToEnd({ animated: false }); }}
+          style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? colors.surface : colors.card, borderWidth: 1, borderColor: colors.border, shadowColor: colors.fg, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3 })}>
+          <Feather name="arrow-down" size={20} color={colors.fg} accessible={false} />
+        </Pressable>
+      </View> : null}
     </View>
   );
 };

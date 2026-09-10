@@ -7,6 +7,7 @@ Users save URLs, screenshots, and short videos from the iOS/macOS share sheet; a
 ## Features
 
 - **Inbox** — compact list by default, optional visual grid, global debounced search/category facets through `GET /api/items`, newest-first pagination, separate network/empty/processing/error states, accessible selection, and PocketBase realtime invalidation
+- **Personalization** — optional profile shared with the web app: work, current focus and preferences; edit, pause or clear from Settings, with an orange full-width interview reminder above Inbox and Chat. The server uses enabled answers in future chats. See [docs/PERSONALIZATION.md](docs/PERSONALIZATION.md).
 - **Chat** — streaming responses with inline `[[itemId]]` citations and expandable sources, account-scoped on-device conversation history and drafts, new/open/delete conversation, stop/retry/copy, and reader-controlled scrolling. A provider above the tabs retains work while navigating inside the app.
 - **Item detail** — title-first hierarchy, compact expandable media, original-source access, readable receipt rows/totals, secondary analysis/tags disclosure, contextual actions and keyboard-safe editing
 - **Native share extension** — iOS + Mac Catalyst, accepts URL / image / text, reads auth token from shared App Group keychain, POSTs to `/api/ingest`
@@ -107,6 +108,7 @@ This client talks to an existing backend — endpoints are hit as documented in 
 - `GET /api/items?q=&category=&sort=date&direction=desc&page=1&perPage=20` for the inbox. It returns `{data:{items,page,perPage,totalItems,totalPages,categories},error:null}`. Categories are normalized (`tech` → `technology`); search/facets cover the complete account library.
 - `pb.collection('items').subscribe(id, cb)` for realtime status updates
 - `POST /api/ingest` for share-extension uploads (`{type, raw_url, raw_image}`)
+- `GET/PUT/DELETE /api/profile/personalization` for the explicit account profile, with revision-checked writes and clear. See `docs/PERSONALIZATION.md`.
 - `POST /api/chat` streams plain text; `x-items` response header carries JSON citations
 - `PATCH /api/items/:id` and `DELETE /api/items/:id`
 
@@ -192,11 +194,27 @@ Matching server code is integrated into sibling `Flowy/main`. Server migrations,
 
 Integration validation: Expo TypeScript, all 21 UI model scenarios, iOS Metro/Hermes export, and the compiled simulator share-extension harness pass. The native share-extension target also passed a clean prebuild/build before integration; this merge retains the same native template/plugin implementation.
 
+
+### Chat presentation (2026-09-10)
+
+New responses reveal in short word groups with at most one second of presentation
+catch-up after receipt completes. `src/hooks/useChatReveal.ts` mirrors the web
+hook; storage and subsequent requests always use the original received text.
+Restored conversations show immediately. Stop/error, leaving the screen,
+backgrounding, Reduce Motion and screen readers flush the presentation queue.
+`src/hooks/useChatMotion.ts` observes native accessibility and app state.
+Flowy uses a small branded avatar and unboxed answers; questions retain a soft
+bubble. The 44pt latest-message arrow overlays the list without reserving a row,
+and follows the composer when the keyboard changes the available height.
+The integrated send/stop control is orange when enabled and neutral when empty.
+`themeColors.chatSend` / `onChatSend` preserve contrast without changing the
+light theme's existing text/link accent. No preview-only replay control ships.
+
 ## Cross-device chat history
 
 Conversations and messages now sync through the account's PocketBase history API;
 drafts and active selection stay on each device. Deploy the paired server's
-migration 30/history endpoint before this client. See [docs/CHAT-HISTORY.md](docs/CHAT-HISTORY.md)
+migration 31/history endpoint before this client. See [docs/CHAT-HISTORY.md](docs/CHAT-HISTORY.md)
 for import, offline recovery, cancellation, pagination and release validation.
 
 Chat rollout compatibility: when the configured server has not deployed the

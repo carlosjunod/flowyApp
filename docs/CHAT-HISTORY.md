@@ -4,7 +4,7 @@ Implemented on `codex/chat-history-sync`, alongside the server worktree. Deploym
 
 Chat history now belongs to the account in PocketBase. `src/hooks/useChatEngine.ts` is the exact portable engine from server `apps/web/lib/chat/useChatEngine.ts` (only its contract import differs). `src/lib/chatContract.ts` mirrors the wire types. `src/lib/chatSync.ts` converts native message/source/storage shapes and connects the engine to `src/lib/api.ts` and the existing account-scoped, atomic SecureStore chunks.
 
-The server must deploy PB migration 30/hooks and `/api/chat/history` before this client ships. No native capabilities, dependencies, Apple identifiers or environment variables changed.
+The server must deploy PB migration 31/hooks and `/api/chat/history` before this client ships. No native capabilities, dependencies, Apple identifiers or environment variables changed.
 
 - Foreground/chat focus and 15-second active-app polling refresh history. New-device selection and drafts remain local.
 - Old local messages import by conversation/message ID; repeated imports preserve server messages and append only unseen IDs. Oversized/invalid local chats remain available with an import error, while other chats can sync.
@@ -58,3 +58,8 @@ local history against an undeployed history endpoint, local response persistence
 and a follow-up carrying prior messages. Shared lifecycle/API suites pass 64
 cases, plus 24 chat-adapter cases. Native/web TypeScript pass. Corrected JavaScript
 was reloaded on the phone; live AI-answer interaction still requires a device check.
+
+Main integration (2026-09-10): preserves personalization and progressive chat
+presentation. The history migration is 31 (30 already belongs to personalization).
+All 32 combined native scenarios, native TypeScript and iOS Hermes export pass;
+paired server validation passes 100 targeted cases and real PB/two-browser checks.

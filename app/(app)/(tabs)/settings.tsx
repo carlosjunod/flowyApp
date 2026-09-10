@@ -46,6 +46,18 @@ export default function SettingsScreen() {
           <DeleteAccountSection />
         </Section>
 
+        <Section title="Personalization">
+          <Link href="/personalization" asChild>
+            <Pressable accessibilityRole="link" className="rounded-xl border border-border bg-card px-4 py-3 flex-row items-center gap-3">
+              <View className="flex-1">
+                <Text className="text-base text-fg">What Flowy knows about you</Text>
+                <Text className="text-xs text-muted mt-1">Your work, goals, and preferences for better answers.</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={colors.muted} />
+            </Pressable>
+          </Link>
+        </Section>
+
         <Section title="Appearance">
           <View className="rounded-xl border border-border bg-card p-1 flex-row">
             {THEME_OPTIONS.map((opt) => {
