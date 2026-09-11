@@ -33,7 +33,7 @@ export function InlineItemChip({ item, id, index }: { item?: CitedItem; id: stri
       accessibilityRole="link"
       accessibilityLabel={`Open source ${index ?? ''}: ${item?.title?.trim() || 'Saved source'}`}
       suppressHighlighting={false}
-      style={{ fontFamily: 'Inter_600SemiBold', fontSize: 12, color: colors.fg, backgroundColor: colors.surface }}
+      style={{ fontFamily: 'Inter_600SemiBold', fontSize: 12, color: colors.accent, backgroundColor: colors.surface }}
     >
       {`\u00a0[${index ?? '?'}]\u00a0`}
     </Text>
