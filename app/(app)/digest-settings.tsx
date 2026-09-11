@@ -235,7 +235,7 @@ export default function DigestSettingsScreen() {
           </Pressable>
           {view && (
             <Text className="text-xs font-semibold text-muted uppercase tracking-widest flex-shrink text-right">
-              {view.effectivePlan || "Your plan"} ·{" "}
+              {view.betaAccessEndsAt ? "Beta Pro" : view.effectivePlan || "Your plan"} ·{" "}
               {view.canEnableDaily ? "Daily + weekly" : "Weekly"}
             </Text>
           )}

@@ -4,6 +4,18 @@ Server: sibling Flowy, integration branch `codex/digest-pricing-integration`. Mi
 
 ## Use
 
+### Complimentary Beta Pro (2026-09-11)
+
+The matching server can grant Pro based on the account creation date. Digest
+settings optionally return `betaAccessEndsAt`; `src/types/index.ts` accepts it
+and `app/(app)/digest-settings.tsx` shows Beta Pro. The server's effective plan
+and daily/weekly permissions remain authoritative. Older servers omit the field.
+Default access includes all of October 30, 2026 in Bogotá. Dates and the disable
+switch live only on PocketBase (`BETA_PRO_STARTS_AT`, `BETA_PRO_ENDS_AT`,
+`BETA_PRO_ENABLED`); no Expo environment change or special signup is needed.
+Expiry restores the underlying paid plan or Free and does not start billing.
+This covers eligible registrations across clients, without verifying TestFlight.
+
 Open Digests → Settings. Choose weekly (Free, maximum one/ISO week) or optional daily (Starter/Plus/Pro, maximum one/local day total). Paid users may choose both; weekly replaces daily on its publication day. Pick local publication time, weekly day, IANA timezone, English/Spanish and independent push/email channels. The content period ends at local midnight: yesterday or the previous seven complete local days. Device timezone is an explicit suggestion, not a silent travel update. Pause/resume/off preserve report history. Exclusions default to receipts, emails and private notes. Preview reuses a published report or labels a fictional example; test email is explicit and limited to one/hour and three/UTC day.
 
 Reports show TLDR, grounded sections, sources, original HTTP(S) links, a chat draft and replaceable useful/not-useful/not-interested feedback. Chat stays within owned report sources through either server retrieval mode. A report removed after source deletion shows a safe tombstone. Fetching a report does not count as reading: the focused, active screen records the first visible render. History is paginated and keyed by account.

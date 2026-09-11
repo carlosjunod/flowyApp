@@ -285,6 +285,7 @@ export type DigestPreferences = {
 export type DigestSettings = {
   version?: 2; revision?: number; settings?: DigestPreferences;
   canEnableDaily?: boolean; effectivePlan?: string; quotaResetsAt?: string;
+  betaAccessEndsAt?: string;
   capabilities?: { enabled: boolean; push: boolean; email: boolean };
   emailAddress?:string; emailSuppressed?:boolean; reportQuota?:{used:number;limit:number;window:string};
   emailVerified?: boolean; hasPushDevice?: boolean;
