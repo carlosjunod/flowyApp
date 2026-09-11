@@ -17,6 +17,7 @@ export type HistoryDigest = {
   digestId: string;
   scope: 'digest' | 'items';
   itemIds?: string[];
+  selectedText?: string;
 };
 export type HistoryMessage = {
   id: string;

@@ -13,6 +13,8 @@ const R2_PUBLIC_URL =
   process.env.EXPO_PUBLIC_R2_PUBLIC_URL || 'https://files.tryflowy.app';
 
 export const ENV = {
+  GOOGLE_IOS_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim() ?? '',
+  GOOGLE_WEB_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() ?? '',
   API_BASE_URL,
   PB_URL,
   R2_PUBLIC_URL,

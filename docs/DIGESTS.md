@@ -16,9 +16,32 @@ switch live only on PocketBase (`BETA_PRO_STARTS_AT`, `BETA_PRO_ENDS_AT`,
 Expiry restores the underlying paid plan or Free and does not start billing.
 This covers eligible registrations across clients, without verifying TestFlight.
 
+### Monthly allowance — v1.0 enforcement, server rollout pending (2026-09-11)
+
+The matching server branch `codex/billing-enforcement` enforces Free 1 / Starter 4 /
+Plus 8 / Pro 30 digests per calendar UTC month, including annual plans. The shorter
+weekly/daily rules below remain cadence guards; they do not increase the monthly
+allowance. Settings optionally return `monthlyReportQuota` with `limit`, `used`,
+`reserved`, `remaining`, `window: 'calendar_month_utc'`, `startsAt`, and `resetsAt`.
+`src/types/index.ts` and `app/(app)/digest-settings.tsx` show the server-owned count,
+pending reservations and local reset date; old servers without that field remain
+supported. Full quota does not disable preference edits or saved-item access.
+Deleting reports or upgrading/downgrading never resets monthly use.
+
+Deploy server migration 34 and matching hooks/web/worker before expecting the
+counter. Native TypeScript validation is supporting evidence, not an iOS/Android
+device acceptance run. The soft release v1.0 is iOS + Android + webapp; email-in
+and macOS sharing remain Coming soon for v1.1 after the soft release.
+
 Open Digests → Settings. Choose weekly (Free, maximum one/ISO week) or optional daily (Starter/Plus/Pro, maximum one/local day total). Paid users may choose both; weekly replaces daily on its publication day. Pick local publication time, weekly day, IANA timezone, English/Spanish and independent push/email channels. The content period ends at local midnight: yesterday or the previous seven complete local days. Device timezone is an explicit suggestion, not a silent travel update. Pause/resume/off preserve report history. Exclusions default to receipts, emails and private notes. Preview reuses a published report or labels a fictional example; test email is explicit and limited to one/hour and three/UTC day.
 
 Reports show TLDR, grounded sections, sources, original HTTP(S) links, a chat draft and replaceable useful/not-useful/not-interested feedback. Chat stays within owned report sources through either server retrieval mode. A report removed after source deletion shows a safe tombstone. Fetching a report does not count as reading: the focused, active screen records the first visible render. History is paginated and keyed by account.
+
+The chat request carries its digest scope with the durable turn. The server validates the owned report, uses its published TLDR/body as bounded untrusted context, and restricts citations to the report’s owned source items. For “Ask about this” on a block, it also carries that block’s exact text as bounded untrusted context, so the generic chat draft remains tied to the selected idea instead of attempting an unrelated library search.
+
+## Detail-screen interaction refinement — 2026-09-11
+
+The report detail keeps highlight actions on one horizontal row: the primary **Ask about this** action and a 44×44pt eye-off control that hides that highlight with an accessible label and undo path. This applies to every rendered report cadence without changing the scoped chat or feedback APIs. Source rows now provide a 48pt favicon when the original HTTP(S) host is known, a document-icon fallback when it is not, a readable two-line saved-item title, host label, and a separate 44pt external-link target. The row remains useful when a source has no preview image or original URL.
 
 ## Native files and boundaries
 
@@ -106,3 +129,5 @@ Review used `emil-design-eng`; the design assessment remains **9.2/10**. Native 
 ## Push follow-up — 2026-09-11
 
 `PushNotificationSettings` is shared by general Settings and this screen. It keeps permission, registration and digest consent separate, supports settings/retry recovery, and accepts typed plus already-delivered legacy item payloads. EAS supplies the matching Firebase configuration and FCM V1 credential. iOS and Android owned-device registration, provider receipts and visible arrival passed; exact notification taps and broader accessibility acceptance remain release gates.
+
+Integration note (2026-09-11): this native source merge includes the optional monthly quota UI and selected-block `selectedText` payload. Their additional server implementations remain on `codex/billing-enforcement` and `codex/digest-pricing-integration`, respectively; merging the current native workspace does not merge those separate server branches.

@@ -81,6 +81,23 @@ function streamQueue() {
 }
 const tick = () => new Promise(resolve => setImmediate(resolve));
 (async () => {
+  const shared = loader()('src/lib/shareIntent.ts');
+  assert.equal(shared.base64FromArrayBuffer(Uint8Array.from([77, 97, 110]).buffer), 'TWFu');
+  assert.equal(shared.base64FromArrayBuffer(Uint8Array.from([77]).buffer), 'TQ==');
+  const encodedFiles = [];
+  const readShared = async file => {
+    encodedFiles.push(file.fileName);
+    return `base64:${file.fileName}`;
+  };
+  const sharedUrl = await shared.payloadFromShareIntent({ files: null, text: 'Read https://youtu.be/demo' }, readShared);
+  assert.deepEqual(sharedUrl, { type: 'youtube', raw_url: 'https://youtu.be/demo' });
+  const sharedPdf = await shared.payloadFromShareIntent({ files: [{ fileName: 'one.pdf', mimeType: 'application/pdf', path: 'file:///one.pdf' }], text: null, webUrl: null, type: 'file' }, readShared);
+  assert.deepEqual(sharedPdf, { type: 'pdf', raw_pdf: { name: 'one.pdf', mime: 'application/pdf', data: 'base64:one.pdf' } });
+  const sharedImages = await shared.payloadFromShareIntent({ files: [{ fileName: 'one.jpg', mimeType: 'image/jpeg', path: 'file:///one.jpg' }, { fileName: 'two.png', mimeType: 'image/png', path: 'file:///two.png' }], text: null, webUrl: null, type: 'media' }, readShared);
+  assert.deepEqual(sharedImages, { type: 'screenshot', raw_images: ['base64:one.jpg', 'base64:two.png'] });
+  assert.deepEqual(encodedFiles, ['one.pdf', 'one.jpg', 'two.png']);
+  passed('Android share intent selects URL, PDF and multi-image payloads compatible with ingest');
+
   const adaptive = loader()('src/lib/adaptiveLayout.ts');
   for (const [width, height, split, columns] of [[390,844,false,1], [768,1024,false,2], [834,1194,false,2], [1024,768,true,1], [1194,834,true,1], [1366,1024,true,1], [600,500,false,1], [744,1133,false,2]]) {
     const layout = adaptive.adaptiveLayout(width, height);

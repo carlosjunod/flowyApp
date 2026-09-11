@@ -1,8 +1,8 @@
 # Tryflowy — React Native client
 
-Universal AI-powered inbox client for iOS and macOS (Mac Catalyst). Built with Expo bare workflow + TypeScript strict + nativewind.
+Universal AI-powered inbox client for iOS, Android and macOS (Mac Catalyst). Built with Expo bare workflow + TypeScript strict + nativewind.
 
-Users save URLs, screenshots, and short videos from the iOS/macOS share sheet; a separate backend processes them with Claude; this app presents the inbox and a natural-language chat over it.
+Users save URLs, screenshots, short videos, PDFs and files from the iOS/macOS share sheet or Android's system share menu; a separate backend processes them with Claude; this app presents the inbox and a natural-language chat over it.
 
 ## Features
 
@@ -10,7 +10,7 @@ Users save URLs, screenshots, and short videos from the iOS/macOS share sheet; a
 - **Personalization** — optional profile shared with the web app: work, current focus and preferences; edit, pause or clear from Settings, with an orange full-width interview reminder above Inbox and Chat. The server uses enabled answers in future chats. See [docs/PERSONALIZATION.md](docs/PERSONALIZATION.md).
 - **Chat** — streaming responses with inline `[[itemId]]` citations and expandable sources, account-scoped on-device conversation history and drafts, new/open/delete conversation, stop/retry/copy, and reader-controlled scrolling. A provider above the tabs retains work while navigating inside the app.
 - **Item detail** — title-first hierarchy, compact expandable media, original-source access, readable receipt rows/totals, secondary analysis/tags disclosure, contextual actions and keyboard-safe editing
-- **Native share extension** — iOS + Mac Catalyst, accepts URL / image / text, reads auth token from shared App Group keychain, POSTs to `/api/ingest`
+- **Native sharing** — iOS + Mac Catalyst uses a native share extension; Android receives `ACTION_SEND` / `ACTION_SEND_MULTIPLE`. Both accept links, images, videos, PDFs and files and send authenticated payloads to `/api/ingest`.
 - Auth via PocketBase email/password, token persisted to shared Keychain so the extension can read it
 
 ## Responsive layout
@@ -46,6 +46,15 @@ npx expo prebuild --platform ios --clean
 cd ios && pod install && cd ..
 npx expo run:ios
 ```
+
+### Android sharing
+
+Android sharing requires a development or release build; Expo Go cannot load the
+native intent receiver. After installing dependencies, generate and run the
+native project with `npx expo prebuild --platform android --clean` followed by
+`npm run android`. Share a link, image, video, PDF or file from another app and
+select **Flowy**. The app opens and queues the item once the signed-in session
+has hydrated.
 
 For Mac Catalyst: open `ios/Tryflowy.xcworkspace`, select the Tryflowy target, and run on **My Mac (Mac Catalyst)**. `SUPPORTS_MACCATALYST=YES` is already set by the `withShareExtension` config plugin.
 
@@ -231,3 +240,7 @@ are distinct from confirmed deletions; connecting is cancellable and bounded to
 ## Device notifications
 
 Settings and Digest Settings share explicit device-notification registration. iOS and Android registration, provider receipts and visible arrival passed on owned devices; notification tap routing remains a release gate. Firebase configuration is supplied by EAS and is never committed to the app.
+
+## Google Sign-In on iOS — 2026-09-11
+
+Native Google login/signup now uses the existing Flowy server and shared session. New accounts require explicit AI-processing consent before creation. See [iOS Google setup and validation](docs/GOOGLE_SIGN_IN_IOS.md) for the two public OAuth IDs, EAS environments, rebuild requirement and device checks. Run `npm run test:google-auth` and `npm run typecheck`. Android Google implementation is deferred.

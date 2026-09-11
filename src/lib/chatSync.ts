@@ -80,8 +80,8 @@ export const nativeChatAdapters: ChatAdapters = {
     if (result.error) throw new Error(result.error.code);
     return result.data;
   },
-  stream: async (text, turn, signal, patch) => {
-    await streamResponse(text, [], undefined, turn, signal, patch);
+  stream: async (text, turn, signal, patch, digestContext) => {
+    await streamResponse(text, [], digestContext, turn, signal, patch);
   },
   streamLocal: async (text, conversation, signal, patch) => {
     const history = conversation.messages

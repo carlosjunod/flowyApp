@@ -272,6 +272,22 @@ export default function DigestSettingsScreen() {
               A few ideas worth keeping. Choose your rhythm, then save your
               choices.
             </Text>
+            {view?.monthlyReportQuota && (
+              <View className="mt-3 gap-1">
+                <Text className="font-sans text-sm text-fg">
+                  {view.monthlyReportQuota.used} of {view.monthlyReportQuota.limit} digests used this month
+                  {view.monthlyReportQuota.reserved > 0 ? ` · ${view.monthlyReportQuota.reserved} preparing` : ''}
+                </Text>
+                <Text className="font-sans text-xs text-muted">
+                  Resets {new Date(view.monthlyReportQuota.resetsAt).toLocaleString()}
+                </Text>
+                {view.monthlyReportQuota.remaining === 0 && (
+                  <Text accessibilityRole="alert" className="font-sans text-sm text-muted">
+                    Your monthly allowance is allocated. New digests resume next month, or when more allowance becomes available. Your saved items remain available.
+                  </Text>
+                )}
+              </View>
+            )}
           </View>
           {loading ? (
             <View className="py-12 items-center gap-3">

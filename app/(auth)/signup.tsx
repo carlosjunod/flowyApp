@@ -5,12 +5,14 @@ import {
   Linking,
   Platform,
   Pressable,
+  ScrollView,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GoogleSignIn } from '@/components/auth/GoogleSignIn';
 import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -36,11 +38,13 @@ export default function SignupScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [googleBusy, setGoogleBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aiConsent, setAiConsent] = useState(false);
 
   const onSubmit = async () => {
+    if (loading || googleBusy) return;
     setError(null);
     if (!email.trim() || !password) {
       setError('Email and password are required');
@@ -83,7 +87,7 @@ export default function SignupScreen() {
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View className="flex-1 justify-center px-6">
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 24 }}>
           <Text
             className="text-5xl text-fg mb-2"
             style={{ fontFamily: 'InstrumentSerif_400Regular', letterSpacing: -1 }}
@@ -139,9 +143,11 @@ export default function SignupScreen() {
             <Button
               title="Create account"
               loading={loading}
+              disabled={googleBusy}
               onPress={onSubmit}
               className="mt-2"
             />
+            {Platform.OS === 'ios' ? <GoogleSignIn disabled={loading} onBusyChange={setGoogleBusy} /> : null}
           </View>
 
           <View className="flex-row items-center justify-center mt-6 gap-1">
@@ -152,7 +158,7 @@ export default function SignupScreen() {
               </Pressable>
             </Link>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

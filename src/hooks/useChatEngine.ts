@@ -4,6 +4,7 @@ import type {
   ChatTurn,
   HistoryConversation,
   HistoryImport,
+  HistoryDigest,
   HistoryList,
   HistoryMessage,
   HistoryOperation,
@@ -44,6 +45,7 @@ export type ChatAdapters = {
     turn: ChatTurn,
     signal: AbortSignal,
     patch: (change: Partial<HistoryMessage>) => void,
+    digestContext?: HistoryDigest,
   ) => Promise<void>;
 };
 export const newChatId = () =>
@@ -649,6 +651,7 @@ export function useChatEngine(
           },
           r.controller.signal,
           patch,
+          current.digestContext,
         );
     } catch (error) {
       if (valid(s) && run.current === r) {

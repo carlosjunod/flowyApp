@@ -64,10 +64,11 @@ export function useChatState(accountId: string) {
     },
     select: engine.open,
     reset: () => engine.startNew(),
-    startDigest: (digestId: string, itemIds?: string[]) =>
+    startDigest: (digestId: string, itemIds?: string[], selectedText?: string) =>
       engine.startNew({
         digestId,
         itemIds,
+        selectedText,
         scope: itemIds ? 'items' : 'digest',
       }),
   };

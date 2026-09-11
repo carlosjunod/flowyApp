@@ -1,5 +1,6 @@
 import { useChat } from "@/hooks/useChat";
 import { useQuery } from "@tanstack/react-query";
+import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import React, { useCallback, useState } from "react";
@@ -14,10 +15,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Button } from "@/components/ui/Button";
+import { AppIcon } from "@/components/ui/AppIcon";
 import { Spinner } from "@/components/ui/Spinner";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { relativeDate } from "@/lib/relativeDate";
+import { hostOf } from "@/lib/thumbnails";
+import { useResolvedColors } from "@/lib/theme";
 import type { Digest, DigestSection } from "@/types";
 
 export default function DigestDetailScreen() {
@@ -103,10 +107,47 @@ export default function DigestDetailScreen() {
   }
 
   const digest = query.data;
+  const highlightAction = (blockId: string, sourceIds: string[], selectedText: string) => (
+    <View className="flex-row items-center gap-2">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Ask about this"
+        accessibilityHint="Starts a chat draft scoped to this highlight's sources"
+        accessibilityState={{ disabled: !chat.ready }}
+        disabled={!chat.ready}
+        onPress={() => {
+          chat.startDigest(digest.id, sourceIds, selectedText);
+          router.push("/chat");
+        }}
+        style={({ pressed }) => [pressed && chat.ready && { opacity: 0.82 }]}
+        className={`h-11 flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 ${!chat.ready ? "opacity-50" : ""}`}
+      >
+        <AppIcon name="message-circle" size={17} />
+        <Text className="text-sm font-semibold text-fg">Ask about this</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Not interested"
+        accessibilityHint="Hides this highlight. You can undo this later."
+        onPress={() => {
+          void feedback(blockId, "not_interested");
+        }}
+        style={({ pressed }) => [pressed && { opacity: 0.72 }]}
+        className="h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface"
+      >
+        <AppIcon name="eye-off" size={18} />
+      </Pressable>
+    </View>
+  );
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={["top"]}>
       <View className="flex-row items-center justify-between px-4 py-3">
-        <Pressable onPress={() => router.back()} hitSlop={8}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back to digests"
+          className="min-h-11 justify-center"
+          onPress={() => router.back()}
+        >
           <Text className="text-accent text-base">← Back</Text>
         </Pressable>
       </View>
@@ -115,8 +156,8 @@ export default function DigestDetailScreen() {
       >
         <View className="gap-1">
           <Text className="text-xs uppercase text-muted">
-            {digest.cadence} · {relativeDate(digest.generated_at)} ·{" "}
-            {digest.content.timezone}
+            {digest.cadence || "digest"} · {relativeDate(digest.generated_at)}
+            {digest.content.timezone ? ` · ${digest.content.timezone}` : ""}
           </Text>
           <Text
             className="text-3xl text-fg"
@@ -174,9 +215,18 @@ export default function DigestDetailScreen() {
         ) : (
           <>
             {(["ideas", "themes", "highlights", "connections"] as const).map(
-              (section) => (
+              (section) => {
+                const blocks = digest.content[section] || [];
+                if (blocks.length === 0) return null;
+                return (
                 <View key={section} className="gap-4">
-                  {(digest.content[section] || []).map((block) => {
+                  <Text
+                    className="text-2xl capitalize text-fg"
+                    style={{ fontFamily: "InstrumentSerif_400Regular" }}
+                  >
+                    {section}
+                  </Text>
+                  {blocks.map((block) => {
                     const hidden = digest.feedback?.some(
                       (f) =>
                         f.target === block.id && f.value === "not_interested",
@@ -201,21 +251,16 @@ export default function DigestDetailScreen() {
                           }}
                           open={open}
                         />
-                        <Button
-                          title="Ask about this"
-                          variant="secondary"
-                          disabled={!chat.ready}
-                          onPress={() => {
-                            chat.startDigest(digest.id, block.source_item_ids);
-                            router.push("/chat");
-                          }}
-                        />
-                        {section === "highlights" && (
+                        {section === "highlights" ? (
+                          highlightAction(block.id, block.source_item_ids, block.text)
+                        ) : (
                           <Button
-                            title="Not interested"
+                            title="Ask about this"
                             variant="secondary"
+                            disabled={!chat.ready}
                             onPress={() => {
-                              void feedback(block.id, "not_interested");
+                              chat.startDigest(digest.id, block.source_item_ids, block.text);
+                              router.push("/chat");
                             }}
                           />
                         )}
@@ -223,7 +268,8 @@ export default function DigestDetailScreen() {
                     );
                   })}
                 </View>
-              ),
+                );
+              },
             )}
             {digest.content.selection && (
               <Text className="text-sm text-muted">
@@ -254,44 +300,30 @@ export default function DigestDetailScreen() {
               Chat uses this report’s sources. Edit your question before
               sending.
             </Text>
-            <Text className="text-xl text-fg">Sources</Text>
+            <View className="gap-1">
+              <Text className="text-2xl text-fg" style={{ fontFamily: "InstrumentSerif_400Regular" }}>
+                Sources
+              </Text>
+              <Text className="text-sm text-muted">
+                Open a saved item or visit its original link.
+              </Text>
+            </View>
             {digest.sources?.map((source) => {
               const url = source.source_url || source.raw_url;
               return (
-                <View key={source.id}>
-                  <Button
-                    title={source.title || "Open source"}
-                    variant="secondary"
-                    onPress={() => open(source.id)}
-                  />
-                  {url && /^https?:\/\//i.test(url) && (
-                    <Pressable
-                      accessibilityRole="link"
-                      className="min-h-11 justify-center"
-                      onPress={() => {
-                        void Linking.openURL(url);
-                      }}
-                    >
-                      <Text className="text-accent">Original source</Text>
-                    </Pressable>
-                  )}
-                </View>
+                <SourceRow
+                  key={source.id}
+                  title={source.title}
+                  url={url}
+                  onOpenItem={() => open(source.id)}
+                  onOpenOriginal={url && /^https?:\/\//i.test(url) ? () => { void Linking.openURL(url); } : undefined}
+                />
               );
             })}
-            <Button
-              title="Useful"
-              variant="secondary"
-              onPress={() => {
-                void feedback("digest", "useful");
-              }}
-            />
-            <Button
-              title="Not useful"
-              variant="secondary"
-              onPress={() => {
-                void feedback("digest", "not_useful");
-              }}
-            />
+            <View className="flex-row gap-2">
+              <Button title="Useful" variant="secondary" className="flex-1" onPress={() => { void feedback("digest", "useful"); }} />
+              <Button title="Not useful" variant="secondary" className="flex-1" onPress={() => { void feedback("digest", "not_useful"); }} />
+            </View>
             <Text accessibilityLiveRegion="polite" className="text-fg">
               {notice}
             </Text>
@@ -346,3 +378,61 @@ const SectionCard: React.FC<{
     ) : null}
   </View>
 );
+
+type SourceRowProps = {
+  title?: string;
+  url?: string;
+  onOpenItem: () => void;
+  onOpenOriginal?: () => void;
+};
+
+const SourceRow: React.FC<SourceRowProps> = ({ title, url, onOpenItem, onOpenOriginal }) => {
+  const colors = useResolvedColors();
+  const [faviconFailed, setFaviconFailed] = useState(false);
+  const host = url ? hostOf(url) : null;
+  const favicon = host
+    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`
+    : null;
+  return (
+    <View className="flex-row items-center gap-3 rounded-2xl border border-border bg-card p-3">
+      <View className="h-12 w-12 overflow-hidden rounded-xl bg-surface items-center justify-center">
+        {favicon && !faviconFailed ? (
+          <Image
+            source={{ uri: favicon }}
+            style={{ width: 30, height: 30 }}
+            contentFit="contain"
+            transition={150}
+            onError={() => setFaviconFailed(true)}
+          />
+        ) : (
+          <AppIcon name="file-text" size={22} />
+        )}
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Open saved source: ${title || host || "source"}`}
+        accessibilityHint="Opens this item in Flowy"
+        className="min-h-11 flex-1 justify-center"
+        onPress={onOpenItem}
+        style={({ pressed }) => [pressed && { opacity: 0.7 }]}
+      >
+        <Text className="text-base font-semibold text-fg" numberOfLines={2}>
+          {title || host || "Saved source"}
+        </Text>
+        {host && <Text className="mt-0.5 text-sm text-muted" numberOfLines={1}>{host}</Text>}
+      </Pressable>
+      {onOpenOriginal && (
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={`Open original source: ${title || host || "source"}`}
+          accessibilityHint="Opens the original link in your browser"
+          className="h-11 w-11 items-center justify-center rounded-xl bg-surface"
+          onPress={onOpenOriginal}
+          style={({ pressed }) => [pressed && { opacity: 0.7 }]}
+        >
+          <Feather name="external-link" size={18} color={colors.accent} />
+        </Pressable>
+      )}
+    </View>
+  );
+};

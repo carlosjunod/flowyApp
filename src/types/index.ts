@@ -160,6 +160,7 @@ export type ChatMessage = {
 };
 
 export type ApiErrorCode =
+  | 'AI_PROCESSING_CONSENT_REQUIRED'
   | 'INVALID_PERSONALIZATION'
   | 'BODY_TOO_LARGE'
   | 'INVALID_BODY'
@@ -190,7 +191,29 @@ export type SortField = 'created' | 'category' | 'type';
 export type SortDir = 'asc' | 'desc';
 export type ViewMode = 'grid' | 'list' | 'detail';
 
-export type IngestType = 'url' | 'screenshot' | 'youtube' | 'video' | 'screen_recording';
+export type IngestType =
+  | 'url'
+  | 'screenshot'
+  | 'youtube'
+  | 'video'
+  | 'screen_recording'
+  | 'reddit'
+  | 'instagram'
+  | 'pinterest'
+  | 'dribbble'
+  | 'linkedin'
+  | 'twitter'
+  | 'tiktok'
+  | 'facebook'
+  | 'pdf'
+  | 'file';
+
+export type SharedFile = {
+  name: string;
+  mime: string;
+  data: string;
+};
+
 export type IngestPayload = {
   type: IngestType;
   raw_url?: string;
@@ -198,6 +221,10 @@ export type IngestPayload = {
   raw_images?: string[];
   raw_video?: string;
   video_mime?: string;
+  raw_pdf?: SharedFile;
+  raw_pdfs?: SharedFile[];
+  raw_file?: SharedFile;
+  raw_files?: SharedFile[];
 };
 
 export type IngestResponse = { id: string; status: ItemStatus };
@@ -286,6 +313,7 @@ export type DigestSettings = {
   version?: 2; revision?: number; settings?: DigestPreferences;
   canEnableDaily?: boolean; effectivePlan?: string; quotaResetsAt?: string;
   betaAccessEndsAt?: string;
+  monthlyReportQuota?: { used: number; reserved: number; remaining: number; limit: number; window: 'calendar_month_utc'; startsAt: string; resetsAt: string };
   capabilities?: { enabled: boolean; push: boolean; email: boolean };
   emailAddress?:string; emailSuppressed?:boolean; reportQuota?:{used:number;limit:number;window:string};
   emailVerified?: boolean; hasPushDevice?: boolean;
@@ -306,6 +334,6 @@ export type BulkActionResult = {
 
 export type BulkActionPayload = { ids: string[] };
 
-export type DigestChatContext = {digestId: string; scope: "digest" | "items"; itemIds?: string[]};
+export type DigestChatContext = {digestId: string; scope: "digest" | "items"; itemIds?: string[]; selectedText?: string};
 
 export * from './personalization';

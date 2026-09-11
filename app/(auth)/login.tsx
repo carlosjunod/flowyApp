@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GoogleSignIn } from '@/components/auth/GoogleSignIn';
 import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -24,6 +25,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
@@ -40,6 +42,7 @@ export default function LoginScreen() {
   }, []);
 
   const onSubmit = async () => {
+    if (loading || appleLoading || googleBusy) return;
     if (!email || !password) {
       setError('Email and password are required');
       return;
@@ -56,6 +59,7 @@ export default function LoginScreen() {
   };
 
   const onApple = async () => {
+    if (loading || appleLoading || googleBusy) return;
     setError(null);
     setAppleLoading(true);
     try {
@@ -144,6 +148,7 @@ export default function LoginScreen() {
               <Button
                 title="Sign in"
                 loading={loading}
+                disabled={appleLoading || googleBusy}
                 onPress={onSubmit}
                 className="mt-2"
               />
@@ -167,21 +172,13 @@ export default function LoginScreen() {
                     onPress={onApple}
                   />
                 ) : null}
-                {/*
-                  Google entry point. `api.authGoogle` is wired server-side, but no
-                  native Google lib is installed yet (@react-native-google-signin or
-                  expo-auth-session) — adding one needs a rebuild. Until then this
-                  surfaces the option and a clear message instead of silently 404ing.
-                */}
-                <Pressable
-                  onPress={() =>
-                    setError('Google sign-in is being set up — use email or Apple for now.')
-                  }
-                  accessibilityRole="button"
-                  className="h-11 rounded-xl border border-border bg-card items-center justify-center"
-                >
-                  <Text className="text-fg text-sm font-medium">Continue with Google</Text>
-                </Pressable>
+                {Platform.OS === 'ios' ? (
+                  <GoogleSignIn disabled={loading || appleLoading} onBusyChange={setGoogleBusy} />
+                ) : (
+                  <Pressable onPress={() => setError('Google sign-in is being set up — use email for now.')} accessibilityRole="button" className="h-11 rounded-xl border border-border bg-card items-center justify-center">
+                    <Text className="text-fg text-sm font-medium">Continue with Google</Text>
+                  </Pressable>
+                )}
               </View>
             </View>
 
