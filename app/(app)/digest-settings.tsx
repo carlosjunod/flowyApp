@@ -629,7 +629,7 @@ export default function DigestSettingsScreen() {
                           disabled={busy}
                           onPress={() => {
                             void registerPushForCurrentUser(true)
-                              .then(setMessage)
+                              .then((result) => setMessage(result.message))
                               .catch(() =>
                                 setMessage(
                                   "Could not enable notifications. Please try again.",
