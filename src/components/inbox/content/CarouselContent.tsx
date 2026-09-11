@@ -7,7 +7,6 @@ import {
   ScrollView,
   Text,
   View,
-  useWindowDimensions,
 } from 'react-native';
 
 import { ENV } from '@/lib/env';
@@ -191,12 +190,12 @@ const MainSlide: React.FC<{
   onPrev: (() => void) | null;
   onNext: (() => void) | null;
 }> = ({ slide, idx, count, onPrev, onNext }) => {
-  const { width } = useWindowDimensions();
+  const [containerSize, setContainerSize] = useState(0);
   const url = r2UrlForKey(slide.r2_key);
-  const containerSize = width - 32; // detail screen has 16px horizontal padding
 
   return (
     <View
+      onLayout={event => setContainerSize(event.nativeEvent.layout.width)}
       className="overflow-hidden rounded-xl border border-border bg-black"
       style={{ position: 'relative' }}
     >

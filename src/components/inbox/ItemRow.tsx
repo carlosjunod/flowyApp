@@ -36,9 +36,9 @@ const compactRelative = (input: string, now: Date = new Date()): string => {
   return monthDayLabel(input);
 };
 
-type Props = { item: Item };
+type Props = { onOpen?: (id: string) => void; active?: boolean; item: Item; inColumn?: boolean };
 
-export const ItemRow: React.FC<Props> = ({ item }) => {
+export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColumn = false }) => {
   const pending = isPending(item);
   const errored = item.status === 'error';
   const ready = item.status === 'ready';
@@ -54,7 +54,8 @@ export const ItemRow: React.FC<Props> = ({ item }) => {
       selection.toggle(item.id);
       return;
     }
-    router.push(`/item/${item.id}`);
+    if (onOpen) onOpen(item.id);
+    else router.push(`/item/${item.id}`);
   };
 
   const handleLongPress = () => {
@@ -71,7 +72,7 @@ export const ItemRow: React.FC<Props> = ({ item }) => {
       <Pressable
         accessibilityRole={selection.mode ? 'checkbox' : 'button'}
         accessibilityLabel={`${item.title ?? item.raw_url ?? 'Saved item'}${pending ? ', processing' : errored ? ', processing failed' : ''}`}
-        accessibilityState={{ checked: selection.mode ? selected : undefined }}
+        accessibilityState={{ checked: selection.mode ? selected : undefined, selected: !selection.mode && active }}
         accessibilityActions={[{ name: 'longpress', label: 'Select item' }]}
         onAccessibilityAction={event => { if (event.nativeEvent.actionName === 'longpress') handleLongPress(); }}
         onPress={handlePress}
@@ -88,8 +89,8 @@ export const ItemRow: React.FC<Props> = ({ item }) => {
           },
           pressed && !pending && { opacity: 0.92, transform: [{ scale: 0.995 }] },
         ]}
-        className={`flex-row items-center gap-3 mx-4 mb-2 px-3 py-3 rounded-2xl bg-card ${
-          selected ? 'border-2 border-accent' : ''
+        className={`flex-row items-center gap-3 ${inColumn ? '' : 'mx-4'} mb-2 px-3 py-3 rounded-2xl bg-card ${
+          selected || (!selection.mode && active) ? 'border-2 border-accent' : ''
         }`}
       >
         {selection.mode ? (

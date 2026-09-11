@@ -28,9 +28,9 @@ const monthDayLabel = (input: string): string => {
 
 const VIDEO_TYPES = new Set(['youtube', 'video', 'screen_recording']);
 
-type Props = { item: Item };
+type Props = { onOpen?: (id: string) => void; active?: boolean; item: Item };
 
-export const ItemCard: React.FC<Props> = ({ item }) => {
+export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item }) => {
   const pending = isPending(item);
   const errored = item.status === 'error';
   const selection = useSelection();
@@ -50,7 +50,8 @@ export const ItemCard: React.FC<Props> = ({ item }) => {
       selection.toggle(item.id);
       return;
     }
-    router.push(`/item/${item.id}`);
+    if (onOpen) onOpen(item.id);
+    else router.push(`/item/${item.id}`);
   };
 
   const handleLongPress = () => {
@@ -63,7 +64,7 @@ export const ItemCard: React.FC<Props> = ({ item }) => {
       <Pressable
         accessibilityRole={selection.mode ? 'checkbox' : 'button'}
         accessibilityLabel={`${item.title ?? item.raw_url ?? 'Saved item'}${pending ? ', processing' : errored ? ', processing failed' : ''}`}
-        accessibilityState={{ checked: selection.mode ? selected : undefined }}
+        accessibilityState={{ checked: selection.mode ? selected : undefined, selected: !selection.mode && active }}
         accessibilityActions={[{ name: 'longpress', label: 'Select item' }]}
         onAccessibilityAction={event => { if (event.nativeEvent.actionName === 'longpress') handleLongPress(); }}
         onPress={handlePress}
@@ -80,7 +81,7 @@ export const ItemCard: React.FC<Props> = ({ item }) => {
           pressed && !pending && { transform: [{ scale: 0.98 }], opacity: 0.97 },
         ]}
         className={`bg-card rounded-[20px] overflow-hidden ${
-          selected ? 'border-2 border-accent' : ''
+          selected || (!selection.mode && active) ? 'border-2 border-accent' : ''
         } ${pending ? 'opacity-80' : ''}`}
       >
         {hasPhoto ? (
@@ -173,7 +174,7 @@ const ImageLed: React.FC<LedProps> = ({
     {domainLabel ? (
       <View
         className="absolute top-2.5 left-2.5 flex-row items-center gap-1.5 rounded-full px-2 py-1"
-        style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}
+        style={{ backgroundColor: 'rgba(255,255,255,0.92)', maxWidth: '85%' }}
       >
         {faviconUri ? (
           <Image
@@ -189,6 +190,7 @@ const ImageLed: React.FC<LedProps> = ({
             fontSize: 11,
             color: '#1C1815',
             maxWidth: 140,
+            flexShrink: 1,
           }}
         >
           {domainLabel}

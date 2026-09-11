@@ -1,3 +1,5 @@
+import { useAdaptivePane } from '@/components/navigation/AdaptiveTabs';
+import { inboxCardColumns, inboxColumns } from '@/lib/adaptiveLayout';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { Feather } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
@@ -42,16 +44,11 @@ import { useResolvedColors } from '@/lib/theme';
 import { useViewMode } from '@/lib/viewMode';
 import type { Item, ViewMode } from '@/types';
 
-const columnsFor = (width: number): number => {
-  if (width >= 1024) return 3;
-  if (width >= 768) return 2;
-  return 1;
-};
-
 export default function InboxScreen() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { width } = useWindowDimensions();
+  const { fontScale } = useWindowDimensions();
+  const { width, split, visible: paneVisible, selectedItemId, onOpenItem } = useAdaptivePane();
   const colors = useResolvedColors();
   const selection = useSelection();
   const [viewMode, setViewMode] = useViewMode();
@@ -111,7 +108,9 @@ export default function InboxScreen() {
 
   const onRefresh = () => query.refetch();
 
-  const columns = viewMode === 'grid' ? columnsFor(width) : 1;
+  const columns = viewMode === 'grid'
+    ? inboxCardColumns(width, fontScale, split)
+    : inboxColumns(width, fontScale);
 
 
   return (
@@ -134,7 +133,7 @@ export default function InboxScreen() {
         </View>
       </View>
       {user && items.length > 0 ? <DigestInvitation key={user.id} userId={user.id} /> : null}
-      <BulkImportSheet onStatusChange={setCaptureStatus} visible={bulkOpen} onClose={() => setBulkOpen(false)} />
+      <BulkImportSheet onStatusChange={setCaptureStatus} visible={bulkOpen && paneVisible} onClose={() => setBulkOpen(false)} />
       <FilterBar
         search={searchInput}
         onSearchChange={setSearchInput}
@@ -145,9 +144,9 @@ export default function InboxScreen() {
       {query.isError ? <View className="px-4 py-3 flex-row items-center gap-2"><Text accessibilityRole="alert" className="text-danger flex-1 text-sm">Your inbox could not be loaded. Check your connection and try again.</Text><Button title="Retry" variant="secondary" onPress={() => { void query.refetch(); }} /></View> : null}
       {query.isLoading ? <View accessibilityLabel="Loading saved content" className="px-4 gap-3 pt-3">{[1, 2, 3].map(n => <View key={n} className="h-20 bg-surface rounded-xl overflow-hidden relative"><Shimmer /></View>)}</View> : null}
       {!query.isLoading && !query.isError ? <Text className="text-xs text-muted px-4 pt-2">{query.data?.pages[0]?.totalItems ?? 0} {search || category ? 'results' : 'saved items'}</Text> : null}
-      {viewMode === 'grid' ? (
+      {viewMode === 'grid' || columns > 1 ? (
         <FlatList
-          key={`grid-${columns}`}
+          key={`${viewMode}-${columns}`}
           data={visible}
           keyExtractor={(it) => it.id}
           numColumns={columns}
@@ -167,7 +166,7 @@ export default function InboxScreen() {
                   : { paddingHorizontal: 16 }
               }
             >
-              <ItemCard item={item} />
+              {viewMode === 'grid' ? <ItemCard item={item} onOpen={onOpenItem} active={item.id === selectedItemId} /> : <ItemRow item={item} inColumn onOpen={onOpenItem} active={item.id === selectedItemId} />}
             </View>
           )}
           ListEmptyComponent={query.isLoading || query.isError ? null :
@@ -209,7 +208,7 @@ export default function InboxScreen() {
             item.kind === 'header' ? (
               <SectionHeader label={item.label} count={item.count} />
             ) : (
-              <ItemRow item={item.item} />
+              <ItemRow item={item.item} onOpen={onOpenItem} active={item.item.id === selectedItemId} />
             )
           }
           ListEmptyComponent={query.isLoading || query.isError ? null :

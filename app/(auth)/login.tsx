@@ -3,9 +3,9 @@ import { Link, router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
-  Linking,
   Platform,
   Pressable,
+  ScrollView,
   Text,
   TextInput,
   View,
@@ -16,7 +16,6 @@ import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useResolvedColors, useTheme } from '@/lib/theme';
-import { ENV } from '@/lib/env';
 
 export default function LoginScreen() {
   const { signIn, signInWithSession } = useAuth();
@@ -28,7 +27,6 @@ export default function LoginScreen() {
   const [appleLoading, setAppleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
-  const [aiConsent, setAiConsent] = useState(false);
 
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
@@ -58,10 +56,6 @@ export default function LoginScreen() {
   };
 
   const onApple = async () => {
-    if (!aiConsent) {
-      setError('Please accept the AI processing disclosure before creating an account with Apple.');
-      return;
-    }
     setError(null);
     setAppleLoading(true);
     try {
@@ -82,7 +76,6 @@ export default function LoginScreen() {
         credential.identityToken,
         credential.email ?? undefined,
         credential.authorizationCode ?? undefined,
-        true,
       );
       if (res.error) {
         setError(res.error.message);
@@ -105,105 +98,103 @@ export default function LoginScreen() {
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View className="flex-1 justify-center px-6">
-          <Text
-            className="text-5xl text-fg mb-2"
-            style={{ fontFamily: 'InstrumentSerif_400Regular', letterSpacing: -1 }}
-          >
-            Flowy
-          </Text>
-          <Text className="text-base text-muted mb-8">Sign in to your inbox</Text>
+        <ScrollView
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            flexGrow: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+          }}
+        >
+          <View style={{ width: '100%', maxWidth: 440 }}>
+            <Text
+              className="text-5xl text-fg mb-2"
+              style={{ fontFamily: 'InstrumentSerif_400Regular', letterSpacing: -1 }}
+            >
+              Flowy
+            </Text>
+            <Text className="text-base text-muted mb-8">Sign in to your inbox</Text>
 
-          <View className="gap-3">
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Email"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              textContentType="emailAddress"
-              className="h-11 rounded-xl border border-border bg-card px-4 text-fg"
-            />
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password"
-              placeholderTextColor={colors.muted}
-              secureTextEntry
-              textContentType="password"
-              className="h-11 rounded-xl border border-border bg-card px-4 text-fg"
-            />
-            {error ? (
-              <Text className="text-danger text-sm">{error}</Text>
-            ) : null}
-            <Button
-              title="Sign in"
-              loading={loading}
-              onPress={onSubmit}
-              className="mt-2"
-            />
-
-            <View className="mt-4 gap-3">
-              <View className="flex-row items-center gap-3">
-                <View className="flex-1 h-px bg-border" />
-                <Text className="text-xs text-muted">or</Text>
-                <View className="flex-1 h-px bg-border" />
-              </View>
-              <Pressable
-                onPress={() => setAiConsent((value) => !value)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: aiConsent }}
-                className="flex-row items-start gap-3 py-1"
-              >
-                <View className="mt-0.5 h-5 w-5 items-center justify-center rounded border border-border" style={{ backgroundColor: aiConsent ? colors.accent : 'transparent' }}>
-                  {aiConsent ? <Text className="text-bg text-xs">✓</Text> : null}
-                </View>
-                <Text className="flex-1 text-muted text-xs leading-5">
-                  For a new account, I agree that Flowy may send my saved content and chat requests to Anthropic, OpenAI, and Voyage AI for its AI features. <Text onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/privacy`)} className="text-accent underline">Privacy Policy</Text> · <Text onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/terms`)} className="text-accent underline">Terms</Text>
-                </Text>
-              </Pressable>
-              {appleAvailable ? (
-                <AppleAuthentication.AppleAuthenticationButton
-                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-                  buttonStyle={
-                    resolved === 'dark'
-                      ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                      : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-                  }
-                  cornerRadius={12}
-                  style={{ height: 44, width: '100%', opacity: appleLoading ? 0.6 : 1 }}
-                  onPress={onApple}
-                />
+            <View className="gap-3">
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Email"
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                className="h-11 rounded-xl border border-border bg-card px-4 text-fg"
+              />
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Password"
+                placeholderTextColor={colors.muted}
+                secureTextEntry
+                textContentType="password"
+                className="h-11 rounded-xl border border-border bg-card px-4 text-fg"
+              />
+              {error ? (
+                <Text className="text-danger text-sm">{error}</Text>
               ) : null}
-              {/*
-                Google entry point. `api.authGoogle` is wired server-side, but no
-                native Google lib is installed yet (@react-native-google-signin or
-                expo-auth-session) — adding one needs a rebuild. Until then this
-                surfaces the option and a clear message instead of silently 404ing.
-              */}
-              <Pressable
-                onPress={() =>
-                  setError('Google sign-in is being set up — use email or Apple for now.')
-                }
-                accessibilityRole="button"
-                className="h-11 rounded-xl border border-border bg-card items-center justify-center"
-              >
-                <Text className="text-fg text-sm font-medium">Continue with Google</Text>
-              </Pressable>
+              <Button
+                title="Sign in"
+                loading={loading}
+                onPress={onSubmit}
+                className="mt-2"
+              />
+
+              <View className="mt-4 gap-3">
+                <View className="flex-row items-center gap-3">
+                  <View className="flex-1 h-px bg-border" />
+                  <Text className="text-xs text-muted">or</Text>
+                  <View className="flex-1 h-px bg-border" />
+                </View>
+                {appleAvailable ? (
+                  <AppleAuthentication.AppleAuthenticationButton
+                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                    buttonStyle={
+                      resolved === 'dark'
+                        ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                        : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                    }
+                    cornerRadius={12}
+                    style={{ height: 44, width: '100%', opacity: appleLoading ? 0.6 : 1 }}
+                    onPress={onApple}
+                  />
+                ) : null}
+                {/*
+                  Google entry point. `api.authGoogle` is wired server-side, but no
+                  native Google lib is installed yet (@react-native-google-signin or
+                  expo-auth-session) — adding one needs a rebuild. Until then this
+                  surfaces the option and a clear message instead of silently 404ing.
+                */}
+                <Pressable
+                  onPress={() =>
+                    setError('Google sign-in is being set up — use email or Apple for now.')
+                  }
+                  accessibilityRole="button"
+                  className="h-11 rounded-xl border border-border bg-card items-center justify-center"
+                >
+                  <Text className="text-fg text-sm font-medium">Continue with Google</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <View className="flex-row items-center justify-center mt-8 gap-1">
+              <Text className="text-muted text-sm">No account?</Text>
+              <Link href="/signup" asChild>
+                <Pressable hitSlop={8}>
+                  <Text className="text-accent text-sm font-medium">Create one</Text>
+                </Pressable>
+              </Link>
             </View>
           </View>
-
-          <View className="flex-row items-center justify-center mt-8 gap-1">
-            <Text className="text-muted text-sm">No account?</Text>
-            <Link href="/signup" asChild>
-              <Pressable hitSlop={8}>
-                <Text className="text-accent text-sm font-medium">Create one</Text>
-              </Pressable>
-            </Link>
-          </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

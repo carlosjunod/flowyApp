@@ -13,6 +13,10 @@ Users save URLs, screenshots, and short videos from the iOS/macOS share sheet; a
 - **Native share extension** — iOS + Mac Catalyst, accepts URL / image / text, reads auth token from shared App Group keychain, POSTs to `/api/ingest`
 - Auth via PocketBase email/password, token persisted to shared Keychain so the extension can read it
 
+## Responsive layout
+
+iPhone remains portrait-only. iPad portrait keeps the same navigation with a denser inbox; sufficiently wide landscape windows show the Inbox list/grid beside its item reader, or Inbox beside Chat when the Chat tab is active. Window size, safe areas and text scale drive the layout. Orientation changes require a native rebuild. See [adaptive layout and local acceptance](docs/RESPONSIVE-LAYOUT.md), including the remaining iPhone Duo integration boundaries.
+
 ## Requirements
 
 - Node 20+

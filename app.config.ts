@@ -62,6 +62,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-video',
     './plugins/withShareExtension',
     './plugins/withPodfileSigningFix',
+    './plugins/withAdaptiveOrientation',
   ],
   experiments: {
     typedRoutes: true,
