@@ -40,6 +40,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: BUNDLE_ID,
+    // EAS file variable, or a local path supplied for a native Android build.
+    googleServicesFile: process.env.GOOGLE_SERVICES_JSON,
     adaptiveIcon: {
       foregroundImage: './icons/adaptive-icon-1024.png',
       backgroundColor: '#ffffff',
@@ -55,7 +57,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-router',
     '@react-native-community/datetimepicker',
     'expo-secure-store',
-    'expo-notifications',
+    ['expo-notifications', { defaultChannel: 'default' }],
     'expo-apple-authentication',
     'expo-video',
     './plugins/withShareExtension',

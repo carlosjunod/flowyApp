@@ -6,6 +6,7 @@ import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DeleteAccountSection } from '@/components/settings/DeleteAccountSection';
+import { PushNotificationSettings } from '@/components/settings/PushNotificationSettings';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/lib/auth';
 import { ENV } from '@/lib/env';
@@ -92,6 +93,10 @@ export default function SettingsScreen() {
           <Text className="text-xs text-muted px-1">
             System follows your device's appearance setting.
           </Text>
+        </Section>
+
+        <Section title="Notifications">
+          <PushNotificationSettings />
         </Section>
 
         <Section title="Inbox">

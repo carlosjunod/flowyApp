@@ -29,3 +29,10 @@ For macOS (Mac Catalyst): in Xcode, target → Supported Destinations → add "M
 - **Bundle identifiers**: main app `app.tryflowy.client`, share extension `app.tryflowy.client.ShareExtension`. App Group `group.app.tryflowy`.
 - **Youtube/TikTok/Instagram host classification** in share extension: hostname suffix match against `youtube.com`, `youtu.be`, `tiktok.com`, `instagram.com`.
 - **Share extension networking**: uses `URLSession` default config; sets `Authorization: Bearer <token>` header from shared keychain. Base URL baked in at build time via `Info.plist` `API_BASE_URL` entry injected by the config plugin from `process.env.EXPO_PUBLIC_API_BASE_URL`.
+
+
+## Push release gates — 2026-09-10
+
+- **BLOCKER: the remaining physical notification scenarios are unverified.** iOS build `b1c7a091-070b-4ab2-9c4f-db6cb8c68fbf` and Android build `a2ee45bd-d9da-4337-bf24-cdfd2fb581de` were installed on owned phones. Registration, provider `ok` receipts and visible arrival passed on both on September 11; Android also displayed a real worker-generated `Ready to read` notification. Still verify foreground/background/terminated item/report taps, broader visual/accessibility behavior, denied-permission settings recovery, offline retry and account switching.
+- Android Firebase project `flowy-494202` now has app `app.tryflowy.client`; EAS stores its `GOOGLE_SERVICES_JSON` file variable for development, preview and production plus the matching FCM V1 service-account credential. Neither credential is tracked by Git or embedded in the client.
+- Server rollout is coordinated through `Flowy/docs/push-notifications-rollout.md`. `DIGEST_PUSH_ENABLED=1` is deployed on web/worker while the worker remains restricted to `DIGEST_DELIVERY_ENV=staging` and its explicit recipient allowlist. This task leaves isolated commits for later merge.

@@ -23,6 +23,7 @@ import { api } from "@/lib/api";
 import { useDigestColors, useDigestVars } from "@/lib/digestAppearance";
 import { useDigestCategories } from "@/hooks/useDigestCategories";
 import { registerPushForCurrentUser } from "@/hooks/usePushRegistration";
+import { PushNotificationSettings } from "@/components/settings/PushNotificationSettings";
 import {
   dateInZone,
   DIGEST_DAYS,
@@ -294,6 +295,7 @@ export default function DigestSettingsScreen() {
                   still update your preferences or turn off existing digests.
                 </Text>
               )}
+              <PushNotificationSettings />
               <DigestSection
                 title="Schedule"
                 subtitle="Choose when to bring your saved ideas back."

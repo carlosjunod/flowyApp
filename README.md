@@ -223,3 +223,7 @@ and remain local, with a visible notice. They sync after the route is available.
 Previously synced chats never fall back to partial local context. Missing routes
 are distinct from confirmed deletions; connecting is cancellable and bounded to
 15 seconds per history request, and generation has a labeled Stop button.
+
+## Device notifications
+
+Settings and Digest Settings share explicit device-notification registration. iOS and Android registration, provider receipts and visible arrival passed on owned devices; notification tap routing remains a release gate. Firebase configuration is supplied by EAS and is never committed to the app.

@@ -9,7 +9,8 @@
     "web": "expo start --web",
     "prebuild": "expo prebuild",
     "typecheck": "tsc --noEmit",
-    "test:ui-models": "node scripts/test-ui-models.cjs"
+    "test:ui-models": "node scripts/test-ui-models.cjs",
+    "test:push-contract": "node scripts/test-push-contract.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/instrument-serif": "^0.4.1",

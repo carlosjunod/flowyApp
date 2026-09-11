@@ -21,6 +21,7 @@ web-build/
 # EAS local credentials (contains plaintext passwords referencing cert files)
 credentials.json
 credentials/
+google-services.json
 
 # Metro
 .metro-health-check*
