@@ -229,7 +229,7 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   passed('Previously sent item pushes remain navigable; unknown types stay rejected');
   const permissionCalls = [];
   let permission = {status:'undetermined',canAskAgain:true};
-  let tokenFailure = false, saveFailure = false;
+  let tokenFailure = false, saveFailure = false, saveGate = null;
   const pushAuth = { model:{id:'account-a'}, token:'auth-a' };
   const pushPlatform = {OS:'android'};
   const register = loader({
@@ -239,7 +239,7 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
     '@/lib/auth':{useAuth:()=>({user:pushAuth.model})},
     '@/lib/pb':{pb:{authStore:pushAuth}},
     '@/lib/pushDevice':{flushPushUnlinks:async()=>{},savePushDevice:async(account,token)=>{
-      permissionCalls.push(['save',account,token]); if(saveFailure)throw Error('server private error');
+      permissionCalls.push(['save',account,token]); if(saveGate)await saveGate;if(saveFailure)throw Error('server private error');
     }},
     'expo-notifications':{
       AndroidImportance:{DEFAULT:3},
@@ -273,6 +273,19 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   assert.equal((await register(false)).status,'registered');
   assert.ok(!permissionCalls.includes('channel')&&!permissionCalls.includes('prompt'));
   passed('Granted iOS permission refreshes registration without prompting');
+  permissionCalls.length=0;
+  let releaseSave;
+  saveGate=new Promise(resolve=>{releaseSave=resolve;});
+  const foregroundRegistration=register(false);
+  const settingsRegistration=register(true);
+  await tick();
+  assert.equal(foregroundRegistration,settingsRegistration);
+  assert.equal(permissionCalls.filter(call=>call==='token').length,1);
+  assert.equal(permissionCalls.filter(call=>Array.isArray(call)).length,1);
+  releaseSave();
+  await Promise.all([foregroundRegistration,settingsRegistration]);
+  saveGate=null;
+  passed('Concurrent foreground and settings events share one push registration');
   pushAuth.model=null;permissionCalls.length=0;
   assert.equal((await register(true)).status,'error');assert.deepEqual(permissionCalls,[]);
   passed('Signed-out users cannot register a device');
@@ -280,6 +293,8 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   const deviceAuth={model:{id:'account-a'},token:'auth-a'};
   let registrationReply={data:{revocation:'r'.repeat(43)}};
   const originalDeviceFetch=globalThis.fetch;
+  const originalAbortTimeout=AbortSignal.timeout;
+  AbortSignal.timeout=undefined;
   globalThis.fetch=async(url,options)=>{
     deviceRequests.push({url,method:options.method,body:JSON.parse(options.body)});
     return {ok:true,json:async()=>registrationReply};
@@ -300,7 +315,10 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
     assert.deepEqual(deviceRequests.at(-1).body,{revocation:'r'.repeat(43)});
     assert.equal(deviceStore.values.has('flowy.push.device'),false);
     passed('Logout unlinks only the stored registration capability');
-  } finally { globalThis.fetch=originalDeviceFetch; }
+  } finally {
+    globalThis.fetch=originalDeviceFetch;
+    AbortSignal.timeout=originalAbortTimeout;
+  }
   const {restoreChat:restoreDigestChat,newConversation:newDigestConversation}=loader()('src/lib/chatModel.ts');
   const scoped={...newDigestConversation(),digestContext:{digestId:'abcdefghijklmno',scope:'digest'}};
   assert.deepEqual(restoreDigestChat({activeId:scoped.id,conversations:[scoped]}).conversations[0].digestContext,scoped.digestContext);

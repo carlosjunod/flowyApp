@@ -19,11 +19,12 @@ export function PushNotificationSettings() {
       if (pending) return;
       pending = true;
       setBusy(true);
-      const next = await registerPushForCurrentUser(request);
-      pending = false;
-      if (active) {
-        setResult(next);
-        setBusy(false);
+      try {
+        const next = await registerPushForCurrentUser(request);
+        if (active) setResult(next);
+      } finally {
+        pending = false;
+        if (active) setBusy(false);
       }
     };
     void run.current(false);

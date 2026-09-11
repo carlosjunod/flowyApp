@@ -2,7 +2,11 @@ import { useEffect } from "react";
 import { AppState, Platform } from "react-native";
 import Constants from "expo-constants";
 import { useAuth } from "@/lib/auth";
-import { savePushDevice, flushPushUnlinks } from "@/lib/pushDevice";
+import {
+  savePushDevice,
+  flushPushUnlinks,
+  PushDeviceError,
+} from "@/lib/pushDevice";
 import { pb } from "@/lib/pb";
 
 export interface PushRegistrationResult {
@@ -10,14 +14,18 @@ export interface PushRegistrationResult {
   message: string;
 }
 
+let activeRegistration: {
+  account: string;
+  promise: Promise<PushRegistrationResult>;
+} | null = null;
+
 /** A permission is requested only from an explicit settings action. */
-export async function registerPushForCurrentUser(
+async function performPushRegistration(
+  user: string,
   requestPermission = false,
 ): Promise<PushRegistrationResult> {
-  if (!pb.authStore.model?.id) return { status: "error", message: "Sign in to enable notifications." };
   if (Platform.OS !== "ios" && Platform.OS !== "android")
     return { status: "unsupported", message: "Notifications are available in the mobile app." };
-  const user = pb.authStore.model.id;
   let stage: "permission" | "token" | "server" = "permission";
   try {
     const notifications = await import("expo-notifications");
@@ -46,7 +54,14 @@ export async function registerPushForCurrentUser(
     await savePushDevice(user, token.data);
     if (pb.authStore.model?.id !== user) return { status: "error", message: "Your account changed. Try again." };
     return { status: "registered", message: "Notifications are enabled on this device. Report notifications follow your report settings." };
-  } catch {
+  } catch (error) {
+    if (typeof __DEV__ !== "undefined" && __DEV__)
+      console.warn("[push] registration failed", {
+        stage,
+        code: error instanceof PushDeviceError ? error.code : undefined,
+        status: error instanceof PushDeviceError ? error.status : undefined,
+        message: error instanceof Error ? error.message : String(error),
+      });
     const messages = {
       permission: "Could not check notification permissions. Try again or open your device settings.",
       token: "Could not connect this device to notifications. Check your connection and use an updated Flowy app, then retry.",
@@ -54,6 +69,24 @@ export async function registerPushForCurrentUser(
     };
     return { status: "error", message: messages[stage] };
   }
+}
+
+/** Concurrent auth, foreground, token-listener and settings events share one attempt. */
+export function registerPushForCurrentUser(
+  requestPermission = false,
+): Promise<PushRegistrationResult> {
+  const account = pb.authStore.model?.id;
+  if (!account)
+    return Promise.resolve({
+      status: "error",
+      message: "Sign in to enable notifications.",
+    });
+  if (activeRegistration?.account === account) return activeRegistration.promise;
+  const promise = performPushRegistration(account, requestPermission).finally(() => {
+    if (activeRegistration?.promise === promise) activeRegistration = null;
+  });
+  activeRegistration = { account, promise };
+  return promise;
 }
 export function usePushRegistration() {
   const { user } = useAuth();
