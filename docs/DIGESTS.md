@@ -23,7 +23,7 @@ The server owns plan/quota/channel capability. No local boolean or incoming noti
 
 ## Mandatory device run — not executed in this task
 
-Use a physical iPhone/Android device and an explicitly authorized own test account. Expo Go/simulator or an accepted Expo ticket does not satisfy this gate. Keep server staging user allowlist active. No new native dependency or config capability was added, so a clean prebuild was not required by these changes; still build the existing development/release target with valid EAS/APNs credentials and native bundle `app.tryflowy.client` (web Apple Services ID remains `app.tryflowy.app`).
+Use a physical iPhone/Android device and an explicitly authorized own test account. Expo Go/simulator or an accepted Expo ticket does not satisfy this gate. Keep server staging user allowlist active. The September 8 delivery work added no native dependency. The September 11 settings redesign adds a date/time picker and requires a new native build (see below); still build the existing development/release target with valid EAS/APNs credentials and native bundle `app.tryflowy.client` (web Apple Services ID remains `app.tryflowy.app`).
 
 1. Point app API/PB configuration to the authorized staging environment. Sign in, enable weekly and save; enable device notifications explicitly, then choose push. Confirm server has the current token and a valid subscription choice.
 2. Generate a synthetic owned report through the durable staging workflow. Record run/report/delivery IDs in the private acceptance log. Distinguish provider accepted/receipt delivered from physical arrival.
@@ -37,3 +37,56 @@ Use a physical iPhone/Android device and an explicitly authorized own test accou
 Local commands: `npm run typecheck`, `npm run test:ui-models`. Server `docs/digest-rollout.md` covers configuration, model/email costs, service-stack tests, screenshots, recovery and rollback. The native model tests and web phone-width screenshots are supporting evidence, not physical push acceptance.
 
 The inbox shows a dismissible weekly invitation only after a saved item and before any explicit settings revision. `src/components/digest/DigestInvitation.tsx` never changes consent. History filters use the same server cadence/read filters as web. Push device writes and deferred logout unlinks are serialized; foreground registration refreshes the server association even when the OS token is unchanged.
+
+
+## Settings redesign — 2026-09-11
+
+The screen now groups rhythm, content, language, delivery and pause controls. Weekly days are named radio choices; publication times use the system time picker. Pausing starts with a week and exposes a native calendar for a different resume date. Checked category/type chips mean **included**; an unchecked minus means excluded. Receipts, email and private notes retain their defaults, and unknown saved exclusions remain editable. Changing a setting never subscribes or sends email until the existing explicit action is taken.
+
+- `src/components/digest/DigestControls.tsx`: accessible chips, section/action primitives and a searchable timezone sheet.
+- `src/components/digest/DigestDateField.tsx`, `src/components/digest/DigestDateField.web.tsx`: native system pickers and browser date/time inputs.
+- `src/hooks/useDigestCategories.ts`: account-scoped, category-only PocketBase query. Preserve exact stored spelling/case/whitespace because the digest worker uses exact exclusions; search facets intentionally normalize these and are unsuitable here.
+- `src/lib/digestSettings.ts`: wall-clock picker conversion, meaningful dirty comparison, exclusion preservation and local-day resume conversion, including DST midnight gaps.
+- `src/lib/digestTimezones.ts`: IANA choices for Hermes without `Intl.supportedValuesOf`; unsupported device timezones are filtered and saved/device values are preserved.
+
+Publication times retain the server's `HH:MM` format independently of the device timezone. Resume dates map to the first valid instant of that date in the schedule timezone. New categories remain included automatically. Plan/channel capability checks and revisioned PATCH are unchanged. The sticky save bar reports pending/saved state; an in-flight guard prevents double saves, errors preserve edits, conflicts require an explicit reload, and navigation warns before discarding a dirty form.
+
+### Native dependency and rollout
+
+`@react-native-community/datetimepicker` is pinned to **8.4.4**, the SDK 54 version, and registered in `app.config.ts`. See [Expo SDK 54 date/time picker documentation](https://docs.expo.dev/versions/v54.0.0/sdk/date-time-picker/). Both lockfiles are updated; pnpm also reconciles its previously stale Expo entries with the already-existing package.json versions. Regenerate and rebuild development/release binaries before opening this route in an older custom native client; a JS-only update cannot add a native module.
+
+A clean **isolated** iOS prebuild and CocoaPods installation completed, with `RNDateTimePicker` autolinked and the existing bundle/share-extension configuration preserved. An Xcode simulator build stopped while copying React's framework due to `No space left on device`; no successful custom Xcode build is claimed. The subsequent user-requested cache cleanup and removal of this task’s temporary simulator/build files freed approximately 35 GiB, leaving 37 GiB available. Existing simulators, source and credentials were preserved. The failed build outputs were removed. Expo Go 54 on an iPhone 16 Pro / iOS 26 simulator was used for the actual native UI review with synthetic settings and API adapters. No production account, notification registration or email send was used.
+
+### UI/UX review
+
+Applied `emil-design-eng` and `mobile-touch`. Scores are a design/code assessment, not a user-study result.
+
+| Before | After | Why |
+| --- | --- | --- |
+| Numeric weekday and free-form HH:MM | Named weekdays and native time picker | Recognizable choices, no malformed schedule entry |
+| Comma-separated exclusion strings | Wrapping check/minus chips with explicit inclusion semantics | Reversible selection, visible state and preserved private defaults |
+| Editable IANA identifier | Searchable city/region list, current value and device shortcut | Avoid timezone typos; retain schedule during travel |
+| Fixed seven-day pause | Native date calendar and local-time resume summary | Choose a return date without mental date arithmetic |
+| Save action at the end of a long form | Persistent save bar, dirty state, conflict handling and exit guard | Keep action and feedback visible |
+| First implementation lost Pressable callback styles in the native render | Static layout/color styles plus active-state feedback; compact day chips | Restore legible selected tags, hit areas and save-button prominence |
+
+First native review: **8.3/10**, rejected because chip/save styles did not render correctly and weekday spacing needed work. These findings were fixed and reviewed again. Final assessment: **9.2/10** (hierarchy 9.4, clarity 9.4, interaction 9.2, accessibility 9.0, error/state handling 9.0).
+
+Validation: native TypeScript and all **33 UI-model scenarios** pass, including new schedule/DST, exact category query, inclusion state and screen/CAS/double-save/plan-gate regressions. An iOS Hermes export passed. Simulator review confirmed native picker presentation, named-day selection, category toggles and long labels, city search and timezone change without HH:MM drift, calendar selection with past days disabled, saved pause date and save confirmation. Light/dark rendering was inspected. Accessibility roles, checked states and hints are exposed in the native accessibility tree; full physical-device VoiceOver/TalkBack, large Dynamic Type and Android acceptance remain unclaimed. The earlier live push delivery acceptance gate is unchanged.
+
+
+## Visual alignment with the web app — 2026-09-11
+
+The native Digest screen now follows the actual web sources: `apps/web/app/globals.css`, `apps/web/app/(app)/settings/digest/page.tsx`, `apps/web/app/(app)/settings/digest.tsx`, `apps/web/components/ui/Button.tsx` and the settings index. `src/lib/digestAppearance.ts` mirrors their Warm Paper / Dark Graphite tokens, rounded to RGB, and scopes NativeWind variables to the Digest screen and its timezone modal. The rest of the native theme is unaffected.
+
+| Before | After | Why |
+| --- | --- | --- |
+| Cream background and the native app's older accent palette | Web background `#FAF8F5` / `#1A1B1E`, matching surfaces, text and borders | Same visual identity in both themes |
+| Promotional headline | Settings eyebrow + Instrument Serif “Digests” at 36/40 | Matches the web settings hierarchy |
+| Platform-default body font in several controls | Existing Inter regular/medium/semibold assets | Matches web labels, paragraphs and controls |
+| White, 16px-radius cards | Web-style surface cards, 12px corners, 20px padding and 24px section spacing | Consistent density and grouping |
+| Solid accent tags and save button | Neutral checked chips and the web primary button; accent reserved for icons and native switches | Match the web's action hierarchy while preserving clear toggle state |
+
+The native time/date pickers, category inclusion behavior, plan/channel restrictions, pause semantics, dirty guard and revisioned save remain unchanged. The minimum 48px control height is retained; named weekday controls fit one row at 393px and wrap at smaller widths. No native dependency or app configuration changed in this visual pass.
+
+Review used `emil-design-eng`; the design assessment remains **9.2/10**. Native TypeScript and all **33 UI-model scenarios** pass. A temporary browser harness rendered the actual screen and controls through React Native Web plus the real NativeWind web interop and compiled Tailwind styles. Synthetic API/category/navigation adapters and SVG icon stand-ins isolated it from user accounts. At 320, 393, 768 and 1280px, both themes have the expected web token colors, no horizontal viewport overflow, and a visible persistent save action. At 393px all seven weekday targets fit one row with at least 44×48px bounds; inclusion toggle and save feedback pass in both themes. Screenshots were visually inspected, including wrapped category labels and dark contrast. This pass validates presentation through the browser renderer, not a new physical-device/native build or Android picker behavior. It generated no Xcode build caches; the temporary preview dependencies/server were removed after review.

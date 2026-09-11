@@ -2,6 +2,7 @@ import { Link, router } from 'expo-router';
 import React, { useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   Text,
@@ -14,6 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useResolvedColors } from '@/lib/theme';
+import { ENV } from '@/lib/env';
 
 const friendlyError = (code: string): string => {
   switch (code) {
@@ -36,6 +38,7 @@ export default function SignupScreen() {
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiConsent, setAiConsent] = useState(false);
 
   const onSubmit = async () => {
     setError(null);
@@ -51,10 +54,14 @@ export default function SignupScreen() {
       setError('Passwords do not match');
       return;
     }
+    if (!aiConsent) {
+      setError('Please accept the AI processing disclosure to create an account.');
+      return;
+    }
     setLoading(true);
     const normalizedEmail = email.trim().toLowerCase();
     console.log('[signup] submitting registerEmail', { email: normalizedEmail });
-    const res = await api.registerEmail(normalizedEmail, password);
+    const res = await api.registerEmail(normalizedEmail, password, undefined, true);
     setLoading(false);
     if (res.error) {
       console.log('[signup] registerEmail failed', {
@@ -97,6 +104,19 @@ export default function SignupScreen() {
               textContentType="emailAddress"
               className="h-11 rounded-xl border border-border bg-card px-4 text-fg"
             />
+            <Pressable
+              onPress={() => setAiConsent((value) => !value)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: aiConsent }}
+              className="flex-row items-start gap-3 py-2"
+            >
+              <View className="mt-0.5 h-5 w-5 items-center justify-center rounded border border-border" style={{ backgroundColor: aiConsent ? colors.accent : 'transparent' }}>
+                {aiConsent ? <Text className="text-bg text-xs">✓</Text> : null}
+              </View>
+              <Text className="flex-1 text-muted text-xs leading-5">
+                I agree that Flowy may send my saved content and chat requests to Anthropic, OpenAI, and Voyage AI to summarize, transcribe, search, and answer questions. <Text onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/privacy`)} className="text-accent underline">Privacy Policy</Text> · <Text onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/terms`)} className="text-accent underline">Terms of Service</Text>
+              </Text>
+            </Pressable>
             <TextInput
               value={password}
               onChangeText={setPassword}

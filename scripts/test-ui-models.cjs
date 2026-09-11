@@ -82,6 +82,83 @@ function streamQueue() {
 }
 const tick = () => new Promise(resolve => setImmediate(resolve));
 (async () => {
+  const digest = loader()('src/lib/digestSettings.ts');
+  for (const time of ['00:00', '08:05', '12:00', '23:59']) assert.equal(digest.timePickerValue(digest.timePickerDate(time)), time);
+  assert.equal(digest.resumeAtDate('2026-09-18', 'America/Bogota'), '2026-09-18T05:00:00.000Z');
+  assert.equal(digest.resumeAtDate('2026-03-08', 'America/New_York'), '2026-03-08T05:00:00.000Z');
+  assert.equal(digest.resumeAtDate('2026-03-09', 'America/New_York'), '2026-03-09T04:00:00.000Z');
+  assert.equal(digest.resumeAtDate('2026-11-02', 'America/New_York'), '2026-11-02T05:00:00.000Z');
+  assert.equal(digest.resumeAtDate('2026-09-06', 'America/Santiago'), '2026-09-06T04:00:00.000Z', 'skipped midnight resumes at first valid hour of requested date');
+  assert.equal(digest.resumeAtDate('2026-09-18', 'Pacific/Kiritimati'), '2026-09-17T10:00:00.000Z');
+  assert.equal(digest.resumeAtDate('2026-09-18', 'Asia/Kathmandu'), '2026-09-17T18:15:00.000Z');
+  passed('Digest native pickers preserve wall time and resume dates across DST, midnight gaps and fractional offsets');
+  assert.deepEqual(digest.exclusionChoices(['design', 'design'], ['legacy', 'private']), ['design', 'legacy', 'private']);
+  assert.deepEqual(digest.toggleExclusion(['receipt', 'note', 'old-type'], 'note'), ['receipt', 'old-type']);
+  assert.deepEqual(digest.toggleExclusion(['receipt', 'old-type'], 'pdf'), ['receipt', 'old-type', 'pdf']);
+  const savedDigest = { locale: 'en', weekly_day: 1, excluded_categories: ['a','b'], excluded_types: ['note'] };
+  assert.equal(digest.preferencesChanged(savedDigest, {...savedDigest, excluded_categories: ['b','a']}), false);
+  assert.equal(digest.preferencesChanged(savedDigest, {...savedDigest, weekly_day: 7}), true);
+  assert.equal(digest.preferencesChanged(savedDigest, {...savedDigest, excluded_types: []}), true);
+  assert.ok(digest.digestTimezones('Pacific/Kiritimati').includes('Pacific/Kiritimati'));
+  passed('Digest inclusion toggles preserve unknown exclusions and detect only meaningful unsaved changes');
+  let digestCategoryQuery;
+  const digestCategoryCalls = [];
+  const categoryHook = loader({
+    '@tanstack/react-query': { useQuery: options => { digestCategoryQuery = options; return options; } },
+    '@/lib/auth': { useAuth: () => ({user:{id:'account-a'}}) },
+    '@/lib/pb': { pb: { filter: (expression, values) => { digestCategoryCalls.push({expression,values}); return 'owned'; }, collection: name => { assert.equal(name,'items'); return { getFullList: async options => { assert.equal(options.fields,'category'); assert.equal(options.filter,'owned'); return [{category:'Tech'},{category:'technology'},{category:'  Design '},{category:'Tech'},{category:''}]; } }; } } },
+  })('src/hooks/useDigestCategories.ts');
+  categoryHook.useDigestCategories();
+  assert.deepEqual(digestCategoryQuery.queryKey, ['digest-categories','account-a']);
+  assert.deepEqual(await digestCategoryQuery.queryFn(), ['  Design ', 'Tech', 'technology']);
+  assert.deepEqual(digestCategoryCalls[0].values, {user:'account-a'});
+  passed('Digest category query is account-scoped and preserves exact stored values required by exclusion filters');
+
+  const digestRunner = hookRunner();
+  const initialDigest = {timezone:'America/Bogota',locale:'en',weekly_enabled:true,weekly_day:1,weekly_local_time:'08:00',weekly_push_enabled:false,weekly_email_enabled:false,daily_enabled:false,daily_local_time:'20:00',daily_push_enabled:false,daily_email_enabled:false,paused_until:null,excluded_types:['receipt','email','note','legacy-type'],excluded_categories:['Private']};
+  const digestView = {revision:4,settings:initialDigest,effectivePlan:'free',canEnableDaily:false,capabilities:{enabled:true,push:false,email:false},emailVerified:false};
+  const digestRequests = [];
+  let releaseDigestSave;
+  const tree = (type, props) => ({type,props});
+  const Screen = loader({
+    react: digestRunner.react, 'react/jsx-runtime': {jsx:tree,jsxs:tree},
+    'react-native': {ActivityIndicator:'ActivityIndicator',Alert:{alert(){}},Pressable:'Pressable',ScrollView:'ScrollView',Switch:'Switch',Text:'Text',View:'View'},
+    'react-native-safe-area-context': {SafeAreaView:'SafeAreaView'},
+    'expo-router': {router:{back(){},push(){}},useNavigation:()=>({dispatch(){}})},
+    '@react-navigation/native': {usePreventRemove(){}},
+    '@/components/ui/AppIcon': {AppIcon:'AppIcon'},
+    '@/components/digest/DigestControls': {DigestAction:'DigestAction',DigestChip:'DigestChip',DigestSection:'DigestSection',DigestTimezone:'DigestTimezone'},
+    '@/components/digest/DigestDateField': {DigestDateField:'DigestDateField'},
+    '@/lib/digestAppearance': {useDigestColors:()=>({}), useDigestVars:()=>({})},
+    '@/hooks/useDigestCategories': {useDigestCategories:()=>({data:['Design','Private'],isPending:false,isError:false})},
+    '@/hooks/usePushRegistration': {registerPushForCurrentUser:async()=>''},
+    '@/lib/api': {api:{getDigestSettings:async()=>({data:digestView,error:null}),patchDigestSettings:payload=>{digestRequests.push(payload);return new Promise(resolve=>{releaseDigestSave=resolve;});}}},
+  })('app/(app)/digest-settings.tsx').default;
+  const nodes = value => !value ? [] : Array.isArray(value) ? value.flatMap(nodes) : typeof value === 'object' ? [value,...nodes(value.props?.children)] : [];
+  let digestTree = digestRunner.render(Screen); await tick(); digestTree = digestRunner.render(Screen);
+  const findDigest = (type, predicate) => nodes(digestTree).find(node=>node.type===type && predicate(node.props)).props;
+  assert.equal(findDigest('Switch',props=>props.accessibilityLabel==='daily digest').disabled,true);
+  assert.equal(findDigest('Switch',props=>props.accessibilityLabel==='weekly push').disabled,true);
+  findDigest('DigestChip',props=>props.label==='Design').onPress();
+  digestTree=digestRunner.render(Screen);
+  findDigest('DigestChip',props=>props.label==='Private notes').onPress();
+  digestTree=digestRunner.render(Screen);
+  findDigest('DigestDateField',props=>props.label==='weekly publication time').onChange('23:59');
+  digestTree=digestRunner.render(Screen);
+  const saveDigest=findDigest('Pressable',props=>props.accessibilityLabel==='Save choices');
+  saveDigest.onPress();saveDigest.onPress();
+  assert.equal(digestRequests.length,1);
+  assert.equal(digestRequests[0].expected_revision,4);
+  assert.equal(digestRequests[0].weekly_local_time,'23:59');
+  assert.deepEqual(digestRequests[0].excluded_categories,['Private','Design']);
+  assert.deepEqual(digestRequests[0].excluded_types,['receipt','email','legacy-type']);
+  releaseDigestSave({data:null,error:{status:409}});await tick();digestTree=digestRunner.render(Screen);
+  assert.equal(findDigest('Pressable',props=>props.accessibilityLabel==='Save choices').disabled,true);
+  assert.equal(findDigest('DigestChip',props=>props.label==='Design').selected,false);
+  assert.ok(findDigest('DigestAction',props=>props.title==='Reload saved choices'));
+  digestRunner.close();
+  passed('Digest screen preserves exclusions, gates plan/channels, submits HH:MM with revision, rejects double saves and keeps edits after conflict');
+
   const profileModel = loader()('src/lib/personalization.ts');
   const emptyProfile = { occupation: '', currentFocus: '', preferences: '', enabled: false, onboardingDismissed: false, revision: 0, updatedAt: null };
   const savedProfile = { ...emptyProfile, occupation: 'Developer', currentFocus: 'Building Flowy', enabled: true, onboardingDismissed: true, revision: 2, updatedAt: '2026-09-10T00:00:00Z' };

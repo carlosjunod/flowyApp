@@ -123,6 +123,8 @@ async function personalizationRequest(
 export type ItemsResponse = { items: Item[]; page: number; perPage: number; totalItems: number; totalPages: number; categories: string[] };
 
 export const api = {
+  getAiProcessingConsent: () => request<{ accepted: boolean; version: string }>('/api/account/ai-consent'),
+  acceptAiProcessingConsent: () => request<{ accepted: boolean; version: string }>('/api/account/ai-consent', { method: 'POST' }),
   getPersonalization: (accountId: string, signal?: AbortSignal) =>
     personalizationRequest(accountId, { signal }),
   savePersonalization: (accountId: string, profile: PersonalizationInput) =>
@@ -181,16 +183,16 @@ export const api = {
       body: JSON.stringify({ ids, ...options }),
     }),
 
-  registerEmail: (email: string, password: string, name?: string) =>
+  registerEmail: (email: string, password: string, name?: string, aiProcessingConsent = false) =>
     request<AuthSession>('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password, name }),
+      body: JSON.stringify({ email, password, name, ai_processing_consent: aiProcessingConsent }),
     }),
 
-  authGoogle: (idToken: string, email?: string) =>
+  authGoogle: (idToken: string, email?: string, aiProcessingConsent = false) =>
     request<AuthSession>('/api/auth/google', {
       method: 'POST',
-      body: JSON.stringify({ id_token: idToken, email }),
+      body: JSON.stringify({ id_token: idToken, email, ai_processing_consent: aiProcessingConsent }),
     }),
 
   /**
@@ -200,13 +202,14 @@ export const api = {
    * app offering Sign in with Apple plus account deletion. Optional: sign-in
    * works without it, only revocation is lost.
    */
-  authApple: (identityToken: string, email?: string, authorizationCode?: string) =>
+  authApple: (identityToken: string, email?: string, authorizationCode?: string, aiProcessingConsent = false) =>
     request<AuthSession>('/api/auth/apple', {
       method: 'POST',
       body: JSON.stringify({
         identity_token: identityToken,
         email,
         authorization_code: authorizationCode,
+        ai_processing_consent: aiProcessingConsent,
       }),
     }),
 
