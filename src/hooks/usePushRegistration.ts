@@ -9,6 +9,8 @@ import {
 } from "@/lib/pushDevice";
 import { pb } from "@/lib/pb";
 
+const ANDROID_PUSH_CHANNEL_ID = "updates";
+
 export interface PushRegistrationResult {
   status: "registered" | "permission-required" | "settings-required" | "error" | "unsupported";
   message: string;
@@ -36,9 +38,10 @@ async function performPushRegistration(
       return { status: "error", message: "This app version cannot register notifications. Update the app and try again." };
     // Android 13 needs a channel before it can present the permission prompt.
     if (Platform.OS === "android")
-      await notifications.setNotificationChannelAsync("default", {
-        name: "Flowy",
-        importance: notifications.AndroidImportance.DEFAULT,
+      await notifications.setNotificationChannelAsync(ANDROID_PUSH_CHANNEL_ID, {
+        name: "Flowy updates",
+        importance: notifications.AndroidImportance.HIGH,
+        sound: "default",
       });
     let permission = await notifications.getPermissionsAsync();
     if (permission.status !== "granted" && permission.canAskAgain && requestPermission)

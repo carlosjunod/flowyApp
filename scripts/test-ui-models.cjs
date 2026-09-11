@@ -242,23 +242,23 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
       permissionCalls.push(['save',account,token]); if(saveGate)await saveGate;if(saveFailure)throw Error('server private error');
     }},
     'expo-notifications':{
-      AndroidImportance:{DEFAULT:3},
-      setNotificationChannelAsync:async()=>{permissionCalls.push('channel');},
+      AndroidImportance:{HIGH:4},
+      setNotificationChannelAsync:async(id,settings)=>{permissionCalls.push(['channel',id,settings]);},
       getPermissionsAsync:async()=>{permissionCalls.push('permission');return permission;},
       requestPermissionsAsync:async()=>{permissionCalls.push('prompt');return permission={status:'granted',canAskAgain:true};},
       getExpoPushTokenAsync:async()=>{permissionCalls.push('token');if(tokenFailure)throw Error('private APNs data');return{data:'ExpoPushToken[test]'};},
     },
   })('src/hooks/usePushRegistration.ts').registerPushForCurrentUser;
   assert.equal((await register(false)).status,'permission-required');
-  assert.deepEqual(permissionCalls,['channel','permission']);
+  assert.deepEqual(permissionCalls,[['channel','updates',{name:'Flowy updates',importance:4,sound:'default'}],'permission']);
   passed('Automatic registration never requests permission or registers an unapproved token');
   permissionCalls.length=0;
   assert.equal((await register(true)).status,'registered');
-  assert.deepEqual(permissionCalls,['channel','permission','prompt','token',['save','account-a','ExpoPushToken[test]']]);
+  assert.deepEqual(permissionCalls,[['channel','updates',{name:'Flowy updates',importance:4,sound:'default'}],'permission','prompt','token',['save','account-a','ExpoPushToken[test]']]);
   passed('Android creates its channel before permission and persists the approved device');
   permission={status:'denied',canAskAgain:false};permissionCalls.length=0;
   assert.equal((await register(true)).status,'settings-required');
-  assert.deepEqual(permissionCalls,['channel','permission']);
+  assert.deepEqual(permissionCalls,[['channel','updates',{name:'Flowy updates',importance:4,sound:'default'}],'permission']);
   passed('Denied permission points to system settings without another prompt');
   permission={status:'granted',canAskAgain:false};saveFailure=true;
   const failedSave=await register(true);
@@ -267,11 +267,11 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   passed('Server registration failure is visible and never reports success');
   saveFailure=false;tokenFailure=true;permissionCalls.length=0;
   assert.equal((await register(true)).status,'error');
-  assert.ok(!permissionCalls.some(call=>Array.isArray(call)));
+  assert.ok(!permissionCalls.some(call=>Array.isArray(call)&&call[0]==='save'));
   passed('Token acquisition failure does not save an invalid device');
   tokenFailure=false;pushPlatform.OS='ios';permissionCalls.length=0;
   assert.equal((await register(false)).status,'registered');
-  assert.ok(!permissionCalls.includes('channel')&&!permissionCalls.includes('prompt'));
+  assert.ok(!permissionCalls.some(call=>Array.isArray(call)&&call[0]==='channel')&&!permissionCalls.includes('prompt'));
   passed('Granted iOS permission refreshes registration without prompting');
   permissionCalls.length=0;
   let releaseSave;
