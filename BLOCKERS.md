@@ -33,6 +33,6 @@ For macOS (Mac Catalyst): in Xcode, target → Supported Destinations → add "M
 
 ## Push release gates — 2026-09-10
 
-- **BLOCKER: physical delivery and signed native build remain unverified.** Use the new build on an owned test device/account to verify foreground/background/terminated item/report receipt and taps, denied-permission settings recovery, offline retry and account switching. Model tests, generated entitlements and Metro/Hermes exports do not establish physical APNs/FCM delivery.
+- **BLOCKER: physical notification delivery and taps remain unverified.** EAS development build `2fbc5968-d25b-4d3e-b4de-813e911fad12` was re-signed as `b1c7a091-070b-4ab2-9c4f-db6cb8c68fbf`, installed on an owned iPhone 16 Pro Max and loaded the branch bundle through Metro. Use this build to verify foreground/background/terminated item/report receipt and taps, denied-permission settings recovery, offline retry and account switching.
 - Android Firebase project `flowy-494202` now has app `app.tryflowy.client`; EAS stores its `GOOGLE_SERVICES_JSON` file variable for development, preview and production plus the matching FCM V1 service-account credential. Neither credential is tracked by Git or embedded in the client.
 - Server rollout is coordinated through `Flowy/docs/push-notifications-rollout.md`. `DIGEST_PUSH_ENABLED=1` is deployed on web/worker while the worker remains restricted to `DIGEST_DELIVERY_ENV=staging` and its explicit recipient allowlist. This task leaves isolated commits for later merge.
