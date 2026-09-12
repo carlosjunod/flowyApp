@@ -1,3 +1,4 @@
+import { SourceText } from './SourceText';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -103,24 +104,13 @@ export const ReelContent: React.FC<{ item: Item }> = ({ item }) => {
             textTransform: 'uppercase',
           }}
         >
-          Transcript
+          Saved text
         </Text>
         <View
           className="rounded-xl border border-border bg-surface"
           style={{ padding: 14 }}
         >
-          <Text
-            style={{
-              fontFamily: 'Inter_400Regular',
-              fontSize: 13,
-              lineHeight: 21,
-              color: colors.muted,
-              fontStyle: item.content?.trim() ? 'normal' : 'italic',
-              opacity: item.content?.trim() ? 1 : 0.7,
-            }}
-          >
-            {item.content?.trim() || 'No transcript captured for this reel.'}
-          </Text>
+          <SourceText text={item.content?.trim() || 'No text captured for this reel.'} />
         </View>
       </View>
     </View>

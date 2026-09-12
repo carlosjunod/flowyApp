@@ -1,3 +1,4 @@
+import { SourceText } from './SourceText';
 import React, { useState } from 'react';
 import Markdown from 'react-native-markdown-display';
 import { safeSemanticUrl } from '@/types/semantic';
@@ -49,8 +50,8 @@ export const GenericContent: React.FC<{ item: Item }> = ({ item }) => {
     <View>
       <ContentTabs
         tabs={[
-          ...(visualText ? [{ id: 'visual' as const, label: 'Visual summary' }] : []),
-          ...(transcriptText ? [{ id: 'transcript' as const, label: item.type === 'audio' || item.type === 'video' ? 'Transcript' : 'Saved text' }] : []),
+          ...(visualText ? [{ id: 'visual' as const, label: 'Image notes' }] : []),
+          ...(transcriptText ? [{ id: 'transcript' as const, label: 'Full text' }] : []),
         ]}
         active={tab}
         onChange={setTab}
@@ -62,9 +63,7 @@ export const GenericContent: React.FC<{ item: Item }> = ({ item }) => {
           padding: 14,
         }}
       >
-        <Markdown onLinkPress={url => Boolean(safeSemanticUrl(url))} style={{ body: { color: colors.fg, fontSize: 15, lineHeight: 22 }, link: { color: colors.fg }, code_inline: { color: colors.fg }, code_block: { color: colors.fg }, fence: { color: colors.fg } }}>
-          {active || emptyLabel}
-        </Markdown>
+        <SourceText text={active || emptyLabel} />
       </View>
     </View>
   );

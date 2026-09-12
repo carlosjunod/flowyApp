@@ -1,3 +1,4 @@
+import { useLocalSearchParams, router } from 'expo-router';
 import { useAdaptivePane } from '@/components/navigation/AdaptiveTabs';
 import { inboxCardColumns, inboxColumns } from '@/lib/adaptiveLayout';
 import { AppIcon } from '@/components/ui/AppIcon';
@@ -64,6 +65,9 @@ export default function InboxScreen() {
     [setViewMode, reducedMotion],
   );
 
+  const params = useLocalSearchParams<{ author?: string }>();
+  const author = typeof params.author === 'string' ? params.author : undefined;
+  const clearAuthor = () => router.setParams({ author: '' });
   const [searchInput, setSearchInput] = useState('');
   const search = useDebounced(searchInput, 200);
   const [category, setCategory] = useState<string | null>(null);
@@ -72,7 +76,7 @@ export default function InboxScreen() {
     userId: user?.id ?? null,
     sortField: 'created',
     sortDir: 'desc',
-    search, category,
+    search, category, author,
   });
 
   const items = useMemo(() => flattenPages(query.data), [query.data]);
@@ -116,6 +120,7 @@ export default function InboxScreen() {
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
       <PersonalizationInvitation />
+      {author ? <View className="px-4 flex-row items-center gap-3"><Text className="text-fg">Author: @{author.replace(/^instagram:/, '')}</Text><Pressable accessibilityRole="button" onPress={clearAuthor} style={{ minHeight: 44, justifyContent: 'center' }}><Text className="text-accent underline">Clear author filter</Text></Pressable></View> : null}
       <View className="flex-row items-center justify-between px-4 pt-2 pb-1">
         <Text
           className="text-3xl text-fg"
@@ -172,12 +177,13 @@ export default function InboxScreen() {
           ListEmptyComponent={query.isLoading || query.isError ? null :
             <EmptyState
               onSave={() => setBulkOpen(true)}
-              hasFilters={!!search || !!category}
+              hasFilters={!!search || !!category || !!author}
               search={search}
               category={category}
               onClearFilters={() => {
                 setSearchInput('');
                 setCategory(null);
+                clearAuthor();
               }}
             />
           }
@@ -214,12 +220,13 @@ export default function InboxScreen() {
           ListEmptyComponent={query.isLoading || query.isError ? null :
             <EmptyState
               onSave={() => setBulkOpen(true)}
-              hasFilters={!!search || !!category}
+              hasFilters={!!search || !!category || !!author}
               search={search}
               category={category}
               onClearFilters={() => {
                 setSearchInput('');
                 setCategory(null);
+                clearAuthor();
               }}
             />
           }

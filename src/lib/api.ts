@@ -132,7 +132,7 @@ export const api = {
   clearPersonalization: (accountId: string, revision: number) =>
     personalizationRequest(accountId, { method: 'DELETE', body: JSON.stringify({ revision }) }),
 
-  listItems: (params: { q?: string; category?: string; sort?: string; direction?: string; page?: number; perPage?: number }) => {
+  listItems: (params: { author?: string; q?: string; category?: string; sort?: string; direction?: string; page?: number; perPage?: number }) => {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== "") query.set(key, String(value));
     return request<ItemsResponse>(`/api/items?${query.toString()}`);
