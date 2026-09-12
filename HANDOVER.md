@@ -232,7 +232,7 @@ Validation for V1.1: TypeScript and all 18 existing UI model scenarios pass; iOS
 
 ## Source identity and content parity — 2026-09-12
 
-Optional source metadata/author key match server migration 35 and D-031. New
+Optional source metadata/author key match server migration 35 and D-032. New
 `src/types/source.ts` mirrors web/worker, `SourceIdentity.tsx` composes profile,
 repository and author navigation with original media; `SourceText.tsx` renders
 safe linkified Markdown. Carousel/reel text is now actionable. Inbox author URL
