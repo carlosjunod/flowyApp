@@ -1,3 +1,4 @@
+import { useItemEngagement } from '@/hooks/useItemEngagement';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { readSemanticContent, canResumeSemantic } from '@/types/semantic';
 import { Feather } from '@expo/vector-icons';
@@ -68,6 +69,7 @@ type ItemReaderProps = {
 /** Shared by the compact detail route and the landscape Inbox reading pane. */
 export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = false }: ItemReaderProps) {
   const { data: item, isLoading, error } = useItemById(id);
+  const engagement = useItemEngagement(item);
   // Pass the exploration status so the watcher re-arms when one starts. It
   // settles on a ready item, and an exploration can begin long after that.
   useItemStatus(id, item?.exploration?.status);
@@ -185,6 +187,17 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
               />
             ) : null}
           </View>
+        </View>
+
+        <View className="gap-1">
+          <Pressable onPress={() => { void engagement.toggleRead(); }} disabled={engagement.busy}
+            accessibilityRole="button" accessibilityLabel={item.read_at ? 'Mark as unread' : 'Mark as read'}
+            accessibilityState={{ disabled: engagement.busy }} className="min-h-[44px] flex-row items-center gap-2 self-start px-3 rounded-full border border-border">
+            <Feather name={item.read_at ? 'check' : 'circle'} size={17} color={colors.muted} />
+            <Text className="text-fg text-sm">{engagement.busy ? 'Saving…' : item.read_at ? 'Read · Mark as unread' : 'Mark as read'}</Text>
+          </Pressable>
+          <Text className="text-muted text-xs">{item.read_at ? 'Marked by you. You can undo this anytime.' : 'No read mark recorded. Opening does not mark this as read.'}</Text>
+          {engagement.error ? <Text accessibilityRole="alert" className="text-danger text-sm">{engagement.error}</Text> : null}
         </View>
 
         {showHero && heroUri ? (

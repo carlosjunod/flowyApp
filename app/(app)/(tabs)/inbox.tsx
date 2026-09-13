@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  AppState,
   FlatList,
   LayoutAnimation,
   Platform,
@@ -66,13 +67,14 @@ export default function InboxScreen() {
 
   const [searchInput, setSearchInput] = useState('');
   const search = useDebounced(searchInput, 200);
+  const [unread, setUnread] = useState(false);
   const [category, setCategory] = useState<string | null>(null);
 
   const query = useItems({
     userId: user?.id ?? null,
     sortField: 'created',
     sortDir: 'desc',
-    search, category,
+    search, category, unread,
   });
 
   const items = useMemo(() => flattenPages(query.data), [query.data]);
@@ -84,7 +86,7 @@ export default function InboxScreen() {
     let cancelled = false;
     const invalidate = () => {
       if (cancelled) return;
-      void queryClient.invalidateQueries({ queryKey: ['items'] });
+      void queryClient.invalidateQueries({ queryKey: ['items', user.id] });
     };
     let unsub: (() => void) | null = null;
     (async () => {
@@ -100,7 +102,11 @@ export default function InboxScreen() {
         // fall back to normal refetch
       }
     })();
+    const foreground = AppState.addEventListener('change', state => { if (state === 'active') invalidate(); });
+    const timer = setInterval(() => { if (AppState.currentState === 'active') invalidate(); }, 30_000);
     return () => {
+      foreground.remove();
+      clearInterval(timer);
       cancelled = true;
       unsub?.();
     };
@@ -135,15 +141,18 @@ export default function InboxScreen() {
       {user && items.length > 0 ? <DigestInvitation key={user.id} userId={user.id} /> : null}
       <BulkImportSheet onStatusChange={setCaptureStatus} visible={bulkOpen && paneVisible} onClose={() => setBulkOpen(false)} />
       <FilterBar
+        unread={unread}
+        onUnreadChange={setUnread}
         search={searchInput}
         onSearchChange={setSearchInput}
         categories={categories}
         category={category}
         onCategoryChange={setCategory}
       />
+      {unread ? <Text className="text-xs text-muted px-4 pt-1">Items without a read mark, including older saves with no recorded reading state.</Text> : null}
       {query.isError ? <View className="px-4 py-3 flex-row items-center gap-2"><Text accessibilityRole="alert" className="text-danger flex-1 text-sm">Your inbox could not be loaded. Check your connection and try again.</Text><Button title="Retry" variant="secondary" onPress={() => { void query.refetch(); }} /></View> : null}
       {query.isLoading ? <View accessibilityLabel="Loading saved content" className="px-4 gap-3 pt-3">{[1, 2, 3].map(n => <View key={n} className="h-20 bg-surface rounded-xl overflow-hidden relative"><Shimmer /></View>)}</View> : null}
-      {!query.isLoading && !query.isError ? <Text className="text-xs text-muted px-4 pt-2">{query.data?.pages[0]?.totalItems ?? 0} {search || category ? 'results' : 'saved items'}</Text> : null}
+      {!query.isLoading && !query.isError ? <Text className="text-xs text-muted px-4 pt-2">{query.data?.pages[0]?.totalItems ?? 0} {search || category || unread ? 'results' : 'saved items'}</Text> : null}
       {viewMode === 'grid' || columns > 1 ? (
         <FlatList
           key={`${viewMode}-${columns}`}
@@ -172,12 +181,13 @@ export default function InboxScreen() {
           ListEmptyComponent={query.isLoading || query.isError ? null :
             <EmptyState
               onSave={() => setBulkOpen(true)}
-              hasFilters={!!search || !!category}
+              hasFilters={!!search || !!category || unread}
               search={search}
               category={category}
               onClearFilters={() => {
                 setSearchInput('');
                 setCategory(null);
+                setUnread(false);
               }}
             />
           }
@@ -214,12 +224,13 @@ export default function InboxScreen() {
           ListEmptyComponent={query.isLoading || query.isError ? null :
             <EmptyState
               onSave={() => setBulkOpen(true)}
-              hasFilters={!!search || !!category}
+              hasFilters={!!search || !!category || unread}
               search={search}
               category={category}
               onClearFilters={() => {
                 setSearchInput('');
                 setCategory(null);
+                setUnread(false);
               }}
             />
           }

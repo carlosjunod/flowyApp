@@ -1,3 +1,4 @@
+import { ReadingIndicator } from './ReadingIndicator';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { SemanticPreview } from './content/SemanticContent';
 import { Feather } from '@expo/vector-icons';
@@ -71,7 +72,7 @@ export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColum
     <Animated.View entering={FadeIn.duration(180)}>
       <Pressable
         accessibilityRole={selection.mode ? 'checkbox' : 'button'}
-        accessibilityLabel={`${item.title ?? item.raw_url ?? 'Saved item'}${pending ? ', processing' : errored ? ', processing failed' : ''}`}
+        accessibilityLabel={`${item.title ?? item.raw_url ?? 'Saved item'}${item.read_at ? ', marked as read' : ', no read mark recorded'}${pending ? ', processing' : errored ? ', processing failed' : ''}`}
         accessibilityState={{ checked: selection.mode ? selected : undefined, selected: !selection.mode && active }}
         accessibilityActions={[{ name: 'longpress', label: 'Select item' }]}
         onAccessibilityAction={event => { if (event.nativeEvent.actionName === 'longpress') handleLongPress(); }}
@@ -143,6 +144,7 @@ export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColum
             {errored ? 'Processing failed · Tap to retry' : pending ? 'Processing saved content…' : subline || item.type}
           </Text>
         </View>
+        <ReadingIndicator item={item} />
         {pending || errored ? <Feather name={errored ? 'alert-circle' : 'clock'} size={18} color={errored ? '#B91C1C' : '#6B6258'} /> : null}
       </Pressable>
     </Animated.View>

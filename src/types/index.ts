@@ -101,6 +101,10 @@ export type Item = {
   source?: ItemSource;
   original_title?: string;
   bookmarked_at?: string;
+  /** Server-recorded first detail opening; absence means no recorded event. */
+  first_opened_at?: string;
+  /** Explicit manual completion only; empty/absent means unmarked. */
+  read_at?: string;
   import_batch?: string;
   /** OpenGraph fields surfaced by ingest enrichment (read by detail renderers). */
   og_image?: string;
@@ -172,6 +176,9 @@ export type ApiErrorCode =
   | 'CHAT_HISTORY_UNAVAILABLE'
   | 'ITEM_NOT_FOUND'
   | 'INVALID_INPUT'
+  | 'INVALID_ORIGIN'
+  | 'INVALID_ENGAGEMENT'
+  | 'ENGAGEMENT_UNAVAILABLE'
   | 'INGEST_FAILED'
   | 'RATE_LIMITED'
   | 'SERVER_ERROR'
@@ -261,6 +268,8 @@ export type AliasData = {
   domain: string;
 };
 
+export type DigestCadence = 'daily' | 'weekly' | 'monthly';
+
 export type DigestSection = {
   category: string;
   summary: string;
@@ -278,7 +287,7 @@ export type DigestContent = {
   themes?: DigestBlock[];
   highlights?: DigestBlock[];
   connections?: DigestBlock[];
-  cadence?: 'daily' | 'weekly';
+  cadence?: DigestCadence;
   timezone?: string;
   quality_mode?: 'ai' | 'fallback';
   quality_reason?: string;
@@ -289,7 +298,7 @@ export type DigestContent = {
 };
 
 export type Digest = {
-  cadence?: 'daily'|'weekly'; first_opened_at?: string; status?: string;
+  cadence?: DigestCadence; first_opened_at?: string; status?: string;
   feedback?: {target:string;value:string}[];
   sources?: {id:string;title?:string;source_url?:string;raw_url?:string}[];
   id: string;
@@ -306,6 +315,8 @@ export type DigestPreferences = {
   timezone: string; locale: 'en' | 'es';
   daily_enabled: boolean; daily_local_time: string; daily_push_enabled: boolean; daily_email_enabled: boolean;
   weekly_enabled: boolean; weekly_day: number; weekly_local_time: string; weekly_push_enabled: boolean; weekly_email_enabled: boolean;
+  /** Omitted by older servers; monthly remains opt-in and shares the paid cadence gate. */
+  monthly_enabled?: boolean; monthly_day?: number; monthly_local_time?: string; monthly_push_enabled?: boolean; monthly_email_enabled?: boolean;
   paused_until: string | null; excluded_types: string[]; excluded_categories: string[];
 };
 
@@ -337,3 +348,6 @@ export type BulkActionPayload = { ids: string[] };
 export type DigestChatContext = {digestId: string; scope: "digest" | "items"; itemIds?: string[]; selectedText?: string};
 
 export * from './personalization';
+
+export type ItemEngagementAction = 'open' | 'mark_read' | 'mark_unread';
+export type ItemEngagement = { id: string; first_opened_at: string; read_at: string };

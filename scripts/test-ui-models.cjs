@@ -190,15 +190,19 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
 
   let searchParams;
   const fixture = { items: [{ id: 'old-item', title: 'An older saved item' }], page: 3, perPage: 20, totalItems: 41, totalPages: 3, categories: ['technology'] };
-  const items = loader({ '@tanstack/react-query': { useInfiniteQuery: options => options }, '@/lib/pb': { pb: {} }, '@/lib/api': { api: { listItems: async params => { searchParams = params; return { data: fixture, error: null }; } } } })('src/hooks/useItems.ts');
+  const items = loader({ '@tanstack/react-query': { useInfiniteQuery: options => options }, '@/lib/auth': { useAuth: () => ({ user: { id: 'account-a' } }) }, '@/lib/pb': { pb: { authStore: { model: { id: 'account-a' }, token: 'fixture' } } }, '@/lib/api': { api: { listItems: async params => { searchParams = params; return { data: fixture, error: null }; } } } })('src/hooks/useItems.ts');
   const options = items.useItems({ userId: 'account-a', sortField: 'created', sortDir: 'desc', search: ' older ', category: ' Tech ' });
   const page = await options.queryFn({ pageParam: 3 });
-  assert.deepEqual(searchParams, { page: 3, perPage: 20, q: 'older', category: 'technology', sort: 'date', direction: 'desc' });
+  assert.deepEqual(searchParams, { unread: undefined, page: 3, perPage: 20, q: 'older', category: 'technology', sort: 'date', direction: 'desc' });
   assert.equal(page.items[0].id, 'old-item');
   assert.equal(options.getNextPageParam(fixture), undefined);
   assert.notDeepEqual(items.itemsQueryKey({ userId: 'account-a', search: 'one', sortField: 'created', sortDir: 'desc' }), items.itemsQueryKey({ userId: 'account-a', search: 'two', sortField: 'created', sortDir: 'desc' }));
 
-  passed('Global search pagination category and cache keys');
+  const unreadOptions = items.useItems({ userId: 'account-a', sortField: 'created', sortDir: 'desc', unread: true });
+  await unreadOptions.queryFn({ pageParam: 1 });
+  assert.equal(searchParams.unread, true);
+  assert.notDeepEqual(unreadOptions.queryKey, items.useItems({ userId: 'account-a', sortField: 'created', sortDir: 'desc' }).queryKey);
+  passed('Global search pagination category unread filter and cache keys');
   const runner = hookRunner();
   const streams = [];
   const writes = [];

@@ -25,6 +25,9 @@ import { useDigestCategories } from "@/hooks/useDigestCategories";
 import { registerPushForCurrentUser } from "@/hooks/usePushRegistration";
 import { PushNotificationSettings } from "@/components/settings/PushNotificationSettings";
 import {
+  availableDigestCadences,
+  DIGEST_CADENCE_LABELS,
+  DIGEST_MONTH_DAYS,
   dateInZone,
   DIGEST_DAYS,
   DIGEST_TYPES,
@@ -236,7 +239,7 @@ export default function DigestSettingsScreen() {
           {view && (
             <Text className="text-xs font-semibold text-muted uppercase tracking-widest flex-shrink text-right">
               {view.betaAccessEndsAt ? "Beta Pro" : view.effectivePlan || "Your plan"} ·{" "}
-              {view.canEnableDaily ? "Daily + weekly" : "Weekly"}
+              {view.canEnableDaily ? `Daily + weekly${view.settings?.monthly_enabled !== undefined ? " + monthly" : ""}` : "Weekly"}
             </Text>
           )}
         </View>
@@ -316,10 +319,10 @@ export default function DigestSettingsScreen() {
                 title="Schedule"
                 subtitle="Choose when to bring your saved ideas back."
               >
-                {(["weekly", "daily"] as const).map((cadence) => {
+                {availableDigestCadences(draft).map((cadence) => {
                   const enabledKey = `${cadence}_enabled` as const;
-                  const enabled = draft[enabledKey];
-                  const locked = cadence === "daily" && !view.canEnableDaily;
+                  const enabled = !!draft[enabledKey];
+                  const locked = cadence !== "weekly" && !view.canEnableDaily;
                   const next = view.next?.find(
                     (entry) => entry.cadence === cadence,
                   );
@@ -331,22 +334,22 @@ export default function DigestSettingsScreen() {
                       <View className="flex-row items-center gap-3">
                         <View className="w-10 h-10 rounded-xl border border-accent/20 bg-accent/10 items-center justify-center">
                           <AppIcon
-                            name={cadence === "weekly" ? "calendar" : "sun"}
+                            name={cadence === "daily" ? "sun" : "calendar"}
                             color={colors.accent}
                           />
                         </View>
                         <View className="flex-1 gap-1">
                           <Text className="text-base text-fg font-semibold">
-                            {cadence === "weekly"
-                              ? "Weekly digest"
-                              : "Daily digest"}
+                            {DIGEST_CADENCE_LABELS[cadence]}
                           </Text>
                           <Text className="font-sans text-sm text-muted">
                             {locked
                               ? "Available on paid plans"
                               : cadence === "weekly"
                                 ? "A little perspective, once a week"
-                                : "A moment for yesterday’s ideas"}
+                                : cadence === "monthly"
+                                  ? "A look back at the previous calendar month"
+                                  : "A moment for yesterday’s ideas"}
                           </Text>
                         </View>
                         <Switch
@@ -391,6 +394,19 @@ export default function DigestSettingsScreen() {
                               </View>
                             </View>
                           )}
+                          {cadence === "monthly" && (
+                            <View className="gap-2">
+                              <Text className="font-sans text-sm text-muted">Publication day of the month</Text>
+                              <View className="flex-row flex-wrap gap-1" accessibilityRole="radiogroup" accessibilityLabel="Monthly publication day">
+                                {DIGEST_MONTH_DAYS.map(day => (
+                                  <DigestChip key={day} label={String(day)} accessibilityLabel={`Day ${day} of each month`}
+                                    compact role="radio" selected={(draft.monthly_day ?? 1) === day} disabled={busy}
+                                    onPress={() => change("monthly_day", day)} />
+                                ))}
+                              </View>
+                              <Text className="font-sans text-xs text-muted">Days 1–28 are available in every month.</Text>
+                            </View>
+                          )}
                           <View className="gap-1 border-t border-border pt-3">
                             <Text className="font-sans text-sm text-muted">
                               Publication time
@@ -398,7 +414,7 @@ export default function DigestSettingsScreen() {
                             <DigestDateField
                               label={`${cadence} publication time`}
                               mode="time"
-                              value={draft[`${cadence}_local_time`]}
+                              value={draft[`${cadence}_local_time`] ?? "08:00"}
                               disabled={busy}
                               onChange={(value) =>
                                 change(`${cadence}_local_time`, value)
@@ -411,7 +427,9 @@ export default function DigestSettingsScreen() {
                           <Text className="font-sans text-sm text-muted leading-5">
                             {cadence === "weekly"
                               ? `Every ${DIGEST_DAYS[draft.weekly_day - 1]} at ${displayTime(draft.weekly_local_time)} · the previous 7 complete days.`
-                              : `Every day at ${displayTime(draft.daily_local_time)} · the previous complete day.`}
+                              : cadence === "monthly"
+                                ? `Day ${draft.monthly_day ?? 1} of each month at ${displayTime(draft.monthly_local_time ?? "08:00")} · the previous complete calendar month.`
+                                : `Every day at ${displayTime(draft.daily_local_time)} · the previous complete day.`}
                           </Text>
                           {!dirty && !paused && next?.enabled && (
                             <Text className="font-sans text-xs text-muted">
@@ -434,10 +452,15 @@ export default function DigestSettingsScreen() {
                     </View>
                   );
                 })}
-                {draft.daily_enabled && draft.weekly_enabled && (
+                {draft.daily_enabled && draft.weekly_enabled && !draft.monthly_enabled && (
                   <Text className="font-sans text-sm text-muted leading-5">
                     On your weekly digest day, it replaces the daily one. You’ll
                     receive at most one report per day.
+                  </Text>
+                )}
+                {draft.monthly_enabled && (draft.weekly_enabled || draft.daily_enabled) && (
+                  <Text className="font-sans text-sm text-muted leading-5">
+                    When schedules overlap, monthly takes priority, then weekly, then daily. You’ll receive at most one report per day. All cadences share your monthly allowance.
                   </Text>
                 )}
                 <View className="gap-2 pt-1">
@@ -582,16 +605,14 @@ export default function DigestSettingsScreen() {
                 title="How it reaches you"
                 subtitle="Every published digest is saved in the app. Notifications and email are optional."
               >
-                {draft.weekly_enabled || draft.daily_enabled ? (
+                {draft.weekly_enabled || draft.daily_enabled || draft.monthly_enabled ? (
                   <View className="bg-surface rounded-xl border border-border p-5 gap-4">
-                    {(["weekly", "daily"] as const)
+                    {availableDigestCadences(draft)
                       .filter((cadence) => draft[`${cadence}_enabled`])
                       .map((cadence) => (
                         <View key={cadence} className="gap-3">
                           <Text className="text-base text-fg font-semibold">
-                            {cadence === "weekly"
-                              ? "Weekly digest"
-                              : "Daily digest"}
+                            {DIGEST_CADENCE_LABELS[cadence]}
                           </Text>
                           {(["push", "email"] as const).map((channel) => {
                             const key =
@@ -613,7 +634,7 @@ export default function DigestSettingsScreen() {
                                 <Switch
                                   thumbColor="#FFFFFF"
                                   accessibilityLabel={`${cadence} ${channel}`}
-                                  value={draft[key]}
+                                  value={!!draft[key]}
                                   trackColor={{ true: colors.accent }}
                                   disabled={
                                     busy ||
@@ -720,7 +741,7 @@ export default function DigestSettingsScreen() {
                   <DigestAction
                     title="Pause for a week…"
                     disabled={
-                      busy || (!draft.daily_enabled && !draft.weekly_enabled)
+                      busy || (!draft.daily_enabled && !draft.weekly_enabled && !draft.monthly_enabled)
                     }
                     onPress={() =>
                       change(
@@ -736,13 +757,14 @@ export default function DigestSettingsScreen() {
                 <DigestAction
                   title="Turn off all digests"
                   disabled={
-                    busy || (!draft.daily_enabled && !draft.weekly_enabled)
+                    busy || (!draft.daily_enabled && !draft.weekly_enabled && !draft.monthly_enabled)
                   }
                   onPress={() => {
                     setDraft({
                       ...draft,
                       daily_enabled: false,
                       weekly_enabled: false,
+                      ...(draft.monthly_enabled !== undefined ? { monthly_enabled: false } : {}),
                     });
                     setMessage("");
                   }}
@@ -837,7 +859,7 @@ export default function DigestSettingsScreen() {
                     ? "Unsaved changes"
                     : paused
                       ? "Digests are paused"
-                      : draft.weekly_enabled || draft.daily_enabled
+                      : draft.weekly_enabled || draft.daily_enabled || draft.monthly_enabled
                         ? "Your schedule is saved"
                         : "Digests are off"}
               </Text>

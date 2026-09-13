@@ -1,6 +1,20 @@
 import { DIGEST_TIMEZONES } from "./digestTimezones";
-import type { DigestPreferences } from "@/types";
+import type { DigestCadence, DigestPreferences } from "@/types";
 import { itemTypeLabel } from "./itemIcons";
+
+export const DIGEST_CADENCE_LABELS: Record<DigestCadence, string> = {
+  daily: 'Daily digest', weekly: 'Weekly digest', monthly: 'Monthly digest',
+};
+export const DIGEST_MONTH_DAYS = Array.from({ length: 28 }, (_, index) => index + 1);
+
+/** Older servers do not expose monthly settings; never send new opt-in fields to them. */
+export function availableDigestCadences(settings: DigestPreferences): DigestCadence[] {
+  return settings.monthly_enabled === undefined ? ['weekly', 'daily'] : ['weekly', 'daily', 'monthly'];
+}
+
+export function nextDigestCadence(cadence?: DigestCadence): DigestCadence | undefined {
+  return cadence === undefined ? 'weekly' : cadence === 'weekly' ? 'daily' : cadence === 'daily' ? 'monthly' : undefined;
+}
 
 export const DIGEST_DAYS = [
   "Monday",
@@ -37,7 +51,7 @@ export function preferencesChanged(
   draft: DigestPreferences | null,
 ): boolean {
   if (!saved || !draft) return false;
-  return (Object.keys(saved) as (keyof DigestPreferences)[]).some((key) => {
+  return ([...new Set([...Object.keys(saved), ...Object.keys(draft)])] as (keyof DigestPreferences)[]).some((key) => {
     const before = saved[key],
       after = draft[key];
     return Array.isArray(before) && Array.isArray(after)

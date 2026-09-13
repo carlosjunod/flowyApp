@@ -10,11 +10,14 @@ import type {
   BulkActionResult,
   CitedItem,
   Digest,
+  DigestCadence,
   DigestSettings,
   DigestPreferences,
   IngestPayload,
   IngestResponse,
   Item,
+  ItemEngagement,
+  ItemEngagementAction,
   PersonalizationProfile,
   PersonalizationInput,
 } from '@/types';
@@ -132,7 +135,7 @@ export const api = {
   clearPersonalization: (accountId: string, revision: number) =>
     personalizationRequest(accountId, { method: 'DELETE', body: JSON.stringify({ revision }) }),
 
-  listItems: (params: { q?: string; category?: string; sort?: string; direction?: string; page?: number; perPage?: number }) => {
+  listItems: (params: { q?: string; category?: string; sort?: string; direction?: string; page?: number; perPage?: number; unread?: boolean }) => {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== "") query.set(key, String(value));
     return request<ItemsResponse>(`/api/items?${query.toString()}`);
@@ -142,6 +145,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+
+  itemEngagement: async (accountId: string, id: string, action: ItemEngagementAction): Promise<ApiResult<ItemEngagement>> => {
+    const token = pb.authStore.token;
+    const sameSession = () => !!token && pb.authStore.model?.id === accountId && pb.authStore.token === token;
+    const sessionError: ApiResult<ItemEngagement> = { data: null, error: { code: 'UNAUTHORIZED', message: 'Your session changed. Reopen this item.' } };
+    if (!sameSession()) return sessionError;
+    const result = await request<ItemEngagement>(`/api/items/${encodeURIComponent(id)}/engagement`, {
+      method: 'POST', body: JSON.stringify({ action }), headers: { Authorization: `Bearer ${token}` },
+    });
+    return sameSession() ? result : sessionError;
+  },
 
   patchItem: (
     id: string,
@@ -228,7 +242,7 @@ export const api = {
   readDigest: (id: string) => request<Record<string, never>>(`/api/digest/${id}/read`, {method:'POST'}),
 
   listDigests: () => request<Digest[]>('/api/digest'),
-  listDigestPage: async (cursor:string|null, filters:{cadence?:'daily'|'weekly';read?:'read'|'new'}={}):Promise<{items:Digest[];nextCursor:string|null}> => {
+  listDigestPage: async (cursor:string|null, filters:{cadence?:DigestCadence;read?:'read'|'new'}={}):Promise<{items:Digest[];nextCursor:string|null}> => {
     const params=new URLSearchParams(filters);if(cursor)params.set('cursor',cursor);
     const response=await fetch(ENV.API_BASE_URL+'/api/digest?'+params.toString(),{headers:jsonHeaders()});
     if(!response.ok)throw new Error('Could not load reports. Check your connection and retry.');

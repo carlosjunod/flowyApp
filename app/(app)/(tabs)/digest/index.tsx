@@ -9,11 +9,12 @@ import { Spinner } from "@/components/ui/Spinner";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { relativeDate } from "@/lib/relativeDate";
-import type { Digest } from "@/types";
+import { nextDigestCadence } from "@/lib/digestSettings";
+import type { Digest, DigestCadence } from "@/types";
 
 export default function DigestListScreen() {
   const { user } = useAuth();
-  const [cadence, setCadence] = useState<"daily" | "weekly" | undefined>(),
+  const [cadence, setCadence] = useState<DigestCadence | undefined>(),
     [read, setRead] = useState<"read" | "new" | undefined>();
   const query = useInfiniteQuery({
     queryKey: ["digests", user?.id, cadence, read],
@@ -59,13 +60,7 @@ export default function DigestListScreen() {
           accessibilityRole="button"
           className="min-h-11 justify-center"
           onPress={() =>
-            setCadence(
-              cadence === undefined
-                ? "weekly"
-                : cadence === "weekly"
-                  ? "daily"
-                  : undefined,
-            )
+            setCadence(nextDigestCadence(cadence))
           }
         >
           <Text className="text-accent">Cadence: {cadence || "All"}</Text>
@@ -111,8 +106,7 @@ export default function DigestListScreen() {
             <View className="items-center justify-center px-6 pt-16">
               <View className="mb-3"><AppIcon name="file-text" size={40} /></View>
               <Text className="text-base text-muted text-center">
-                Nothing new to recap yet. Choose a weekly digest in settings
-                when you’re ready.
+                {cadence || read ? "No digests match these filters." : "Nothing new to recap yet. Choose your digest schedule in settings when you’re ready."}
               </Text>
             </View>
           }

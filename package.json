@@ -9,6 +9,8 @@
     "web": "expo start --web",
     "prebuild": "expo prebuild",
     "typecheck": "tsc --noEmit",
+    "test:digest-monthly": "node scripts/test-digest-monthly.cjs",
+    "test:item-engagement": "node scripts/test-item-engagement.cjs",
     "test:ui-models": "node scripts/test-ui-models.cjs",
     "test:push-contract": "node scripts/test-push-contract.cjs",
     "test:google-auth": "node scripts/test-google-auth.cjs"

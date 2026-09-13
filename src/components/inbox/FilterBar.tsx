@@ -5,6 +5,8 @@ import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useResolvedColors } from '@/lib/theme';
 
 type Props = {
+  unread?: boolean;
+  onUnreadChange?: (value: boolean) => void;
   search: string;
   onSearchChange: (value: string) => void;
   categories: string[];
@@ -13,6 +15,7 @@ type Props = {
 };
 
 export const FilterBar: React.FC<Props> = ({
+  unread, onUnreadChange,
   search,
   onSearchChange,
   categories,
@@ -52,6 +55,10 @@ export const FilterBar: React.FC<Props> = ({
             All
           </Text>
         </Pressable>
+        {onUnreadChange ? <Pressable accessibilityRole="button" accessibilityState={{ selected: !!unread }}
+          onPress={() => onUnreadChange(!unread)} className={`px-3.5 h-11 rounded-full items-center justify-center ${unread ? 'bg-fg' : 'bg-card border border-border'}`}>
+          <Text className={unread ? 'text-bg' : 'text-fg'}>Unread</Text>
+        </Pressable> : null}
         {categories.map((c) => (
           <Pressable
             key={c}

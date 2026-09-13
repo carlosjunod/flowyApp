@@ -1,3 +1,4 @@
+import { ReadingIndicator } from './ReadingIndicator';
 import { itemTypeLabel } from '@/lib/itemIcons';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { SemanticPreview } from './content/SemanticContent';
@@ -63,7 +64,7 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item }) => {
     <Animated.View entering={FadeIn.duration(180)}>
       <Pressable
         accessibilityRole={selection.mode ? 'checkbox' : 'button'}
-        accessibilityLabel={`${item.title ?? item.raw_url ?? 'Saved item'}${pending ? ', processing' : errored ? ', processing failed' : ''}`}
+        accessibilityLabel={`${item.title ?? item.raw_url ?? 'Saved item'}${item.read_at ? ', marked as read' : ', no read mark recorded'}${pending ? ', processing' : errored ? ', processing failed' : ''}`}
         accessibilityState={{ checked: selection.mode ? selected : undefined, selected: !selection.mode && active }}
         accessibilityActions={[{ name: 'longpress', label: 'Select item' }]}
         onAccessibilityAction={event => { if (event.nativeEvent.actionName === 'longpress') handleLongPress(); }}
@@ -123,6 +124,7 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item }) => {
           {item.summary ? <Text className="text-muted text-sm" numberOfLines={2}>{item.summary}</Text> : null}
           {pending || errored ? <Text className={errored ? 'text-danger text-sm' : 'text-muted text-sm'}>{errored ? 'Processing failed · Tap to retry' : 'Processing saved content…'}</Text> : null}
           <View className="flex-row items-end justify-between">
+            <ReadingIndicator item={item} />
             <Text
               className="text-muted text-xs flex-1 pr-2"
               numberOfLines={1}

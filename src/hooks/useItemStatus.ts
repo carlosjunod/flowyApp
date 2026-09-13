@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
+import { useAuth } from '@/lib/auth';
 import { pb } from '@/lib/pb';
 import type { Item } from '@/types';
 
@@ -38,9 +39,12 @@ const MAX_EXPLORE_WATCH_MS = 5 * 60_000;
  */
 export const useItemStatus = (id: string | undefined, watchKey?: string): void => {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const userId = user?.id;
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !userId) return;
+    const token = pb.authStore.token;
     const startedAt = Date.now();
     let cancelled = false;
     // Set once we have stopped watching, so a subscription whose setup resolves
@@ -66,8 +70,8 @@ export const useItemStatus = (id: string | undefined, watchKey?: string): void =
     };
 
     const handleItem = (item: Item) => {
-      if (cancelled) return;
-      qc.setQueryData<Item>(['item', id], item);
+      if (cancelled || item.user !== userId || pb.authStore.model?.id !== userId || pb.authStore.token !== token) return;
+      qc.setQueryData<Item>(['item', id, userId], item);
       qc.invalidateQueries({ queryKey: ['items'] });
       maybeStop(item);
     };
@@ -104,5 +108,5 @@ export const useItemStatus = (id: string | undefined, watchKey?: string): void =
       stopPolling();
       unsubscribe?.();
     };
-  }, [id, qc, watchKey]);
+  }, [id, qc, watchKey, userId]);
 };
