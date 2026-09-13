@@ -38,11 +38,13 @@ function loader(mocks = {}) {
   assert.equal(source.readAuthor({ type: 'instagram', content: 'Caption: @bob' }), undefined);
   assert.equal(source.githubRepository('https://github.com/acme/tool.git').url, 'https://github.com/acme/tool');
   let received;
-  const items = loader({ '@tanstack/react-query': { useInfiniteQuery: options => options }, '@/lib/pb': { pb: {} }, '@/lib/api': { api: { listItems: async params => { received = params; return { data: { items: [], totalItems: 0, page: 1, perPage: 20 }, error: null }; } } } })('src/hooks/useItems.ts');
-  const params = { userId: 'alice', sortField: 'created', sortDir: 'desc', category: 'design', author: 'instagram:bob' };
+  const items = loader({ '@tanstack/react-query': { useInfiniteQuery: options => options }, '@/lib/auth': { useAuth: () => ({ user: { id: 'alice' } }) }, '@/lib/pb': { pb: { authStore: { model: { id: 'alice' }, token: 'fixture-token' } } }, '@/lib/api': { api: { listItems: async params => { received = params; return { data: { items: [], totalItems: 0, page: 1, perPage: 20 }, error: null }; } } } })('src/hooks/useItems.ts');
+  const params = { userId: 'alice', sortField: 'created', sortDir: 'desc', category: 'design', unread: true, author: 'instagram:bob' };
   await items.useItems(params).queryFn({ pageParam: 2 });
   assert.equal(received.author, 'instagram:bob');
   assert.equal(received.category, 'design');
+  assert.equal(received.unread, true);
+  assert.notDeepEqual(items.itemsQueryKey(params), items.itemsQueryKey({ ...params, unread: false }));
   assert.equal(received.page, 2);
   assert.notDeepEqual(items.itemsQueryKey(params), items.itemsQueryKey({ ...params, author: 'instagram:carol' }));
   assert.notDeepEqual(items.itemsQueryKey(params), items.itemsQueryKey({ ...params, userId: 'carol' }));
