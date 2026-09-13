@@ -233,3 +233,15 @@ Validation: TypeScript and the existing 18 UI-model scenarios pass; iOS Metro/He
 The mirrored contract accepts optional extraction quality/progress and evidence origins while preserving old V1 records. Detail renders quality notices even for generic content, distinguishes incomplete reading from insufficient source text, labels caption/OCR/transcript evidence and offers “Continue extraction” through the existing Explore action. The worker checkpoints work and skips link lookup when continuing; no request shape or native capability changed. Original media and receipts remain in place. Source counts are classifier-reported with literal evidence, not keyword heuristics. The provider has not been evaluated against production content and no feature was deployed or enabled by this task.
 
 Validation for V1.1: TypeScript and all 18 existing UI model scenarios pass; iOS Metro/Hermes export succeeds. No native-device interaction was tested. Server regression suite: 133 tests across 14 files.
+
+## Source identity and content parity — 2026-09-12
+
+Optional source metadata/author key match server migration 35 and D-032. New
+`src/types/source.ts` mirrors web/worker, `SourceIdentity.tsx` composes profile,
+repository and author navigation with original media; `SourceText.tsx` renders
+safe linkified Markdown. Carousel/reel text is now actionable. Inbox author URL
+params feed the account-scoped API and query key, independently of categories.
+Legacy original author headers remain clickable. Author grouping requires a
+persisted key; future processing/cache hits populate it without a bulk backfill.
+No native capability/configuration change. Existing deployed builds have no
+runtime/channel for OTA; ship updated iOS production and Android preview builds.

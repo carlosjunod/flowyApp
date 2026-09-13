@@ -83,6 +83,8 @@ export type ItemExploration = {
 };
 
 export type Item = {
+  source_metadata?: import('./source').SourceMetadata;
+  author_key?: string;
   id: string;
   user: string;
   type: ItemType;

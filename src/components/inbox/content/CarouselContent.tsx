@@ -1,3 +1,4 @@
+import { SourceText } from './SourceText';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -106,6 +107,7 @@ export const CarouselContent: React.FC<{ item: Item }> = ({ item }) => {
       {/* Thumbnail strip */}
       <ThumbnailStrip slides={slides} activeIdx={idx} onSelect={setIdx} />
 
+      {item.content ? <View className="my-4"><Text className="text-fg font-semibold">Saved text</Text><SourceText text={item.content} /></View> : null}
       {/* AI Vision toggle + panel */}
       <Pressable
         onPress={() => setShowAI((v) => !v)}

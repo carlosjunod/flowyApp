@@ -1,3 +1,4 @@
+import { SourceIdentity } from './SourceIdentity';
 import React from 'react';
 
 import { getContentType, type ContentType } from '@/lib/contentType';
@@ -23,7 +24,7 @@ export const ContentRenderer: React.FC<{ item: Item; contentType?: ContentType }
 }) => {
   const type = contentType ?? getContentType(item);
 
-  return <><SemanticContent item={item} /><OriginalContent item={item} type={type} /></>;
+  return <><SourceIdentity item={item} /><SemanticContent item={item} /><OriginalContent item={item} type={type} /></>;
 };
 
 function OriginalContent({ item, type }: { item: Item; type: ContentType }) {
