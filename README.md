@@ -282,3 +282,19 @@ Native TypeScript, label API/order tests, ten reader navigation scenarios and
 26 Google authentication scenarios pass on the integrated main source. The
 broader UI-model harness reaches its previously documented TypeScript generic
 transpilation failure in `chatSync.ts`; this is not a passing full UI-model suite.
+
+### Inbox states and card sizes — 2026-09-14
+
+The native inbox now exposes Cards, List and Summary, plus persistent Small,
+Medium and Large card sizes. All variants use `src/components/inbox/ItemStatus.tsx`
+and the portable `src/types/inbox-presentation.ts` rules mirrored in the web app.
+Completed Deep Dives have a warm orange surface; unread saves use a green dot
+and read saves a muted check. Processing retains the saved title with a loader.
+A failed processing run displays Link saved (when a usable link exists), Open
+link and Retry processing; a failed Deep Dive keeps existing content and retries
+research independently. The reader uses the same neutral failure wording.
+
+Validation: `npm run typecheck`, plus 52 paired web/native tests and the web
+acceptance runner documented in the sibling server's `TESTING.md`. Native type
+parity includes the existing optional exploration `deep` flag. No dependencies,
+entitlements, API shapes or native project configuration changed.

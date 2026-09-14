@@ -1,33 +1,26 @@
-import { useCallback, useEffect, useState } from 'react';
-
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ViewMode } from '@/types';
-
+import { isCardSize, type CardSize } from '@/types/inbox-presentation';
 import { localSecureStore } from './secureStore';
 
-const VIEW_MODE_KEY = 'tryflowy.viewMode';
-const DEFAULT: ViewMode = 'list';
+const isViewMode = (value: unknown): value is ViewMode => value === 'grid' || value === 'list' || value === 'detail';
 
-const isViewMode = (value: unknown): value is ViewMode =>
-  value === 'grid' || value === 'list';
-
-export const useViewMode = (): [ViewMode, (mode: ViewMode) => void] => {
-  const [mode, setMode] = useState<ViewMode>(DEFAULT);
-
+function usePreference<T extends string>(key: string, fallback: T, valid: (value: unknown) => value is T): [T, (value: T) => void] {
+  const [value, setValue] = useState(fallback);
+  const edited = useRef(false);
+  const writes = useRef(Promise.resolve());
   useEffect(() => {
-    let mounted = true;
-    localSecureStore.getItem(VIEW_MODE_KEY).then((raw) => {
-      if (!mounted) return;
-      if (isViewMode(raw)) setMode(raw);
-    });
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    let alive = true;
+    void localSecureStore.getItem(key).then(raw => { if (alive && !edited.current && valid(raw)) setValue(raw); }).catch(() => {});
+    return () => { alive = false; };
+  }, [key, valid]);
+  const update = useCallback((next: T) => {
+    edited.current = true;
+    setValue(next);
+    writes.current = writes.current.then(() => localSecureStore.setItem(key, next)).catch(() => {});
+  }, [key]);
+  return [value, update];
+}
 
-  const update = useCallback((next: ViewMode) => {
-    setMode(next);
-    void localSecureStore.setItem(VIEW_MODE_KEY, next);
-  }, []);
-
-  return [mode, update];
-};
+export const useViewMode = () => usePreference<ViewMode>('tryflowy.viewMode', 'list', isViewMode);
+export const useCardSize = () => usePreference<CardSize>('tryflowy.cardSize', 'medium', isCardSize);

@@ -73,6 +73,8 @@ export type ExplorationDeepAnalysis = {
 
 export type ItemExploration = {
   status: ExplorationStatus;
+  /** Existing server flag distinguishes research from automatic exploration. */
+  deep?: boolean;
   primary_link?: ExplorationLink;
   candidates: ExplorationCandidate[];
   video_insights?: ExplorationVideoInsights;

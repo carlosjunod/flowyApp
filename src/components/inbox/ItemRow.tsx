@@ -1,4 +1,6 @@
-import { ReadingIndicator } from './ReadingIndicator';
+import { ItemStatus } from './ItemStatus';
+import { itemPresentation } from '@/types/inbox-presentation';
+import { useResolvedColors } from '@/lib/theme';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { SemanticPreview } from './content/SemanticContent';
 import { Feather } from '@expo/vector-icons';
@@ -38,12 +40,12 @@ const compactRelative = (input: string, now: Date = new Date()): string => {
   return monthDayLabel(input);
 };
 
-type Props = { onOpen?: (id: string) => void; active?: boolean; item: Item; inColumn?: boolean };
+type Props = { onOpen?: (id: string) => void; active?: boolean; item: Item; inColumn?: boolean; detailed?: boolean };
 
-export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColumn = false }) => {
+export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColumn = false, detailed = false }) => {
   const pending = isPending(item);
-  const errored = item.status === 'error';
-  const ready = item.status === 'ready';
+  const colors = useResolvedColors();
+  const presentation = itemPresentation(item);
   const selection = useSelection();
   const selected = selection.selectedIds.has(item.id);
   const thumb = thumbnailFor(item);
@@ -73,7 +75,7 @@ export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColum
     <Animated.View entering={FadeIn.duration(180)}>
       <Pressable
         accessibilityRole={selection.mode ? 'checkbox' : 'button'}
-        accessibilityLabel={`${item.title ?? item.raw_url ?? 'Saved item'}${item.read_at ? ', marked as read' : ', no read mark recorded'}${pending ? ', processing' : errored ? ', processing failed' : ''}`}
+        accessibilityLabel={`${item.title ?? item.raw_url ?? 'Saved item'}${item.read_at ? ', marked as read' : ', no read mark recorded'}${", " + presentation.label + (presentation.notice ? ", " + presentation.notice : "")}`}
         accessibilityState={{ checked: selection.mode ? selected : undefined, selected: !selection.mode && active }}
         accessibilityActions={[{ name: 'longpress', label: 'Select item' }]}
         onAccessibilityAction={event => { if (event.nativeEvent.actionName === 'longpress') handleLongPress(); }}
@@ -83,6 +85,9 @@ export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColum
         style={({ pressed }) => [
           {
             minHeight: 64,
+            backgroundColor: presentation.deep ? colors.inboxDeep : colors.card,
+            borderWidth: selected || active ? 2 : 1,
+            borderColor: selected || active ? colors.accent : presentation.deep ? colors.inboxDeepBorder : colors.border,
             shadowColor: '#1C1815',
             shadowOpacity: 0.06,
             shadowRadius: 8,
@@ -106,13 +111,13 @@ export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColum
         ) : null}
         <View
           className="rounded-lg bg-surface items-center justify-center overflow-hidden border border-border"
-          style={{ width: 40, height: 40 }}
+          style={{ width: detailed ? 56 : 40, height: detailed ? 56 : 40 }}
         >
           {thumb.kind === 'image' ? (
             <Image
               source={{ uri: thumb.uri }}
               contentFit="cover"
-              style={{ width: 40, height: 40 }}
+              style={{ width: detailed ? 56 : 40, height: detailed ? 56 : 40 }}
             />
           ) : (
             <AppIcon name={thumb.icon} size={20} />
@@ -142,11 +147,11 @@ export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColum
             style={{ fontFamily: 'Inter_400Regular', fontSize: 12 }}
             numberOfLines={1}
           >
-            {errored ? 'Processing failed · Tap to retry' : pending ? 'Processing saved content…' : subline || item.type}
+            {subline || item.type}
           </Text>
+          {detailed && item.summary ? <Text style={{ color: colors.muted, fontSize: 14, lineHeight: 20 }} numberOfLines={3}>{item.summary}</Text> : null}
+          <ItemStatus item={item} selectionMode={selection.mode} />
         </View>
-        <ReadingIndicator item={item} />
-        {pending || errored ? <Feather name={errored ? 'alert-circle' : 'clock'} size={18} color={errored ? '#B91C1C' : '#6B6258'} /> : null}
       </Pressable>
       {!selection.mode ? <View style={{ position: 'absolute', top: 10, right: inColumn ? 8 : 24 }}><ItemActionsMenu item={item} variant="compact" /></View> : null}
     </Animated.View>

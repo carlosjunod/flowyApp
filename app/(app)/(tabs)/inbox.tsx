@@ -28,6 +28,7 @@ import { BulkImportSheet } from '@/components/inbox/BulkImportSheet';
 import { FilterBar } from '@/components/inbox/FilterBar';
 import { ItemCard } from '@/components/inbox/ItemCard';
 import { ItemRow } from '@/components/inbox/ItemRow';
+import { ItemDetailRow } from '@/components/inbox/ItemDetailRow';
 import { SelectionActionBar } from '@/components/inbox/SelectionActionBar';
 import { Shimmer } from '@/components/ui/Shimmer';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -43,7 +44,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import { pb } from '@/lib/pb';
 import { useResolvedColors } from '@/lib/theme';
-import { useViewMode } from '@/lib/viewMode';
+import { useViewMode, useCardSize } from '@/lib/viewMode';
 import type { Item, ViewMode } from '@/types';
 
 export default function InboxScreen() {
@@ -54,6 +55,7 @@ export default function InboxScreen() {
   const colors = useResolvedColors();
   const selection = useSelection();
   const [viewMode, setViewMode] = useViewMode();
+  const [cardSize, setCardSize] = useCardSize();
   const [bulkOpen, setBulkOpen] = useState(false);
   const [captureStatus, setCaptureStatus] = useState<'idle' | 'working' | 'done'>('idle');
   const reducedMotion = useReducedMotion();
@@ -123,7 +125,7 @@ export default function InboxScreen() {
   };
 
   const columns = viewMode === 'grid'
-    ? inboxCardColumns(width, fontScale, split)
+    ? inboxCardColumns(width, fontScale, split, cardSize)
     : inboxColumns(width, fontScale);
 
 
@@ -139,14 +141,11 @@ export default function InboxScreen() {
           Inbox
         </Text>
         <View className="flex-row items-center gap-2">
-          <ViewModeToggle
-            value={viewMode === 'list' ? 'list' : 'grid'}
-            onChange={onViewModeChange}
-          />
           <Pressable onPress={() => selection.mode ? selection.exit() : selection.enter()} accessibilityRole="button" accessibilityLabel={selection.mode ? 'Cancel selection' : 'Select items'} className="h-11 justify-center px-2"><Text className="text-fg text-sm">{selection.mode ? 'Cancel' : 'Select'}</Text></Pressable>
           <Pressable onPress={() => setBulkOpen(true)} accessibilityRole="button" accessibilityLabel="Save a link" className="h-11 rounded-full bg-primary px-4 justify-center"><Text className="text-bg font-semibold">{captureStatus === 'working' ? 'Saving…' : captureStatus === 'done' ? 'Saved' : 'Save'}</Text></Pressable>
         </View>
       </View>
+      <ViewModeToggle value={viewMode} onChange={onViewModeChange} cardSize={cardSize} onCardSize={setCardSize} />
       {user && items.length > 0 ? <DigestInvitation key={user.id} userId={user.id} /> : null}
       <BulkImportSheet onStatusChange={setCaptureStatus} visible={bulkOpen && paneVisible} onClose={() => setBulkOpen(false)} />
       <FilterBar
@@ -163,7 +162,7 @@ export default function InboxScreen() {
       {query.isError ? <View className="px-4 py-3 flex-row items-center gap-2"><Text accessibilityRole="alert" className="text-danger flex-1 text-sm">Your inbox could not be loaded. Check your connection and try again.</Text><Button title="Retry" variant="secondary" onPress={() => { void query.refetch(); }} /></View> : null}
       {query.isLoading ? <View accessibilityLabel="Loading saved content" className="px-4 gap-3 pt-3">{[1, 2, 3].map(n => <View key={n} className="h-20 bg-surface rounded-xl overflow-hidden relative"><Shimmer /></View>)}</View> : null}
       {!query.isLoading && !query.isError ? <Text className="text-xs text-muted px-4 pt-2">{query.data?.pages[0]?.totalItems ?? 0} {search || category || tag || unread || author ? 'results' : 'saved items'}</Text> : null}
-      {viewMode === 'grid' || columns > 1 ? (
+      {viewMode === 'grid' || viewMode === 'detail' || columns > 1 ? (
         <FlatList
           key={`${viewMode}-${columns}`}
           data={visible}
@@ -185,7 +184,7 @@ export default function InboxScreen() {
                   : { paddingHorizontal: 16 }
               }
             >
-              {viewMode === 'grid' ? <ItemCard item={item} onOpen={onOpenItem} active={item.id === selectedItemId} /> : <ItemRow item={item} inColumn onOpen={onOpenItem} active={item.id === selectedItemId} />}
+              {viewMode === 'grid' ? <ItemCard item={item} size={cardSize} onOpen={onOpenItem} active={item.id === selectedItemId} /> : viewMode === 'detail' ? <ItemDetailRow item={item} inColumn onOpen={onOpenItem} active={item.id === selectedItemId} /> : <ItemRow item={item} inColumn onOpen={onOpenItem} active={item.id === selectedItemId} />}
             </View>
           )}
           ListEmptyComponent={query.isLoading || query.isError ? null :

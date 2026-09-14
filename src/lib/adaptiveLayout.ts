@@ -1,3 +1,5 @@
+import type { CardSize } from '@/types/inbox-presentation';
+
 /** Layout follows the app window, never a device model or the physical screen. */
 export function adaptiveLayout(width: number, height: number, fontScale = 1) {
   const minPaneWidth = 400 * Math.max(1, fontScale);
@@ -12,9 +14,9 @@ export function inboxColumns(width: number, fontScale = 1): number {
 }
 
 /** Cards can be denser than rows, especially beside the chat panel. */
-export function inboxCardColumns(width: number, fontScale = 1, split = false): number {
-  const minCardWidth = (split ? 180 : 250) * Math.max(1, fontScale);
-  return Math.max(1, Math.min(3, Math.floor((width - 32 + 12) / (minCardWidth + 12))));
+export function inboxCardColumns(width: number, fontScale = 1, split = false, size: CardSize = 'medium'): number {
+  const minCardWidth = (size === 'small' ? 148 : size === 'large' ? 340 : split ? 180 : 250) * Math.max(1, fontScale);
+  return Math.max(1, Math.min(size === 'small' ? 4 : 3, Math.floor((width - 32 + 12) / (minCardWidth + 12))));
 }
 
 export function tabIsVisible(name: string, active: string, split: boolean): boolean {

@@ -1,3 +1,4 @@
+import { itemPresentation } from '@/types/inbox-presentation';
 import { useItemEngagement } from '@/hooks/useItemEngagement';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { Feather } from '@expo/vector-icons';
@@ -188,8 +189,8 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
             </Text>
             {item.status !== 'ready' ? (
               <Badge
-                label={item.status === 'error' ? 'Processing failed' : 'Processing…'}
-                tone={item.status === 'error' ? 'danger' : 'neutral'}
+                label={itemPresentation(item).label}
+                tone="neutral"
               />
             ) : null}
           </View>
@@ -267,9 +268,9 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
 
 
         {item.status === 'error' ? (
-          <View className="rounded-xl border border-danger bg-danger/10 p-3">
-            <Text className="text-danger font-medium mb-1">Processing error</Text>
-            <Text className="text-danger">We could not finish processing this save. Your original is still available.</Text>
+          <View className="rounded-xl border border-border bg-surface p-3">
+            <Text className="text-fg font-medium mb-1">{itemPresentation(item).label}</Text>
+            <Text className="text-muted">{itemPresentation(item).notice}</Text>
             <ReloadButton item={item} />
           </View>
         ) : null}

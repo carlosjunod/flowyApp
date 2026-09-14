@@ -1,4 +1,6 @@
-import { ReadingIndicator } from './ReadingIndicator';
+import { ItemStatus } from './ItemStatus';
+import { itemPresentation, type CardSize } from '@/types/inbox-presentation';
+import { useResolvedColors } from '@/lib/theme';
 import { itemTypeLabel } from '@/lib/itemIcons';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { SemanticPreview } from './content/SemanticContent';
@@ -10,8 +12,6 @@ import { ItemActionsMenu } from './ItemActionsMenu';
 import { Pressable, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
-import { Shimmer } from '@/components/ui/Shimmer';
-import { Spinner } from '@/components/ui/Spinner';
 import { hostOf, thumbnailFor } from '@/lib/thumbnails';
 import { useSelection } from '@/lib/selection';
 import type { Item } from '@/types';
@@ -30,11 +30,12 @@ const monthDayLabel = (input: string): string => {
 
 const VIDEO_TYPES = new Set(['youtube', 'video', 'screen_recording']);
 
-type Props = { onOpen?: (id: string) => void; active?: boolean; item: Item };
+type Props = { onOpen?: (id: string) => void; active?: boolean; item: Item; size?: CardSize };
 
-export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item }) => {
+export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item, size = 'medium' }) => {
   const pending = isPending(item);
-  const errored = item.status === 'error';
+  const colors = useResolvedColors();
+  const presentation = itemPresentation(item);
   const selection = useSelection();
   const selected = selection.selectedIds.has(item.id);
   const thumb = thumbnailFor(item);
@@ -66,7 +67,7 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item }) => {
     <Animated.View entering={FadeIn.duration(180)}>
       <Pressable
         accessibilityRole={selection.mode ? 'checkbox' : 'button'}
-        accessibilityLabel={`${item.title ?? item.raw_url ?? 'Saved item'}${item.read_at ? ', marked as read' : ', no read mark recorded'}${pending ? ', processing' : errored ? ', processing failed' : ''}`}
+        accessibilityLabel={`${item.title ?? item.raw_url ?? 'Saved item'}${item.read_at ? ', marked as read' : ', no read mark recorded'}${", " + presentation.label + (presentation.notice ? ", " + presentation.notice : "")}`}
         accessibilityState={{ checked: selection.mode ? selected : undefined, selected: !selection.mode && active }}
         accessibilityActions={[{ name: 'longpress', label: 'Select item' }]}
         onAccessibilityAction={event => { if (event.nativeEvent.actionName === 'longpress') handleLongPress(); }}
@@ -76,6 +77,9 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item }) => {
         style={({ pressed }) => [
           {
             elevation: 2,
+            backgroundColor: presentation.deep ? colors.inboxDeep : colors.card,
+            borderWidth: selected || active ? 2 : 1,
+            borderColor: selected || active ? colors.accent : presentation.deep ? colors.inboxDeepBorder : colors.border,
             shadowColor: '#1C1815',
             shadowOpacity: 0.08,
             shadowRadius: 12,
@@ -85,7 +89,7 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item }) => {
         ]}
         className={`bg-card rounded-[20px] overflow-hidden ${
           selected || (!selection.mode && active) ? 'border-2 border-accent' : ''
-        } ${pending ? 'opacity-80' : ''}`}
+        }`}
       >
         {hasPhoto ? (
           <ImageLed
@@ -115,8 +119,8 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item }) => {
             className="text-fg"
             style={{
               fontFamily: 'Inter_600SemiBold',
-              fontSize: 19,
-              lineHeight: 24,
+              fontSize: size === 'small' ? 15 : size === 'large' ? 19 : 17,
+              lineHeight: size === 'small' ? 20 : 24,
               letterSpacing: -0.2,
             }}
             numberOfLines={2}
@@ -124,10 +128,8 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item }) => {
             {item.title ?? item.raw_url ?? (pending ? 'Preparing saved content…' : 'Saved item')}
           </Text>
           <SemanticPreview item={item} />
-          {item.summary ? <Text className="text-muted text-sm" numberOfLines={2}>{item.summary}</Text> : null}
-          {pending || errored ? <Text className={errored ? 'text-danger text-sm' : 'text-muted text-sm'}>{errored ? 'Processing failed · Tap to retry' : 'Processing saved content…'}</Text> : null}
+          {item.summary ? <Text className="text-muted text-sm" numberOfLines={size === 'small' ? 1 : size === 'large' ? 3 : 2}>{item.summary}</Text> : null}
           <View className="flex-row items-end justify-between">
-            <ReadingIndicator item={item} />
             <Text
               className="text-muted text-xs flex-1 pr-2"
               numberOfLines={1}
@@ -142,6 +144,7 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item }) => {
               {monthDayLabel(item.created)}
             </Text>
           </View>
+          <ItemStatus item={item} selectionMode={selection.mode} />
         </View>
       </Pressable>
       {!selection.mode ? <View style={{ position: 'absolute', top: 8, right: 8 }}><ItemActionsMenu item={item} variant="compact" /></View> : null}
@@ -240,14 +243,7 @@ const ImageLed: React.FC<LedProps> = ({
         {selected ? <Feather name="check" size={14} color="#fff" /> : null}
       </View>
     ) : null}
-    {pending ? (
-      <>
-        <Shimmer />
-        <View className="absolute inset-0 items-center justify-center">
-          <Spinner tint="muted" />
-        </View>
-      </>
-    ) : null}
+
   </View>
 );
 

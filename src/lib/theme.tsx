@@ -147,6 +147,9 @@ export const themeColors = {
     border: '#DFD5C2',
     danger: '#DC2626',
     success: '#10B981',
+    unread: '#237445',
+    inboxDeep: '#FAEEE8',
+    inboxDeepBorder: '#DCA48E',
   },
   dark: {
     bg: '#1A1C20',
@@ -161,6 +164,9 @@ export const themeColors = {
     border: '#3A3D44',
     danger: '#F87171',
     success: '#34D399',
+    unread: '#68C08A',
+    inboxDeep: '#39302E',
+    inboxDeepBorder: '#785448',
   },
 } as const;
 
