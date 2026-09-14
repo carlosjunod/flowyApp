@@ -267,3 +267,8 @@ for ten logic/delegation scenarios. See `docs/reader-ui-parity.md` for validatio
 `codex/tag-manager` now combines the recovered labels implementation with current `origin/main` and `codex/unified-reader-ui`. The reusable category/tag picker retains A–Z / Most saved ordering, counts, expansion and global rename/delete confirmation. Tag, category, search, author and unread filters compose in the API request and account-specific query cache; the new saved-item reader, takeaways, visible actions, notes and return navigation remain intact.
 
 Validated with TypeScript, `node scripts/test-labels.cjs`, `npm run test:item-engagement`, `node scripts/test-source-identity.cjs`, `npm run test:reader-navigation` and an iOS Metro/Hermes export. The labels harness covers combined filters, pagination and distinct query keys. Server UI tests target this paired worktree through `FLOWY_TEST_NATIVE_ROOT`. Physical-device label interactions have not been tested, and this branch has not been merged to main or distributed. Deploy the matching server's PocketBase label hooks, then web/API, before releasing the native changes.
+
+
+### Local main and simulator — 2026-09-14
+
+The tags/categories and shared reader are now merged into local `main` (`0929149`), paired with the server integration `46db015`. Existing local changes were reconciled and their original snapshots retained in Git stashes. The installed development build launches in the iPhone 16e iOS 26.0 simulator using this checkout's Metro server at `http://127.0.0.1:8081`; the current launch reached login without authentication. Restart with `npx expo start --dev-client --localhost --port 8081`, then press `i`. No new native binary, main push or backend deployment was performed.
