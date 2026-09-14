@@ -72,17 +72,17 @@ export default function InboxScreen() {
   const [searchInput, setSearchInput] = useState('');
   const search = useDebounced(searchInput, 200);
   const [unread, setUnread] = useState(false);
+  const [tag, setTag] = useState<string | null>(null);
   const [category, setCategory] = useState<string | null>(null);
 
   const query = useItems({
     userId: user?.id ?? null,
     sortField: 'created',
     sortDir: 'desc',
-    search, category, unread, author,
+    search, category, tag, unread, author,
   });
 
   const items = useMemo(() => flattenPages(query.data), [query.data]);
-  const categories = query.data?.pages[0]?.categories ?? [];
   const visible = items;
 
   useEffect(() => {
@@ -91,6 +91,7 @@ export default function InboxScreen() {
     const invalidate = () => {
       if (cancelled) return;
       void queryClient.invalidateQueries({ queryKey: ['items', user.id] });
+      void queryClient.invalidateQueries({ queryKey: ['labels', user.id] });
     };
     let unsub: (() => void) | null = null;
     (async () => {
@@ -116,7 +117,10 @@ export default function InboxScreen() {
     };
   }, [user?.id, queryClient]);
 
-  const onRefresh = () => query.refetch();
+  const onRefresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ['labels', user?.id] });
+    return query.refetch();
+  };
 
   const columns = viewMode === 'grid'
     ? inboxCardColumns(width, fontScale, split)
@@ -150,14 +154,15 @@ export default function InboxScreen() {
         onUnreadChange={setUnread}
         search={searchInput}
         onSearchChange={setSearchInput}
-        categories={categories}
+        tag={tag}
+        onTagChange={setTag}
         category={category}
         onCategoryChange={setCategory}
       />
       {unread ? <Text className="text-xs text-muted px-4 pt-1">Items without a read mark, including older saves with no recorded reading state.</Text> : null}
       {query.isError ? <View className="px-4 py-3 flex-row items-center gap-2"><Text accessibilityRole="alert" className="text-danger flex-1 text-sm">Your inbox could not be loaded. Check your connection and try again.</Text><Button title="Retry" variant="secondary" onPress={() => { void query.refetch(); }} /></View> : null}
       {query.isLoading ? <View accessibilityLabel="Loading saved content" className="px-4 gap-3 pt-3">{[1, 2, 3].map(n => <View key={n} className="h-20 bg-surface rounded-xl overflow-hidden relative"><Shimmer /></View>)}</View> : null}
-      {!query.isLoading && !query.isError ? <Text className="text-xs text-muted px-4 pt-2">{query.data?.pages[0]?.totalItems ?? 0} {search || category || unread ? 'results' : 'saved items'}</Text> : null}
+      {!query.isLoading && !query.isError ? <Text className="text-xs text-muted px-4 pt-2">{query.data?.pages[0]?.totalItems ?? 0} {search || category || tag || unread || author ? 'results' : 'saved items'}</Text> : null}
       {viewMode === 'grid' || columns > 1 ? (
         <FlatList
           key={`${viewMode}-${columns}`}
@@ -186,7 +191,7 @@ export default function InboxScreen() {
           ListEmptyComponent={query.isLoading || query.isError ? null :
             <EmptyState
               onSave={() => setBulkOpen(true)}
-              hasFilters={!!search || !!category || unread || !!author}
+              hasFilters={!!search || !!category || !!tag || unread || !!author}
               search={search}
               category={category}
               onClearFilters={() => {
@@ -194,6 +199,7 @@ export default function InboxScreen() {
                 setCategory(null);
                 setUnread(false);
                 clearAuthor();
+                setTag(null);
               }}
             />
           }
@@ -230,7 +236,7 @@ export default function InboxScreen() {
           ListEmptyComponent={query.isLoading || query.isError ? null :
             <EmptyState
               onSave={() => setBulkOpen(true)}
-              hasFilters={!!search || !!category || unread || !!author}
+              hasFilters={!!search || !!category || !!tag || unread || !!author}
               search={search}
               category={category}
               onClearFilters={() => {
@@ -238,6 +244,7 @@ export default function InboxScreen() {
                 setCategory(null);
                 setUnread(false);
                 clearAuthor();
+                setTag(null);
               }}
             />
           }

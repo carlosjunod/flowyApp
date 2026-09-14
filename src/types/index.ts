@@ -166,6 +166,8 @@ export type ChatMessage = {
 };
 
 export type ApiErrorCode =
+  | 'LABEL_CHANGED'
+  | 'LABELS_UNAVAILABLE'
   | 'AI_PROCESSING_CONSENT_REQUIRED'
   | 'INVALID_PERSONALIZATION'
   | 'BODY_TOO_LARGE'

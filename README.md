@@ -6,6 +6,8 @@ Users save URLs, screenshots, short videos, PDFs and files from the iOS/macOS sh
 
 ## Features
 
+- **Categories and tags** — shared two-row counted-chip picker below search and in Manage labels, with compact sort/settings/expand icons, expandable list, A–Z / Most saved order, exact combined filters, and global rename/delete with affected-publication confirmation. Requires the server `GET/POST /api/labels` route and PB label transaction hooks deployed first. No native dependency or entitlement change. Validate with `node scripts/test-labels.cjs` and `npm run typecheck`.
+
 - **Inbox** — compact list by default, optional visual grid, global debounced search/category facets through `GET /api/items`, newest-first pagination, separate network/empty/processing/error states, accessible selection, and PocketBase realtime invalidation
 - **Personalization** — optional profile shared with the web app: work, current focus and preferences; edit, pause or clear from Settings, with an orange full-width interview reminder above Inbox and Chat. The server uses enabled answers in future chats. See [docs/PERSONALIZATION.md](docs/PERSONALIZATION.md).
 - **Chat** — streaming responses with inline `[[itemId]]` citations and expandable sources, account-scoped on-device conversation history and drafts, new/open/delete conversation, stop/retry/copy, and reader-controlled scrolling. A provider above the tabs retains work while navigating inside the app.
