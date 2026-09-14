@@ -260,3 +260,10 @@ iOS uses the system interactive back gesture; other native targets use the
 reader gesture. Right-to-left does not close. Related saves replace the reader,
 so one Back returns to the inbox/context. Run `npm run test:reader-navigation`
 for ten logic/delegation scenarios. See `docs/reader-ui-parity.md` for validation.
+
+
+### Tags and saved-item reader integration — 2026-09-14
+
+`codex/tag-manager` now combines the recovered labels implementation with current `origin/main` and `codex/unified-reader-ui`. The reusable category/tag picker retains A–Z / Most saved ordering, counts, expansion and global rename/delete confirmation. Tag, category, search, author and unread filters compose in the API request and account-specific query cache; the new saved-item reader, takeaways, visible actions, notes and return navigation remain intact.
+
+Validated with TypeScript, `node scripts/test-labels.cjs`, `npm run test:item-engagement`, `node scripts/test-source-identity.cjs`, `npm run test:reader-navigation` and an iOS Metro/Hermes export. The labels harness covers combined filters, pagination and distinct query keys. Server UI tests target this paired worktree through `FLOWY_TEST_NATIVE_ROOT`. Physical-device label interactions have not been tested, and this branch has not been merged to main or distributed. Deploy the matching server's PocketBase label hooks, then web/API, before releasing the native changes.

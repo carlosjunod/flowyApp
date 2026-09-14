@@ -74,7 +74,7 @@ function loader(mocks = {}) {
       replacement: null,
       revision: "a".repeat(64),
     });
-    await labelApi.listItems({ tag: "design", category: "technology" });
+    await labelApi.listItems({ tag: "design", category: "technology", author: "instagram:alice", unread: true, q: "saved", page: 2 });
     assert.equal(labelRequests[0].url, "https://fixture.invalid/api/labels");
     assert.equal(
       labelRequests[1].init.headers.Authorization,
@@ -87,7 +87,8 @@ function loader(mocks = {}) {
       replacement: null,
       revision: "a".repeat(64),
     });
-    assert.match(labelRequests[3].url, /tag=design/);
+    const filters = new URL(labelRequests[3].url).searchParams;
+    for (const [name, value] of Object.entries({tag: "design", category: "technology", author: "instagram:alice", unread: "true", q: "saved", page: "2"})) assert.equal(filters.get(name), value);
     global.fetch = async () =>
       Response.json({ data: null, error: "LABEL_CHANGED" }, { status: 409 });
     const stale = await labelApi.changeLabel({
@@ -100,6 +101,20 @@ function loader(mocks = {}) {
   } finally {
     global.fetch = originalFetch;
   }
+  let queryOptions;
+  let queryParams;
+  const itemModel = loader({
+    "@tanstack/react-query": { useInfiniteQuery: options => { queryOptions = options; } },
+    "@/lib/api": { api: { listItems: async params => { queryParams = params; return { data: { items: [] }, error: null }; } } },
+    "@/lib/auth": {},
+    "@/lib/pb": { pb: { authStore: { model: { id: "owner" }, token: "session" } } },
+  })("src/hooks/useItems.ts");
+  const combined = { userId: "owner", sortField: "created", sortDir: "desc", search: " saved ", category: "TECH", tag: " Design ", author: "instagram:alice", unread: true };
+  itemModel.useItems(combined);
+  await queryOptions.queryFn({ pageParam: 2 });
+  assert.deepEqual(queryParams, { page: 2, perPage: 20, q: "saved", category: "technology", tag: "design", author: "instagram:alice", unread: true, sort: "date", direction: "desc" });
+  for (const patch of [{tag: "other"}, {category: "art"}, {author: "instagram:bob"}, {unread: false}, {userId: "other"}]) assert.notDeepEqual(itemModel.itemsQueryKey(combined), itemModel.itemsQueryKey({...combined, ...patch}));
+  assert.deepEqual(itemModel.itemsQueryKey(combined), itemModel.itemsQueryKey({...combined, tag: "design", category: "technology", search: "saved"}));
   console.log(
     "PASS native label ordering, authenticated API, filters and stale review errors",
   );
