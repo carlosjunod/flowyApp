@@ -2,7 +2,8 @@ import { useItemEngagement } from '@/hooks/useItemEngagement';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   Alert,
   Linking,
@@ -21,6 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EnrichedSections } from '@/components/inbox/EnrichedSections';
 import { ExploreCTA } from '@/components/inbox/ExploreCTA';
+import { ReaderSwipe } from '@/components/inbox/ReaderSwipe';
 import { SourceChip } from '@/components/inbox/SourceChip';
 import { TagEditor } from '@/components/inbox/TagEditor';
 import { READER_COPY, readerAction, readerSummary, readerDate } from '@/types/reader';
@@ -71,6 +73,7 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
   const [editing, setEditing] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
+  const scrollGesture = useMemo(() => Gesture.Native(), []);
 
   const startResearch = async () => {
     if (!item || researchLock.current || item.exploration?.status === 'exploring') return;
@@ -85,20 +88,24 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
 
   if (isLoading) {
     return (
+      <ReaderSwipe onClose={onClose} scrollGesture={scrollGesture} disabled={embedded}>
       <SafeAreaView className="flex-1 bg-bg">
         <Spinner className="mt-12" size="large" />
         <Button title={embedded ? "Close reader" : "Back"} variant="secondary" onPress={onClose} />
       </SafeAreaView>
+      </ReaderSwipe>
     );
   }
   if (error || !item) {
     return (
+      <ReaderSwipe onClose={onClose} scrollGesture={scrollGesture} disabled={embedded}>
       <SafeAreaView className="flex-1 bg-bg items-center justify-center px-6">
         <Text className="text-base text-danger mb-4">
           This item could not be loaded. Check your connection or return to your inbox.
         </Text>
         <Button title={embedded ? "Close reader" : "Back"} variant="secondary" onPress={onClose} />
       </SafeAreaView>
+      </ReaderSwipe>
     );
   }
 
@@ -126,6 +133,7 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
     ?? (heroThumb.kind === 'image' ? heroThumb.uri : null);
 
   return (
+    <ReaderSwipe onClose={onClose} scrollGesture={scrollGesture} disabled={embedded || editing || photoOpen}>
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
       <View className="flex-row items-center justify-between px-4 py-3">
         <Pressable
@@ -153,6 +161,7 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
         <Pressable onPress={() => { setEditing(true); setActionsOpen(false); }} accessibilityRole="button" className="min-h-[44px] justify-center px-3"><Text className="text-fg">Edit details</Text></Pressable>
         <DeleteButton id={item.id} onDeleted={onClose} />
       </View> : null}
+      <GestureDetector gesture={scrollGesture}>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 96, gap: 16 }}>
 
 
@@ -355,6 +364,7 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
           </View>
         ) : null}
       </ScrollView>
+      </GestureDetector>
       {editing ? (
         <EditModal
           item={item}
@@ -362,6 +372,7 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
         />
       ) : null}
     </SafeAreaView>
+    </ReaderSwipe>
   );
 }
 

@@ -51,7 +51,29 @@ working interactions and no unresolved critical defect in the reviewed scope.
 | --- | ---: | ---: | --- |
 | 1 | 8.6 | 8.5 | Core author/card/continuation layout works. Align section labels, notes editing, metadata, related cards and author navigation. |
 | 2 | 9.3 | 9.2 | Light/dark and small widths work. Replace failed/oversized favicon covers, expose inbox reading menus and finish source fallback parity. |
-| 3 | 9.6 | 9.6 | Reviewed updated mobile/desktop web renders and native light/dark/long-author screens; functional checks pass. Both scores exceed 9.5: visual loop stopped. |
+| 3 | 9.6 | 9.6 | Reviewed updated mobile/desktop web renders and native light/dark/long-author screens; functional checks pass. Both scores exceed 9.5 for the original presentation scope; navigation was requested afterwards. |
+
+## Added return navigation
+
+The **mobile-touch** skill guides a left swipe from the rightmost 28px on both
+readers. Center swipes remain available to media; vertical scrolling and short
+or cancelled drags do not close the reader. Native uses Gesture Handler and
+Reanimated on the UI thread, with reduced motion and an explicit relationship
+to the content scroll gesture. Editing, expanded images and embedded readers
+disable this gesture. The native route dismisses related reader screens back
+to the inbox instead of walking through each related save.
+
+Web mobile (<768px) uses one same-URL history entry. Back closes the fullscreen
+reader; Forward restores it; related saves replace the entry. A cancelled draft
+discard restores that entry. Manual close consumes it before author navigation,
+allowing Next to restore its state first. Desktop history is unchanged.
+
+Navigation review: web **9.6/10**, with real browser touch and Back/Forward
+checks passing. Native presentation retains its reviewed 9.6/10 appearance;
+physical swipe acceptance is pending. The simulator automation emitted touch
+down/up but no movement, confirmed by temporary event instrumentation (removed).
+Eight real native-worklet logic scenarios pass; these do not substitute for
+physical iOS touch delivery. The expanded iteration stays open until that check.
 
 ## Verification and reproducible local review
 
@@ -101,11 +123,15 @@ will not acquire these JavaScript changes by itself.
 
 ## Final validation
 
-- 69 targeted web, server-continuation and native-component tests pass.
-- Native: 4 engagement groups and 26 Google iOS/Android scenarios pass.
+- 77 targeted web, server-continuation and native-component tests pass, including
+  8 reader history/gesture scenarios.
+- Native: 4 engagement groups, 26 Google iOS/Android scenarios and 8 reader
+  navigation worklet scenarios pass (`npm run test:reader-navigation`).
 - Web and native scoped TypeScript pass; production Next build passes.
 - Playwright production-build acceptance: 4 viewport/theme combinations pass
-  reading/reversal, full text, author filtering and overflow/page-error checks.
+  reading/reversal, full text, author filtering and overflow/page-error checks;
+  mobile touch gestures, browser Back/Forward, cancelled draft discard and
+  desktop history isolation also pass against the local server.
 - Actual simulator: both themes, long names, author filtering, read/reversal,
   inbox read menu and extraction busy/completion verified. Extraction work uses
   a simulated local worker; provider accuracy and TestFlight are not claimed.

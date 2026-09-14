@@ -262,3 +262,17 @@ Validated in the local iPhone 16e iOS 26 simulator with synthetic fixtures,
 including light/dark, long authors, author filtering, reading and continuation.
 This is not a TestFlight release. See `docs/reader-ui-parity.md` for the paired
 source audit, evaluation loop, verification and local launch configuration.
+
+### Reader return navigation — 2026-09-14
+
+`ReaderSwipe.tsx` adds leftward return from the rightmost 28px, driven by
+Gesture Handler/Reanimated and coordinated with the reader ScrollView. Center
+media gestures and vertical scroll retain their role. Short/cancelled drags
+settle back, reduced motion is respected, and editing/expanded/embedded modes
+disable this gesture. The detail route now dismisses to `/inbox`, including
+related reader stacks. Visible Back remains available.
+
+`npm run test:reader-navigation` passes eight worklet logic scenarios. Physical
+swipe validation in the iOS Simulator is pending: automation produces touch
+down/up but no movement. Temporary event diagnostics have been removed. The
+app is running with local fixtures for that check; see `docs/reader-ui-parity.md`.

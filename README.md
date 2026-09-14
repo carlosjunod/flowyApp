@@ -252,3 +252,9 @@ authors have separate profile and saved-author actions. Continue extraction sits
 beside incomplete content; read/unread is explicit in detail and inbox menus.
 Personal notes can be edited. Full transcripts, research findings and source
 excerpts remain available. See [review and local preview](docs/reader-ui-parity.md).
+
+The fullscreen reader supports a left swipe from the right edge to return to
+the inbox, alongside its visible Back button. Media swipes use the center;
+vertical and cancelled gestures stay in the reader. Run
+`npm run test:reader-navigation` for the eight gesture logic scenarios. Local
+physical swipe acceptance is tracked in `docs/reader-ui-parity.md`.
