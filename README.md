@@ -272,3 +272,13 @@ Validated with TypeScript, `node scripts/test-labels.cjs`, `npm run test:item-en
 ### Local main and simulator — 2026-09-14
 
 The tags/categories and shared reader are now merged into local `main` (`0929149`), paired with the server integration `46db015`. Existing local changes were reconciled and their original snapshots retained in Git stashes. The installed development build launches in the iPhone 16e iOS 26.0 simulator using this checkout's Metro server at `http://127.0.0.1:8081`; the current launch reached login without authentication. Restart with `npx expo start --dev-client --localhost --port 8081`, then press `i`. No new native binary, main push or backend deployment was performed.
+
+
+### Tags release validation — 2026-09-14
+
+The UI-model request regression now exercises normalized tags with global search,
+category pagination and separate query-cache keys, including clearing a tag.
+Native TypeScript, label API/order tests, ten reader navigation scenarios and
+26 Google authentication scenarios pass on the integrated main source. The
+broader UI-model harness reaches its previously documented TypeScript generic
+transpilation failure in `chatSync.ts`; this is not a passing full UI-model suite.
