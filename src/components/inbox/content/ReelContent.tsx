@@ -1,9 +1,11 @@
+import { savedMediaKind } from '@/types/reader';
 import { SourceText } from './SourceText';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { CollapsibleSection } from '../CollapsibleSection';
 import { Linking, Pressable, Text, View } from 'react-native';
 
 import { ENV } from '@/lib/env';
@@ -28,12 +30,15 @@ function r2Url(item: Item): string | null {
  */
 export const ReelContent: React.FC<{ item: Item }> = ({ item }) => {
   const colors = useResolvedColors();
+  const [failed, setFailed] = useState(false);
   const directUrl = r2Url(item);
   const slideUrl = item.media?.[0]?.r2_key ? r2UrlForKey(item.media[0]!.r2_key) : null;
   const videoUrl = directUrl ?? slideUrl;
   const sourceUrl = item.source_url ?? item.raw_url ?? '';
   const slideKind = item.media?.[0]?.kind;
-  const isImage = slideKind === 'image' && !directUrl;
+  const key = item.r2_key ?? item.media?.[0]?.r2_key;
+  const kind = savedMediaKind(key);
+  const isImage = kind === 'image' || (kind === 'unknown' && slideKind !== 'video');
 
   return (
     <View>
@@ -41,16 +46,17 @@ export const ReelContent: React.FC<{ item: Item }> = ({ item }) => {
         className="mb-3 overflow-hidden rounded-xl border border-border bg-black"
         style={{ width: '100%' }}
       >
-        {videoUrl ? (
+        {videoUrl && !failed ? (
           isImage ? (
             <Image
               source={{ uri: videoUrl }}
-              style={{ width: '100%', aspectRatio: 9 / 16, maxHeight: 520 }}
+              style={{ width: '100%', aspectRatio: 9 / 16, maxHeight: 320 }}
+              onError={() => setFailed(true)}
               contentFit="contain"
               accessibilityLabel={item.title ?? 'Reel preview'}
             />
           ) : (
-            <ReelVideo uri={videoUrl} poster={directUrl} />
+            <ReelVideo uri={videoUrl} onError={() => setFailed(true)} />
           )
         ) : (
           <ReelPlaceholder url={sourceUrl} title={item.title} />
@@ -76,9 +82,8 @@ export const ReelContent: React.FC<{ item: Item }> = ({ item }) => {
             hitSlop={6}
             accessibilityRole="link"
             accessibilityLabel="Watch on Instagram"
-            style={({ pressed }) => [
-              { flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.7 : 1 },
-            ]}
+            className="active:opacity-80"
+            style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 4 }}
           >
             <Text
               style={{
@@ -94,95 +99,36 @@ export const ReelContent: React.FC<{ item: Item }> = ({ item }) => {
         </View>
       ) : null}
 
-      <View>
-        <Text
-          className="text-muted mb-2"
-          style={{
-            fontFamily: 'Inter_600SemiBold',
-            fontSize: 10.5,
-            letterSpacing: 1.2,
-            textTransform: 'uppercase',
-          }}
-        >
-          Saved text
-        </Text>
-        <View
-          className="rounded-xl border border-border bg-surface"
-          style={{ padding: 14 }}
-        >
-          <SourceText text={item.content?.trim() || 'No text captured for this reel.'} />
-        </View>
-      </View>
+      {item.content?.trim() ? <CollapsibleSection label="Saved text" defaultOpen={false}><SourceText text={item.content} /></CollapsibleSection> : null}
     </View>
   );
 };
 
-const ReelVideo: React.FC<{ uri: string; poster?: string | null }> = ({ uri }) => {
+const ReelVideo: React.FC<{ uri: string; onError: () => void }> = ({ uri, onError }) => {
   // expo-video v3 API: useVideoPlayer hook returns a player object passed to VideoView.
   const player = useVideoPlayer(uri, (p) => {
     p.loop = false;
     // Do not autoplay — Reels are loud and unexpected on detail mount.
   });
 
+  useEffect(() => { const subscription = player.addListener('statusChange', event => { if (event.status === 'error') onError(); }); return () => subscription.remove(); }, [player, onError]);
   return (
     <VideoView
       player={player}
       nativeControls
       allowsFullscreen
       allowsPictureInPicture
-      style={{ width: '100%', aspectRatio: 9 / 16, maxHeight: 520, backgroundColor: '#000' }}
+      style={{ width: '100%', aspectRatio: 9 / 16, maxHeight: 320, backgroundColor: '#000' }}
       contentFit="contain"
     />
   );
 };
 
-const ReelPlaceholder: React.FC<{ url: string; title?: string }> = ({ url, title }) => (
-  <Pressable
-    onPress={() => (url ? Linking.openURL(url) : undefined)}
-    accessibilityRole="link"
-    accessibilityLabel={title ? `Open ${title} on Instagram` : 'Open reel on Instagram'}
-    style={({ pressed }) => [
-      {
-        width: '100%',
-        aspectRatio: 9 / 16,
-        maxHeight: 520,
-        alignItems: 'center',
-        justifyContent: 'center',
-        // Instagram-ish gradient (single solid since RN needs LinearGradient lib for stops;
-        // we keep it deliberately simple — the focus is "Watch on Instagram" affordance).
-        backgroundColor: '#e1306c',
-        opacity: pressed ? 0.92 : 1,
-      },
-    ]}
-  >
-    <View
-      style={{
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        borderWidth: 2,
-        borderColor: 'rgba(255,255,255,0.9)',
-        backgroundColor: 'rgba(0,0,0,0.35)',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <Feather name="play" size={22} color="#fff" style={{ marginLeft: 3 }} />
-    </View>
-    <Text
-      numberOfLines={2}
-      style={{
-        position: 'absolute',
-        bottom: 14,
-        left: 16,
-        right: 16,
-        textAlign: 'center',
-        fontFamily: 'Inter_500Medium',
-        fontSize: 12,
-        color: 'rgba(255,255,255,0.9)',
-      }}
-    >
-      {title ?? 'Open this reel on Instagram'}
-    </Text>
-  </Pressable>
-);
+const ReelPlaceholder: React.FC<{ url: string; title?: string }> = ({ url, title }) => {
+  const colors = useResolvedColors();
+  return <Pressable onPress={() => url ? Linking.openURL(url) : undefined} disabled={!url} accessibilityRole="link" accessibilityLabel="Watch on Instagram" className="active:opacity-80 bg-surface" style={{ width: '100%', height: 160, alignItems: 'center', justifyContent: 'center', padding: 16, gap: 12 }}>
+    <Feather name="external-link" size={24} color={colors.accent} />
+    <Text style={{ color: colors.fg, textAlign: 'center', fontSize: 14 }}>{title ?? 'Open this reel on Instagram'}</Text>
+    <Text style={{ color: colors.muted, fontSize: 12 }}>Preview unavailable · Watch on Instagram</Text>
+  </Pressable>;
+};

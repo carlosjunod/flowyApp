@@ -48,6 +48,7 @@ function hooks() {
       },
     },
     render(fn) { index = 0; effects = []; const tree = fn(); effects.forEach(fn => fn()); return tree; },
+    reset() { slots.length = 0; index = 0; effects = []; },
     close() { slots.forEach(s => s?.cleanup?.()); },
   };
 }
@@ -91,6 +92,40 @@ const passed = label => { checks++; console.log(`PASS ${label}`); };
   await assert.rejects(missing.requestGoogleIdentity, /GOOGLE_NOT_CONFIGURED/);
   passed('missing configuration/token never reaches backend');
 
+  const androidCalls = [];
+  const androidSdk = { ...sdk, statusCodes: { ...sdk.statusCodes, PLAY_SERVICES_NOT_AVAILABLE: 'play-unavailable' }, GoogleSignin: {
+    configure: options => androidCalls.push(['configure', options]),
+    hasPlayServices: async options => { androidCalls.push(['services', options]); return true; },
+    signOut: async () => androidCalls.push(['signOut']),
+    signIn: async () => ({ type: 'success', data: { idToken: identity.idToken, user: { email: identity.email } } }),
+  } };
+  const android = loader({ './env': { ENV: { GOOGLE_WEB_CLIENT_ID: 'web.apps.googleusercontent.com' } }, '@react-native-google-signin/google-signin': androidSdk })('src/lib/googleSignIn.android.ts');
+  assert.deepEqual(await android.requestGoogleIdentity(), identity);
+  assert.deepEqual(androidCalls[0], ['configure', { webClientId: 'web.apps.googleusercontent.com', offlineAccess: false }]);
+  assert.deepEqual(androidCalls[1], ['services', { showPlayServicesUpdateDialog: true }]);
+  await android.requestGoogleIdentity();
+  assert.equal(androidCalls.filter(c => c[0] === 'configure').length, 1);
+  assert.equal(androidCalls.filter(c => c[0] === 'signOut').length, 4);
+  passed('Android uses shared web audience, checks Play services and clears SDK sessions');
+  androidSdk.GoogleSignin.hasPlayServices = async () => false;
+  await assert.rejects(android.requestGoogleIdentity, /GOOGLE_PLAY_SERVICES_UNAVAILABLE/);
+  androidSdk.GoogleSignin.hasPlayServices = async () => { throw { code: 'play-unavailable' }; };
+  await assert.rejects(android.requestGoogleIdentity, /GOOGLE_PLAY_SERVICES_UNAVAILABLE/);
+  androidSdk.GoogleSignin.hasPlayServices = async () => true;
+  for (const [code, expected] of [['10', 'GOOGLE_NOT_CONFIGURED'], ['7', 'NETWORK_ERROR']]) {
+    androidSdk.GoogleSignin.signIn = async () => { throw { code }; };
+    await assert.rejects(android.requestGoogleIdentity, new RegExp(expected));
+  }
+  passed('Android missing services, signing mismatch and network errors are recoverable');
+  androidSdk.GoogleSignin.signIn = async () => ({ type: 'cancelled', data: null });
+  assert.equal(await android.requestGoogleIdentity(), null);
+  androidSdk.GoogleSignin.signIn = async () => { throw { code: 'cancelled' }; };
+  assert.equal(await android.requestGoogleIdentity(), null);
+  androidSdk.GoogleSignin.signIn = async () => ({ type: 'success', data: { idToken: null, user: {} } });
+  await assert.rejects(android.requestGoogleIdentity, /GOOGLE_TOKEN_MISSING/);
+  await assert.rejects(loader({ './env': { ENV: {} } })('src/lib/googleSignIn.android.ts').requestGoogleIdentity, /GOOGLE_NOT_CONFIGURED/);
+  passed('Android cancellation, missing token and missing configuration never create sessions');
+
   const { exchangeGoogleIdentity } = loader({})('src/lib/googleAuth.ts');
   const sent = [];
   assert.deepEqual(await exchangeGoogleIdentity(identity, async (...args) => { sent.push(args); return consentError; }), { type: 'consent', identity });
@@ -106,13 +141,14 @@ const passed = label => { checks++; console.log(`PASS ${label}`); };
   assert.equal((await exchangeGoogleIdentity(identity, async () => ({ data: {}, error: null }))).type, 'error');
   passed('provider/server errors are recoverable and malformed sessions are rejected');
 
-  function fixture(exchange, getIdentity = async () => identity) {
+  let platform;
+  function fixture(exchange, getIdentity = async () => identity, props = {}) {
     const runner = hooks();
     const saved = [], routes = [], exchanges = [];
     let nativeCalls = 0;
     const load = loader({
       react: runner.react,
-      'react-native': { Platform: { OS: 'ios' }, Modal: 'Modal', View: 'View', Text: 'Text', Pressable: 'Pressable', ScrollView: 'ScrollView', Linking: { openURL: async () => {} } },
+      'react-native': { Platform: { OS: platform }, Modal: 'Modal', View: 'View', Text: 'Text', Pressable: 'Pressable', ScrollView: 'ScrollView', Linking: { openURL: async () => {} } },
       'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
       'expo-router': { router: { replace: route => routes.push(route) } },
       '@/components/ui/Button': { Button: 'Button' },
@@ -123,64 +159,143 @@ const passed = label => { checks++; console.log(`PASS ${label}`); };
     });
     const { GoogleSignIn } = load('src/components/auth/GoogleSignIn.tsx');
     const onBusyChange = () => {};
-    const render = () => runner.render(() => GoogleSignIn({ onBusyChange }));
+    const render = () => runner.render(() => GoogleSignIn({ onBusyChange, ...props }));
     const button = title => find(render(), el => el.props?.title === title);
     return { runner, render, button, saved, routes, exchanges, nativeCalls: () => nativeCalls };
   }
-  let f = fixture(async () => ({ data: session, error: null }));
-  await f.button('Continue with Google').props.onPress();
-  assert.deepEqual(f.saved, [session]);
-  assert.deepEqual(f.routes, ['/inbox']);
-  assert.equal(find(f.render(), e => e.type === 'Modal').props.visible, false);
-  passed('existing Google user goes straight to shared session and inbox');
-  f = fixture(async (_token, _email, consent) => consent ? { data: session, error: null } : consentError);
-  await f.button('Continue with Google').props.onPress();
-  assert.equal(f.saved.length, 0);
-  assert.equal(find(f.render(), e => e.type === 'Modal').props.visible, true);
-  assert.equal(f.button('Create account').props.disabled, true);
-  await f.button('Create account').props.onPress();
-  assert.equal(f.exchanges.length, 1);
-  find(f.render(), e => e.props?.accessibilityRole === 'checkbox').props.onPress();
-  await f.button('Create account').props.onPress();
-  assert.deepEqual(f.saved, [session]);
-  assert.equal(f.nativeCalls(), 1);
-  passed('new Google user must check disclosure; selected token reused only after acceptance');
-  f = fixture(async () => consentError);
-  await f.button('Continue with Google').props.onPress();
-  f.button('Cancel').props.onPress();
-  assert.equal(find(f.render(), e => e.type === 'Modal').props.visible, false);
-  assert.equal(f.exchanges.length, 1);
-  assert.equal(f.saved.length, 0);
-  passed('declining consent creates no session and makes no second request');
-  f = fixture(async () => { throw new Error('must not run'); }, async () => null);
-  await f.button('Continue with Google').props.onPress();
-  assert.equal(f.exchanges.length, 0);
-  assert.equal(find(f.render(), e => e.props?.accessibilityRole === 'alert'), null);
-  passed('Google sheet cancellation leaves login usable without an error');
-  let resolve;
-  f = fixture(async () => ({ data: session, error: null }), () => new Promise(r => { resolve = r; }));
-  const pending = f.button('Continue with Google').props.onPress();
-  await f.button('Continue with Google').props.onPress();
-  assert.equal(f.nativeCalls(), 1);
-  f.runner.close();
-  resolve(identity);
-  await pending;
-  assert.equal(f.exchanges.length, 0);
-  assert.equal(f.saved.length, 0);
-  passed('duplicate taps coalesce and leaving login prevents late authentication');
-  f = fixture(async (_token, _email, consent) => consent
-    ? { data: null, error: { code: 'INVALID_GOOGLE_TOKEN' } }
-    : consentError);
-  await f.button('Continue with Google').props.onPress();
-  find(f.render(), e => e.props?.accessibilityRole === 'checkbox').props.onPress();
-  await f.button('Create account').props.onPress();
-  assert.equal(f.saved.length, 0);
-  assert.equal(find(f.render(), e => e.type === 'Modal').props.visible, false);
-  assert.ok(find(f.render(), e => e.props?.accessibilityRole === 'alert'));
-  assert.equal(f.button('Continue with Google').props.loading, false);
-  await f.button('Continue with Google').props.onPress();
-  assert.equal(f.nativeCalls(), 2);
-  assert.equal(f.button('Create account').props.disabled, true);
-  passed('expired consent exchange restores login; retry uses a fresh identity and unchecked consent');
-  console.log(`${checks} Google iOS regression scenarios passed.`);
+  for (platform of ['ios', 'android']) {
+    let f = fixture(async () => ({ data: session, error: null }));
+    await f.button('Continue with Google').props.onPress();
+    assert.deepEqual(f.saved, [session]);
+    assert.deepEqual(f.routes, ['/inbox']);
+    assert.equal(find(f.render(), e => e.type === 'Modal').props.visible, false);
+    passed('existing Google user goes straight to shared session and inbox');
+    f = fixture(async (_token, _email, consent) => consent ? { data: session, error: null } : consentError);
+    await f.button('Continue with Google').props.onPress();
+    assert.equal(f.saved.length, 0);
+    assert.equal(find(f.render(), e => e.type === 'Modal').props.visible, true);
+    assert.equal(f.button('Create account').props.disabled, true);
+    await f.button('Create account').props.onPress();
+    assert.equal(f.exchanges.length, 1);
+    find(f.render(), e => e.props?.accessibilityLabel === 'Accept AI processing').props.onPress();
+    assert.equal(f.button('Create account').props.disabled, true);
+    await f.button('Create account').props.onPress();
+    assert.equal(f.exchanges.length, 1);
+    find(f.render(), e => e.props?.accessibilityLabel === 'Accept Terms of Service and Privacy Policy').props.onPress();
+    await f.button('Create account').props.onPress();
+    assert.deepEqual(f.saved, [session]);
+    assert.equal(f.nativeCalls(), 1);
+    passed('new Google user must check disclosure; selected token reused only after acceptance');
+    f = fixture(async () => ({ data: session, error: null }), undefined, { aiProcessingConsent: true });
+    await f.button('Continue with Google').props.onPress();
+    assert.equal(f.exchanges[0][2], true);
+    assert.deepEqual(f.saved, [session]);
+    assert.equal(find(f.render(), e => e.type === 'Modal').props.visible, false);
+    passed('signup forwards explicit consent without a second disclosure');
+    f = fixture(async () => ({ data: session, error: null }), undefined, { disabled: true });
+    await f.button('Continue with Google').props.onPress();
+    assert.equal(f.nativeCalls(), 0);
+    passed('disabled signup cannot start Google authentication');
+    f = fixture(async () => consentError);
+    await f.button('Continue with Google').props.onPress();
+    f.button('Cancel').props.onPress();
+    assert.equal(find(f.render(), e => e.type === 'Modal').props.visible, false);
+    assert.equal(f.exchanges.length, 1);
+    assert.equal(f.saved.length, 0);
+    passed('declining consent creates no session and makes no second request');
+    f = fixture(async () => { throw new Error('must not run'); }, async () => null);
+    await f.button('Continue with Google').props.onPress();
+    assert.equal(f.exchanges.length, 0);
+    assert.equal(find(f.render(), e => e.props?.accessibilityRole === 'alert'), null);
+    passed('Google sheet cancellation leaves login usable without an error');
+    let resolve;
+    f = fixture(async () => ({ data: session, error: null }), () => new Promise(r => { resolve = r; }));
+    const pending = f.button('Continue with Google').props.onPress();
+    await f.button('Continue with Google').props.onPress();
+    assert.equal(f.nativeCalls(), 1);
+    f.runner.close();
+    resolve(identity);
+    await pending;
+    assert.equal(f.exchanges.length, 0);
+    assert.equal(f.saved.length, 0);
+    passed('duplicate taps coalesce and leaving login prevents late authentication');
+    f = fixture(async (_token, _email, consent) => consent
+      ? { data: null, error: { code: 'INVALID_GOOGLE_TOKEN' } }
+      : consentError);
+    await f.button('Continue with Google').props.onPress();
+    find(f.render(), e => e.props?.accessibilityLabel === 'Accept AI processing').props.onPress();
+    assert.equal(f.button('Create account').props.disabled, true);
+    await f.button('Create account').props.onPress();
+    assert.equal(f.exchanges.length, 1);
+    find(f.render(), e => e.props?.accessibilityLabel === 'Accept Terms of Service and Privacy Policy').props.onPress();
+    await f.button('Create account').props.onPress();
+    assert.equal(f.saved.length, 0);
+    assert.equal(find(f.render(), e => e.type === 'Modal').props.visible, false);
+    assert.ok(find(f.render(), e => e.props?.accessibilityRole === 'alert'));
+    assert.equal(f.button('Continue with Google').props.loading, false);
+    await f.button('Continue with Google').props.onPress();
+    assert.equal(f.nativeCalls(), 2);
+    assert.equal(f.button('Create account').props.disabled, true);
+    passed('expired consent exchange restores login; retry uses a fresh identity and unchecked consent');
+  }
+  {
+    const runner = hooks();
+    const requests = [], sessions = [], routes = [], links = [];
+    let response = { data: session, error: null };
+    const load = loader({
+      react: runner.react,
+      'react-native': { Platform: { OS: 'ios' }, KeyboardAvoidingView: 'KeyboardAvoidingView', View: 'View', Text: 'Text', TextInput: 'TextInput', Pressable: 'Pressable', ScrollView: 'ScrollView', Linking: { openURL: async url => links.push(url) } },
+      'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+      'expo-router': { Link: 'Link', router: { push: route => routes.push(route), replace: route => routes.push(route) } },
+      'expo-apple-authentication': { isAvailableAsync: async () => false },
+      '@/components/auth/GoogleSignIn': { GoogleSignIn: 'GoogleSignIn' },
+      '@/components/ui/Button': { Button: 'Button' },
+      '@/lib/api': { api: { registerEmail: async (...args) => { requests.push(args); if (response instanceof Error) throw response; return response; } } },
+      '@/lib/auth': { useAuth: () => ({ signInWithSession: async value => sessions.push(value) }) },
+      '@/lib/theme': { useResolvedColors: () => ({ muted: '#888', accent: '#f60' }), useTheme: () => ({ resolved: 'light' }) },
+      '@/lib/env': { ENV: { API_BASE_URL: 'https://fixture.invalid' } },
+    });
+    const Login = load('app/(auth)/login.tsx').default;
+    const login = runner.render(Login);
+    find(login, e => e.props?.accessibilityRole === 'link').props.onPress();
+    assert.deepEqual(routes, ['/(auth)/signup']);
+    passed('Create one pushes the explicit signup screen');
+    runner.close();
+    runner.reset();
+    const Signup = load('app/(auth)/signup.tsx').default;
+    const render = () => runner.render(Signup);
+    const field = name => find(render(), e => e.props?.placeholder === name);
+    const button = () => find(render(), e => e.props?.title === 'Create account');
+    field('Email').props.onChangeText(' Fixture@Example.com ');
+    field('Password (min 8 chars)').props.onChangeText('fixture-password');
+    field('Confirm password').props.onChangeText('fixture-password');
+    assert.equal(button().props.disabled, true);
+    await button().props.onPress();
+    assert.equal(requests.length, 0);
+    find(render(), e => e.props?.accessibilityLabel === 'Accept AI processing').props.onPress();
+    await button().props.onPress();
+    assert.equal(requests.length, 0);
+    find(render(), e => e.props?.accessibilityLabel === 'Accept Terms of Service and Privacy Policy').props.onPress();
+    assert.equal(button().props.disabled, false);
+    field('Confirm password').props.onChangeText('different-password');
+    await button().props.onPress();
+    assert.equal(requests.length, 0);
+    field('Confirm password').props.onChangeText('fixture-password');
+    await find(render(), e => e.props?.accessibilityRole === 'link' && e.props?.children === 'Terms of Service').props.onPress();
+    await find(render(), e => e.props?.accessibilityRole === 'link' && e.props?.children === 'Privacy Policy').props.onPress();
+    assert.deepEqual(links, ['https://fixture.invalid/terms', 'https://fixture.invalid/privacy']);
+    assert.equal(button().props.disabled, false);
+    assert.equal(find(render(), e => e.type === 'GoogleSignIn').props.aiProcessingConsent, true);
+    response = new Error('fixture network failure');
+    await button().props.onPress();
+    assert.equal(button().props.loading, false);
+    assert.equal(sessions.length, 0);
+    response = { data: session, error: null };
+    await button().props.onPress();
+    assert.deepEqual(requests.at(-1), ['fixture@example.com', 'fixture-password', undefined, true]);
+    assert.deepEqual(sessions, [session]);
+    assert.equal(routes.at(-1), '/inbox');
+    passed('email signup requires both acceptances, recovers from network failure and saves the returned session');
+  }
+  console.log(`${checks} auth iOS/Android regression scenarios passed.`);
 })().catch(error => { console.error(error); process.exitCode = 1; });

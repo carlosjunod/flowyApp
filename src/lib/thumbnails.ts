@@ -1,3 +1,4 @@
+import { savedMediaKind } from '@/types/reader';
 import type { Item } from '@/types';
 
 import { ENV } from './env';
@@ -24,22 +25,16 @@ export type Thumb =
   | { kind: 'icon'; icon: ItemIconName };
 
 export const thumbnailFor = (item: Item): Thumb => {
-  if (item.r2_key) {
+  if (item.r2_key && savedMediaKind(item.r2_key) !== 'video') {
     return { kind: 'image', uri: `${ENV.R2_PUBLIC_URL}/${item.r2_key}` };
   }
+  const poster = item.media?.find(slide => savedMediaKind(slide.r2_key) === 'image');
+  if (poster) return { kind: 'image', uri: `${ENV.R2_PUBLIC_URL}/${poster.r2_key}` };
+  if (item.og_image) return { kind: 'image', uri: item.og_image };
   const url = item.raw_url ?? item.source_url;
   if (item.type === 'youtube' && url) {
     const id = extractYoutubeId(url);
     if (id) return { kind: 'image', uri: `https://img.youtube.com/vi/${id}/hqdefault.jpg` };
-  }
-  if (url) {
-    const host = hostOf(url);
-    if (host) {
-      return {
-        kind: 'image',
-        uri: `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`,
-      };
-    }
   }
   return { kind: 'icon', icon: itemTypeIcon[item.type] };
 };

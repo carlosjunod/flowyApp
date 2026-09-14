@@ -5,7 +5,8 @@ import { SemanticPreview } from './content/SemanticContent';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
+import { ItemActionsMenu } from './ItemActionsMenu';
 import { Pressable, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -37,7 +38,8 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item }) => {
   const selection = useSelection();
   const selected = selection.selectedIds.has(item.id);
   const thumb = thumbnailFor(item);
-  const hasPhoto = thumb.kind === 'image';
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+  const hasPhoto = thumb.kind === 'image' && thumb.uri !== failedUri;
   const url = item.source_url ?? item.raw_url;
   const host = url ? hostOf(url) : null;
   const domainLabel = host ? stripWww(host) : null;
@@ -88,6 +90,7 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item }) => {
         {hasPhoto ? (
           <ImageLed
             item={item}
+            onError={() => setFailedUri(thumb.kind === 'image' ? thumb.uri : null)}
             thumb={thumb as { kind: 'image'; uri: string }}
             faviconUri={faviconUri}
             domainLabel={domainLabel}
@@ -141,11 +144,13 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item }) => {
           </View>
         </View>
       </Pressable>
+      {!selection.mode ? <View style={{ position: 'absolute', top: 8, right: 8 }}><ItemActionsMenu item={item} variant="compact" /></View> : null}
     </Animated.View>
   );
 };
 
 type LedProps = {
+  onError: () => void;
   item: Item;
   thumb: { kind: 'image'; uri: string };
   faviconUri: string | null;
@@ -157,6 +162,7 @@ type LedProps = {
 };
 
 const ImageLed: React.FC<LedProps> = ({
+  onError,
   item,
   thumb,
   faviconUri,
@@ -169,6 +175,7 @@ const ImageLed: React.FC<LedProps> = ({
   <View className="relative" style={{ aspectRatio: 1.6 }}>
     <Image
       source={{ uri: thumb.uri }}
+      onError={onError}
       contentFit="cover"
       transition={150}
       style={{ width: '100%', height: '100%' }}
@@ -254,7 +261,7 @@ type EditorialProps = {
 };
 
 const Editorial: React.FC<EditorialProps> = ({ item, faviconUri, domainLabel, selected, selectionMode }) => (
-  <View className="bg-surface px-3 pt-3 pb-2 flex-row items-center gap-2">
+  <View className="bg-surface pl-3 pr-14 pt-3 pb-2 flex-row items-center gap-2">
     {faviconUri ? <Image source={{ uri: faviconUri }} style={{ width: 18, height: 18, borderRadius: 3 }} /> : <AppIcon type={item.type} size={18} />}
     <Text className="text-muted text-xs flex-1" numberOfLines={1}>{domainLabel ?? item.type}</Text>
     {selectionMode ? <Feather name={selected ? 'check-circle' : 'circle'} size={22} color={selected ? '#A74326' : '#6B6258'} /> : null}

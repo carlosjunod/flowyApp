@@ -245,3 +245,36 @@ Legacy original author headers remain clickable. Author grouping requires a
 persisted key; future processing/cache hits populate it without a bulk backfill.
 No native capability/configuration change. Existing deployed builds have no
 runtime/channel for OTA; ship updated iOS production and Android preview builds.
+
+## Unified reader — 2026-09-14
+
+The paired `codex/unified-reader-ui` branch starts from `9719b96` and retains the
+pending Google iOS/Android changes from the original checkout. The shared
+`src/types/reader.ts` presentation contract is byte-identical to web. Native
+Takeaways colors/card are now used by both apps; author profile and saved-author
+navigation are separate, continuation is visible beside coverage, and full
+research/text/notes remain accessible. Native notes use the existing PATCH
+field. Explicit read/unread is available in the reader and inbox menus; opening
+remains independent. Stored JPEG posters never enter video decoders. Actual OG
+images supplement thumbnails, while favicons remain small source icons.
+
+Validated in the local iPhone 16e iOS 26 simulator with synthetic fixtures,
+including light/dark, long authors, author filtering, reading and continuation.
+This is not a TestFlight release. See `docs/reader-ui-parity.md` for the paired
+source audit, evaluation loop, verification and local launch configuration.
+
+### Reader return navigation — 2026-09-14
+
+The corrected return direction is left to right. Right-to-left does not close.
+iOS delegates to native-stack interactive back in `app/(app)/_layout.tsx`;
+`ReaderSwipe.tsx` disables its custom recognizer on iOS to avoid competition.
+Other platforms recognize rightward movement from the leftmost 28px, coordinate
+with the ScrollView, respect reduced motion and cancel short/reversed gestures.
+Editing/expanded/embedded modes disable the custom gesture.
+
+`app/(app)/item/[id].tsx` replaces its route when opening a related save so one
+Back returns to the inbox/context. A missing previous screen falls back to inbox.
+Ten logic/delegation scenarios pass in `npm run test:reader-navigation`.
+Actual iOS Simulator navigation confirms related-save → Back → Inbox. Automated
+physical drag delivery cannot be asserted: the tool sends down/up without
+movement. No debug instrumentation remains. See `docs/reader-ui-parity.md`.

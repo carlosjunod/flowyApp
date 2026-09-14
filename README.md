@@ -245,4 +245,18 @@ Settings and Digest Settings share explicit device-notification registration. iO
 
 ## Google Sign-In on iOS — 2026-09-11
 
-Native Google login/signup now uses the existing Flowy server and shared session. New accounts require explicit AI-processing consent before creation. See [iOS Google setup and validation](docs/GOOGLE_SIGN_IN_IOS.md) for the two public OAuth IDs, EAS environments, rebuild requirement and device checks. Run `npm run test:google-auth` and `npm run typecheck`. Android Google implementation is deferred.
+Native Google login/signup now uses the existing Flowy server and shared session. New accounts require explicit AI-processing consent before creation. See [iOS Google setup and validation](docs/GOOGLE_SIGN_IN_IOS.md) for the two public OAuth IDs, EAS environments, rebuild requirement and device checks. Run `npm run test:google-auth` and `npm run typecheck`. Android Google implementation uses the same server contract; see [Android configuration](docs/GOOGLE_SIGN_IN_ANDROID.md).
+
+## Reader parity — 2026-09-14
+
+Web and native use the same Takeaways card and reader content hierarchy. Source
+authors have separate profile and saved-author actions. Continue extraction sits
+beside incomplete content; read/unread is explicit in detail and inbox menus.
+Personal notes can be edited. Full transcripts, research findings and source
+excerpts remain available. See [review and local preview](docs/reader-ui-parity.md).
+
+The fullscreen reader returns with a left-to-right swipe from the left edge.
+iOS uses the system interactive back gesture; other native targets use the
+reader gesture. Right-to-left does not close. Related saves replace the reader,
+so one Back returns to the inbox/context. Run `npm run test:reader-navigation`
+for ten logic/delegation scenarios. See `docs/reader-ui-parity.md` for validation.

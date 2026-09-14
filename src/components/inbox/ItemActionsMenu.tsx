@@ -22,7 +22,7 @@ type Props = {
   onDeleted?: () => void;
 };
 
-type Action = { key: 'open' | 'reload' | 'delete'; label: string; destructive?: boolean; disabled?: boolean };
+type Action = { key: 'open' | 'read' | 'reload' | 'delete'; label: string; destructive?: boolean; disabled?: boolean };
 
 const reportFailure = (title: string, message: string) => {
   Alert.alert(title, message);
@@ -37,7 +37,8 @@ export const ItemActionsMenu: React.FC<Props> = ({ item, variant = 'inline', onD
 
   const buildActions = (): Action[] => [
     { key: 'open', label: 'Open' },
-    { key: 'reload', label: item.status === 'error' ? 'Retry processing' : 'Reprocess', disabled: reloadDisabled },
+    { key: 'read', label: item.read_at ? 'Mark as unread' : 'Mark as read', disabled: actions.pending.has(item.id) },
+    { key: 'reload', label: item.status === 'error' ? 'Retry processing' : 'Process again', disabled: reloadDisabled },
     { key: 'delete', label: 'Delete', destructive: true },
   ];
 
@@ -46,6 +47,7 @@ export const ItemActionsMenu: React.FC<Props> = ({ item, variant = 'inline', onD
       actions.open(item.id);
       return;
     }
+    if (key === 'read') { const result = await actions.setRead(item.id, !item.read_at); if (!result.ok) reportFailure('Reading status not saved', result.error.message); return; }
     if (key === 'reload') {
       const res = await actions.reloadItem(item.id);
       if (!res.ok) reportFailure('Reload failed', res.error.message);
@@ -85,7 +87,7 @@ export const ItemActionsMenu: React.FC<Props> = ({ item, variant = 'inline', onD
     else setAndroidOpen(true);
   };
 
-  const triggerSize = variant === 'compact' ? 28 : 32;
+  const triggerSize = 44;
   const iconSize = variant === 'compact' ? 16 : 18;
 
   return (

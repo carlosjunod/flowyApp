@@ -5,5 +5,6 @@ export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   return <ItemReader key={id} id={id}
     onClose={() => { if (router.canGoBack()) router.back(); else router.replace('/inbox'); }}
-    onOpenItem={itemId => router.push(`/item/${itemId}`)} />;
+    // Keep one reader entry, so a single back gesture returns to the inbox.
+    onOpenItem={itemId => router.replace(`/item/${itemId}`)} />;
 }

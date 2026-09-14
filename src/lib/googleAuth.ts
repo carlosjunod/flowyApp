@@ -13,7 +13,9 @@ export function googleAuthMessage(error: unknown): string {
   const code = typeof error === 'string' ? error : error instanceof Error ? error.message : '';
   switch (code) {
     case 'GOOGLE_NOT_CONFIGURED':
-      return 'Google sign-in is unavailable in this build. Please use email or Apple.';
+      return 'Google sign-in is unavailable in this build. Please use email.';
+    case 'GOOGLE_PLAY_SERVICES_UNAVAILABLE':
+      return 'Google sign-in needs Google Play services. Update or enable them, then try again.';
     case 'NETWORK_ERROR':
       return 'Couldn’t connect. Check your connection and try Google again.';
     case 'EMAIL_IN_USE':
@@ -25,7 +27,7 @@ export function googleAuthMessage(error: unknown): string {
     case 'RATE_LIMITED':
       return 'Too many attempts. Wait a moment and try again.';
     default:
-      return 'Couldn’t sign in with Google. Please try again or use email or Apple.';
+      return 'Couldn’t sign in with Google. Please try again or use email.';
   }
 }
 

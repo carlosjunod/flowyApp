@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React from 'react';
+import { ItemActionsMenu } from './ItemActionsMenu';
 import { Pressable, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -90,7 +91,7 @@ export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColum
           },
           pressed && !pending && { opacity: 0.92, transform: [{ scale: 0.995 }] },
         ]}
-        className={`flex-row items-center gap-3 ${inColumn ? '' : 'mx-4'} mb-2 px-3 py-3 rounded-2xl bg-card ${
+        className={`flex-row items-center gap-3 ${inColumn ? '' : 'mx-4'} mb-2 pl-3 pr-14 py-3 rounded-2xl bg-card ${
           selected || (!selection.mode && active) ? 'border-2 border-accent' : ''
         }`}
       >
@@ -147,6 +148,7 @@ export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColum
         <ReadingIndicator item={item} />
         {pending || errored ? <Feather name={errored ? 'alert-circle' : 'clock'} size={18} color={errored ? '#B91C1C' : '#6B6258'} /> : null}
       </Pressable>
+      {!selection.mode ? <View style={{ position: 'absolute', top: 10, right: inColumn ? 8 : 24 }}><ItemActionsMenu item={item} variant="compact" /></View> : null}
     </Animated.View>
   );
 };

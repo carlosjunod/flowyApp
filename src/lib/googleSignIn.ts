@@ -1,4 +1,4 @@
-/** Platform boundary: iOS supplies the native implementation. */
+/** Platform boundary: iOS and Android supply the native implementation. */
 export interface GoogleIdentity {
   idToken: string;
   email: string;

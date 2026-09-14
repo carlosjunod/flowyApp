@@ -1,5 +1,5 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { Link, router } from 'expo-router';
+import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -172,7 +172,7 @@ export default function LoginScreen() {
                     onPress={onApple}
                   />
                 ) : null}
-                {Platform.OS === 'ios' ? (
+                {Platform.OS === 'ios' || Platform.OS === 'android' ? (
                   <GoogleSignIn disabled={loading || appleLoading} onBusyChange={setGoogleBusy} />
                 ) : (
                   <Pressable onPress={() => setError('Google sign-in is being set up — use email for now.')} accessibilityRole="button" className="h-11 rounded-xl border border-border bg-card items-center justify-center">
@@ -184,11 +184,14 @@ export default function LoginScreen() {
 
             <View className="flex-row items-center justify-center mt-8 gap-1">
               <Text className="text-muted text-sm">No account?</Text>
-              <Link href="/signup" asChild>
-                <Pressable hitSlop={8}>
-                  <Text className="text-accent text-sm font-medium">Create one</Text>
-                </Pressable>
-              </Link>
+              <Pressable
+                accessibilityRole="link"
+                onPress={() => router.push('/(auth)/signup')}
+                hitSlop={8}
+                style={{ minHeight: 44, justifyContent: 'center' }}
+              >
+                <Text className="text-accent text-sm font-medium">Create one</Text>
+              </Pressable>
             </View>
           </View>
         </ScrollView>

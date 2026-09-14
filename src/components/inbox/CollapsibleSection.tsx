@@ -57,6 +57,7 @@ export const CollapsibleSection: React.FC<Props> = ({
           alignItems: 'center',
           gap: 8,
           paddingVertical: 14,
+          minHeight: 48,
         }}
       >
         <Animated.View style={chevStyle}>
@@ -65,9 +66,8 @@ export const CollapsibleSection: React.FC<Props> = ({
         <Text
           style={{
             fontFamily: 'Inter_600SemiBold',
-            fontSize: 10.5,
-            letterSpacing: 1.05,
-            textTransform: 'uppercase',
+            fontSize: 14,
+            flexShrink: 1,
             color: colors.muted,
           }}
         >

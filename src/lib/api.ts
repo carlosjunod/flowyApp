@@ -163,7 +163,7 @@ export const api = {
 
   patchItem: (
     id: string,
-    patch: Partial<Pick<Item, 'title' | 'summary' | 'category' | 'tags'>>,
+    patch: Partial<Pick<Item, 'title' | 'summary' | 'category' | 'tags' | 'notes'>>,
   ) =>
     request<Item>(`/api/items/${id}`, {
       method: 'PATCH',
