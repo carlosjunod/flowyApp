@@ -167,3 +167,13 @@ the original dirty checkouts were not rewritten. No TestFlight release occurred.
 This was the deployment before the direction correction. Physical native drag
 is a validation limitation, not an automated E2E pass; corrected source and
 platform delegation are described above.
+
+### Direction correction deployed
+
+The corrected web source `d2d2c03` was deployed as Railway
+`1e4a4d6c-ab14-4a5c-9992-fc963df86130` with `SUCCESS` on 2026-09-14.
+Native source `b7b493c` is loaded in the local simulator. Current validation:
+71 reader/continuation tests plus 6 source-identity tests, 10 native navigation
+scenarios, scoped TypeScript, production build and all four browser cases pass.
+Iteration 5 visual scores are 9.6/10 for both clients. Physical iOS drag delivery
+remains outside the automation's coverage; the system gesture owns iOS return.
