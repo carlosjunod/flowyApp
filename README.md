@@ -253,8 +253,8 @@ beside incomplete content; read/unread is explicit in detail and inbox menus.
 Personal notes can be edited. Full transcripts, research findings and source
 excerpts remain available. See [review and local preview](docs/reader-ui-parity.md).
 
-The fullscreen reader supports a left swipe from the right edge to return to
-the inbox, alongside its visible Back button. Media swipes use the center;
-vertical and cancelled gestures stay in the reader. Run
-`npm run test:reader-navigation` for the eight gesture logic scenarios. Local
-physical swipe acceptance is tracked in `docs/reader-ui-parity.md`.
+The fullscreen reader returns with a left-to-right swipe from the left edge.
+iOS uses the system interactive back gesture; other native targets use the
+reader gesture. Right-to-left does not close. Related saves replace the reader,
+so one Back returns to the inbox/context. Run `npm run test:reader-navigation`
+for ten logic/delegation scenarios. See `docs/reader-ui-parity.md` for validation.

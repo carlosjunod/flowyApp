@@ -265,14 +265,16 @@ source audit, evaluation loop, verification and local launch configuration.
 
 ### Reader return navigation — 2026-09-14
 
-`ReaderSwipe.tsx` adds leftward return from the rightmost 28px, driven by
-Gesture Handler/Reanimated and coordinated with the reader ScrollView. Center
-media gestures and vertical scroll retain their role. Short/cancelled drags
-settle back, reduced motion is respected, and editing/expanded/embedded modes
-disable this gesture. The detail route now dismisses to `/inbox`, including
-related reader stacks. Visible Back remains available.
+The corrected return direction is left to right. Right-to-left does not close.
+iOS delegates to native-stack interactive back in `app/(app)/_layout.tsx`;
+`ReaderSwipe.tsx` disables its custom recognizer on iOS to avoid competition.
+Other platforms recognize rightward movement from the leftmost 28px, coordinate
+with the ScrollView, respect reduced motion and cancel short/reversed gestures.
+Editing/expanded/embedded modes disable the custom gesture.
 
-`npm run test:reader-navigation` passes eight worklet logic scenarios. Physical
-swipe validation in the iOS Simulator is pending: automation produces touch
-down/up but no movement. Temporary event diagnostics have been removed. The
-app is running with local fixtures for that check; see `docs/reader-ui-parity.md`.
+`app/(app)/item/[id].tsx` replaces its route when opening a related save so one
+Back returns to the inbox/context. A missing previous screen falls back to inbox.
+Ten logic/delegation scenarios pass in `npm run test:reader-navigation`.
+Actual iOS Simulator navigation confirms related-save → Back → Inbox. Automated
+physical drag delivery cannot be asserted: the tool sends down/up without
+movement. No debug instrumentation remains. See `docs/reader-ui-parity.md`.

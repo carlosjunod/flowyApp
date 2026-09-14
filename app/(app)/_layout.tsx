@@ -62,9 +62,9 @@ export function AppNavigator() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, animation: reducedMotion ? 'none' : 'default' }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="item/[id]" options={{
+        // iOS owns interactive back. ReaderSwipe handles other platforms only.
         gestureEnabled: true,
         gestureDirection: 'horizontal',
-        // Reserve the edge for back; horizontal media keeps the rest of the screen.
         fullScreenGestureEnabled: false,
       }} />
       <Stack.Screen name="personalization" />

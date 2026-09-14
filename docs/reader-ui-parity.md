@@ -52,28 +52,39 @@ working interactions and no unresolved critical defect in the reviewed scope.
 | 1 | 8.6 | 8.5 | Core author/card/continuation layout works. Align section labels, notes editing, metadata, related cards and author navigation. |
 | 2 | 9.3 | 9.2 | Light/dark and small widths work. Replace failed/oversized favicon covers, expose inbox reading menus and finish source fallback parity. |
 | 3 | 9.6 | 9.6 | Reviewed updated mobile/desktop web renders and native light/dark/long-author screens; functional checks pass. Both scores exceed 9.5 for the original presentation scope; navigation was requested afterwards. |
+| 4 | 9.6 | 9.6 | Added browser history and the initially requested leftward gesture; native physical drag could not be automated. The user then corrected the intended direction. |
+| 5 | 9.6 | 9.6 | Corrected return to left-to-right, disabled right-to-left closing, used iOS native-stack back, and verified that related saves keep one reader entry. |
 
-## Added return navigation
+## Added return navigation (direction corrected)
 
-The **mobile-touch** skill guides a left swipe from the rightmost 28px on both
-readers. Center swipes remain available to media; vertical scrolling and short
-or cancelled drags do not close the reader. Native uses Gesture Handler and
-Reanimated on the UI thread, with reduced motion and an explicit relationship
-to the content scroll gesture. Editing, expanded images and embedded readers
-disable this gesture. The native route dismisses related reader screens back
-to the inbox instead of walking through each related save.
+The user corrected the direction: **left to right returns; right to left does
+not close**. Mobile web and non-iOS native clients recognize this from the
+leftmost 28px. Center swipes remain available to media; vertical scrolling and
+short/cancelled drags do not close the reader. The **mobile-touch** skill guides
+finger-following transforms, reduced motion and cancellation.
+
+On iOS, the native stack owns its standard interactive edge-back gesture. The
+custom recognizer is disabled there to prevent competing handlers or double
+pops. Related saves replace the current reader route, so one back returns to
+the existing inbox/context and preserves its state. A direct/deep-linked reader
+without a previous screen falls back to `/inbox` via its Back control.
+Other native targets use Gesture Handler/Reanimated and defer the scroll view
+only until edge direction is known; edit/expanded-image/embedded modes disable
+that custom gesture.
 
 Web mobile (<768px) uses one same-URL history entry. Back closes the fullscreen
 reader; Forward restores it; related saves replace the entry. A cancelled draft
 discard restores that entry. Manual close consumes it before author navigation,
 allowing Next to restore its state first. Desktop history is unchanged.
 
-Navigation review: web **9.6/10**, with real browser touch and Back/Forward
-checks passing. Native presentation retains its reviewed 9.6/10 appearance;
-physical swipe acceptance is pending. The simulator automation emitted touch
-down/up but no movement, confirmed by temporary event instrumentation (removed).
-Eight real native-worklet logic scenarios pass; these do not substitute for
-physical iOS touch delivery. The expanded iteration stays open until that check.
+Iteration 5 retains **9.6/10 on both presentations** after reviewing the unchanged
+reader renders and corrected navigation. Real web touch/Back/Forward checks
+pass, including explicit right-to-left inactivity and inbox scroll restoration.
+Ten native logic/delegation scenarios pass. In the actual iOS Simulator, opening
+a related save followed by one Back returns directly to the inbox. Physical
+drag delivery is not claimed as an automated iOS E2E pass: the automation emits
+touch down/up without movement. The iOS implementation now delegates that
+interaction to native-stack rather than a custom recognizer.
 
 ## Verification and reproducible local review
 
@@ -125,8 +136,8 @@ will not acquire these JavaScript changes by itself.
 
 - 77 targeted web, server-continuation and native-component tests pass, including
   8 reader history/gesture scenarios.
-- Native: 4 engagement groups, 26 Google iOS/Android scenarios and 8 reader
-  navigation worklet scenarios pass (`npm run test:reader-navigation`).
+- Native: 4 engagement groups, 26 Google iOS/Android scenarios and 10 reader
+  navigation/delegation scenarios pass (`npm run test:reader-navigation`).
 - Web and native scoped TypeScript pass; production Next build passes.
 - Playwright production-build acceptance: 4 viewport/theme combinations pass
   reading/reversal, full text, author filtering and overflow/page-error checks;
@@ -153,5 +164,6 @@ The deployed source was a clean git archive, without local fixture environment
 files. Native source `b1b9eb2` is running in the local development client.
 Both source branches are pushed as `codex/unified-reader-ui`; origin/main and
 the original dirty checkouts were not rewritten. No TestFlight release occurred.
-The only open acceptance check is the physical native return swipe described
-above; its logic tests and all web browser navigation checks pass.
+This was the deployment before the direction correction. Physical native drag
+is a validation limitation, not an automated E2E pass; corrected source and
+platform delegation are described above.
