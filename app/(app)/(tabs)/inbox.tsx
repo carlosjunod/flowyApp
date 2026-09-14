@@ -126,7 +126,7 @@ export default function InboxScreen() {
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
       <PersonalizationInvitation />
-      {author ? <View className="px-4 flex-row items-center gap-3"><Text className="text-fg">Author: @{author.replace(/^instagram:/, '')}</Text><Pressable accessibilityRole="button" onPress={clearAuthor} style={{ minHeight: 44, justifyContent: 'center' }}><Text className="text-accent underline">Clear author filter</Text></Pressable></View> : null}
+      {author ? <View className="mx-4 px-3 flex-row flex-wrap items-center justify-between gap-x-3 rounded-xl border border-border bg-surface"><Text className="text-fg text-sm py-2" style={{ flexShrink: 1 }}>Your saves · @{author.replace(/^instagram:/, '')}</Text><Pressable accessibilityRole="button" accessibilityLabel="Clear author filter" onPress={clearAuthor} style={{ minHeight: 44, justifyContent: 'center' }}><Text className="text-accent font-medium">Clear</Text></Pressable></View> : null}
       <View className="flex-row items-center justify-between px-4 pt-2 pb-1">
         <Text
           className="text-3xl text-fg"

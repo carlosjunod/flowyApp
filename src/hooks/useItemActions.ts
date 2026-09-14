@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 
+import { pb } from '@/lib/pb';
 import { api } from '@/lib/api';
 import type { ApiError, BulkActionResult } from '@/types';
 
@@ -121,9 +122,21 @@ export const useItemActions = () => {
     [qc, mark],
   );
 
+  const setRead = useCallback(async (id: string, read: boolean): Promise<SingleResult> => {
+    const userId = pb.authStore.model?.id, token = pb.authStore.token;
+    if (!userId) return { ok: false, error: { code: 'UNAUTHORIZED', message: 'Please sign in again.' } };
+    mark([id], true);
+    try {
+      const result = await api.itemEngagement(userId, id, read ? 'mark_read' : 'mark_unread');
+      if (result.error) return { ok: false, error: result.error };
+      if (pb.authStore.token === token) await Promise.all([qc.invalidateQueries({ queryKey: ['item', id, userId] }), qc.invalidateQueries({ queryKey: ['items', userId] })]);
+      return { ok: true };
+    } finally { mark([id], false); }
+  }, [qc, mark]);
+
   return useMemo(
-    () => ({ open, reloadItem, deleteItem, reloadMany, deleteMany, exploreMany, pending }),
-    [open, reloadItem, deleteItem, reloadMany, deleteMany, exploreMany, pending],
+    () => ({ setRead, open, reloadItem, deleteItem, reloadMany, deleteMany, exploreMany, pending }),
+    [setRead, open, reloadItem, deleteItem, reloadMany, deleteMany, exploreMany, pending],
   );
 };
 

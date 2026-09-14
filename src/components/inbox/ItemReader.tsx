@@ -1,10 +1,8 @@
 import { useItemEngagement } from '@/hooks/useItemEngagement';
 import { AppIcon } from '@/components/ui/AppIcon';
-import { readSemanticContent, canResumeSemantic } from '@/types/semantic';
 import { Feather } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -25,17 +23,20 @@ import { EnrichedSections } from '@/components/inbox/EnrichedSections';
 import { ExploreCTA } from '@/components/inbox/ExploreCTA';
 import { SourceChip } from '@/components/inbox/SourceChip';
 import { TagEditor } from '@/components/inbox/TagEditor';
+import { READER_COPY, readerAction, readerSummary, readerDate } from '@/types/reader';
+import { SourceIdentity } from '@/components/inbox/content/SourceIdentity';
+import { SemanticContent } from '@/components/inbox/content/SemanticContent';
+import { SourceText } from '@/components/inbox/content/SourceText';
+import { CollapsibleSection } from '@/components/inbox/CollapsibleSection';
 import { ContentRenderer } from '@/components/inbox/content/ContentRenderer';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { useItemActions } from '@/hooks/useItemActions';
-import { useDeleteItem, useItemById, usePatchItem } from '@/hooks/useItems';
+import { useDeleteItem, useItemById, usePatchItem, useRelatedItems } from '@/hooks/useItems';
 import { useItemStatus } from '@/hooks/useItemStatus';
 import { getContentType } from '@/lib/contentType';
 import { ENV } from '@/lib/env';
-import { pb } from '@/lib/pb';
-import { relativeDate } from '@/lib/relativeDate';
 import { sourceChip } from '@/lib/sourceChip';
 import { hostOf, thumbnailFor } from '@/lib/thumbnails';
 import { useResolvedColors } from '@/lib/theme';
@@ -43,20 +44,6 @@ import type { Item } from '@/types';
 
 const stripWww = (h: string) => h.replace(/^www\./, '');
 
-const useRelatedItems = (item: Item | undefined) =>
-  useQuery<Item[], Error>({
-    queryKey: ['related', item?.id, item?.category],
-    enabled: !!item?.id && !!item?.category,
-    queryFn: async () => {
-      if (!item?.id || !item?.category) return [];
-      const escapedCat = item.category.replace(/"/g, '\\"');
-      const res = await pb.collection('items').getList<Item>(1, 6, {
-        filter: `category = "${escapedCat}" && id != "${item.id}"`,
-        sort: '-created',
-      });
-      return res.items;
-    },
-  });
 
 type ItemReaderProps = {
   id: string;
@@ -79,12 +66,22 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
   const colors = useResolvedColors();
   const actions = useItemActions();
 
+  const [startingResearch, setStartingResearch] = useState(false);
+  const researchLock = useRef(false);
   const [editing, setEditing] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
-  const [tagsOpen, setTagsOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
-  const [noteExpanded, setNoteExpanded] = useState(false);
-  const [noteCanExpand, setNoteCanExpand] = useState(false);
+
+  const startResearch = async () => {
+    if (!item || researchLock.current || item.exploration?.status === 'exploring') return;
+    researchLock.current = true;
+    setStartingResearch(true);
+    try {
+      const result = await actions.exploreMany([item.id], { deep: !readerAction(item).resume });
+      if (!result.ok && 'error' in result) Alert.alert('Could not start', result.error.message);
+      else if (result.ok && result.data.failed.length) Alert.alert('Could not start', 'Please try again. Completed work is kept.');
+    } finally { researchLock.current = false; setStartingResearch(false); }
+  };
 
   if (isLoading) {
     return (
@@ -178,7 +175,7 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
               className="text-muted"
               style={{ fontFamily: 'Inter_400Regular', fontSize: 13 }}
             >
-              {relativeDate(item.created)}
+              {readerDate(item.created)}
             </Text>
             {item.status !== 'ready' ? (
               <Badge
@@ -189,17 +186,88 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
           </View>
         </View>
 
-        <View className="gap-1">
-          <Pressable onPress={() => { void engagement.toggleRead(); }} disabled={engagement.busy}
-            accessibilityRole="button" accessibilityLabel={item.read_at ? 'Mark as unread' : 'Mark as read'}
-            accessibilityState={{ disabled: engagement.busy }} className="min-h-[44px] flex-row items-center gap-2 self-start px-3 rounded-full border border-border">
-            <Feather name={item.read_at ? 'check' : 'circle'} size={17} color={colors.muted} />
-            <Text className="text-fg text-sm">{engagement.busy ? 'Saving…' : item.read_at ? 'Read · Mark as unread' : 'Mark as read'}</Text>
+        <SourceIdentity item={item} />
+        <View style={{ gap: 8 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {url ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => { if (url) void Linking.openURL(url); }}
+            className="rounded-full bg-accent flex-row items-center justify-center gap-2"
+            style={{ flex: 1, minWidth: 145 }}
+            hitSlop={4}
+          >
+            <View className="flex-row items-center justify-center gap-2 py-3 px-4">
+              <Feather name="external-link" size={16} color={colors.onAccent} />
+              <Text
+                className="text-on-accent"
+                style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15 }}
+              >
+                Open original
+              </Text>
+            </View>
           </Pressable>
-          <Text className="text-muted text-xs">{item.read_at ? 'Marked by you. You can undo this anytime.' : 'No read mark recorded. Opening does not mark this as read.'}</Text>
+        ) : null}
+
+
+        <View style={{ flex: 1, minWidth: 145 }}>
+          <Pressable onPress={() => { void engagement.toggleRead(); }} disabled={engagement.busy}
+            accessibilityRole="button" accessibilityLabel={item.read_at ? READER_COPY.markUnread : READER_COPY.markRead}
+            accessibilityState={{ disabled: engagement.busy }} className="min-h-[44px] flex-row items-center justify-center gap-2 px-3 rounded-full border border-border">
+            <Feather name={item.read_at ? 'check' : 'circle'} size={17} color={colors.muted} />
+            <Text className="text-fg text-sm">{engagement.busy ? 'Saving…' : item.read_at ? READER_COPY.markUnread : READER_COPY.markRead}</Text>
+          </Pressable>
           {engagement.error ? <Text accessibilityRole="alert" className="text-danger text-sm">{engagement.error}</Text> : null}
         </View>
 
+          </View>
+          <Text className="text-muted" style={{ fontSize: 12, lineHeight: 18 }}>{READER_COPY.readingHint}</Text>
+        </View>
+        {(
+          <View style={{ position: 'relative' }}>
+
+            <View
+              className="rounded-2xl bg-card px-4 py-4 gap-2"
+              style={{
+                borderRadius: 18,
+                shadowColor: '#1C1815',
+                shadowOpacity: 0.05,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 3 },
+                elevation: 2,
+              }}
+            >
+              <View className="flex-row items-center gap-2">
+                <View className="w-1.5 h-1.5 rounded-full bg-accent" />
+                <Text
+                  className="text-muted"
+                  style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11, letterSpacing: 1 }}
+                >
+                  {READER_COPY.takeaways}
+                </Text>
+              </View>
+              <Text
+                className="text-fg"
+                style={{ fontFamily: 'Inter_400Regular', fontSize: 16, lineHeight: 25 }}
+              >
+                {readerSummary(item)}
+              </Text>
+            </View>
+          </View>
+        )}
+
+
+        {item.status === 'error' ? (
+          <View className="rounded-xl border border-danger bg-danger/10 p-3">
+            <Text className="text-danger font-medium mb-1">Processing error</Text>
+            <Text className="text-danger">We could not finish processing this save. Your original is still available.</Text>
+            <ReloadButton item={item} />
+          </View>
+        ) : null}
+
+        <SemanticContent item={item} action={readerAction(item).resume ? <ExploreCTA item={item} starting={startingResearch} onPress={startResearch} /> : undefined} />
+        <View style={{ gap: 12 }}>
+          <Text accessibilityRole="header" className="text-fg" style={{ fontFamily: 'Inter_600SemiBold', fontSize: 18 }}>{READER_COPY.original}</Text>
         {showHero && heroUri ? (
           <Pressable accessibilityRole="button" accessibilityLabel={photoOpen ? "Collapse image" : "Expand image"} accessibilityState={{ expanded: photoOpen }} onPress={() => setPhotoOpen(v => !v)} className="relative">
             <View
@@ -246,123 +314,22 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
             ) : null}
           </Pressable>
         ) : null}
-        {url ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => { if (url) void Linking.openURL(url); }}
-            style={({ pressed }) => [pressed && { opacity: 0.92 }]}
-            className="rounded-full bg-accent flex-row items-center justify-center gap-2"
-            hitSlop={4}
-          >
-            <View className="flex-row items-center justify-center gap-2 py-3.5 px-5">
-              <Feather name="external-link" size={16} color={colors.onAccent} />
-              <Text
-                className="text-on-accent"
-                style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15 }}
-              >
-                Open original
-              </Text>
-            </View>
-          </Pressable>
-        ) : null}
-
-
-        {item.notes?.trim() ? (
-          <View className="rounded-2xl border border-border bg-surface p-4 gap-3">
-            <View className="flex-row items-center gap-2">
-              <Feather name="edit-3" size={14} color={colors.accent} />
-              <Text className="text-muted text-xs font-medium">YOUR NOTE</Text>
-            </View>
-            <Text selectable className="text-fg text-base leading-6" numberOfLines={noteExpanded ? undefined : 5} onTextLayout={({ nativeEvent }) => { if (!noteExpanded) setNoteCanExpand(nativeEvent.lines.length >= 5); }}>
-              {item.notes}
-            </Text>
-            {noteCanExpand ? (
-              <Pressable onPress={() => setNoteExpanded(value => !value)} accessibilityRole="button" accessibilityState={{ expanded: noteExpanded }} className="min-h-[44px] justify-center">
-                <Text className="text-accent font-medium">{noteExpanded ? 'Show less' : 'Read full note'}</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        ) : null}
-
-        {contentType === 'receipt' ? <ContentRenderer item={item} contentType={contentType} /> : null}
-        {item.summary ? (
-          <View style={{ position: 'relative' }}>
-
-            <View
-              className="rounded-2xl bg-card px-4 py-4 gap-2"
-              style={{
-                borderRadius: 18,
-                shadowColor: '#1C1815',
-                shadowOpacity: 0.05,
-                shadowRadius: 10,
-                shadowOffset: { width: 0, height: 3 },
-                elevation: 2,
-              }}
-            >
-              <View className="flex-row items-center gap-2">
-                <View className="w-1.5 h-1.5 rounded-full bg-accent" />
-                <Text
-                  className="text-muted"
-                  style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11, letterSpacing: 1 }}
-                >
-                  FLOWY AI · TAKEAWAYS
-                </Text>
-              </View>
-              <Text
-                className="text-fg"
-                style={{ fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 24 }}
-              >
-                {item.summary}
-              </Text>
-            </View>
-          </View>
-        ) : null}
-
-
-        {item.status === 'error' ? (
-          <View className="rounded-xl border border-danger bg-danger/10 p-3">
-            <Text className="text-danger font-medium mb-1">Processing error</Text>
-            <Text className="text-danger">We could not finish processing this save. Your original is still available.</Text>
-            <ReloadButton item={item} />
-          </View>
-        ) : null}
-
-        {contentType !== 'receipt' ? <ContentRenderer item={item} contentType={contentType} /> : null}
-
-        {/* Rendered unconditionally, and NOT behind `item.exploration`.
-            That field only exists once an exploration has already run: the
-            server creates it when POST /api/items/bulk/explore starts a job.
-            Gating on it meant the only control that can start one appeared
-            solely on items that no longer needed it — and with auto-enrich at
-            ingest opt-in and off (AUTO_ENRICH_ENABLED), that was every item.
-            ExploreCTA already handles `exploration === undefined` as its
-            `idle` variant. Only ready items can be explored (the server
-            answers NOT_READY otherwise), so still gate on status. */}
-        {item.status === 'ready' ? (
-          <ExploreCTA
-            resumeMode={canResumeSemantic(readSemanticContent(item.structured_content))}
-            resourceMode={['list', 'entity'].includes(readSemanticContent(item.structured_content)?.layout ?? '')}
-            exploration={item.exploration}
-            isReceipt={item.type === 'receipt'}
-            onPress={() => {
-              void actions.exploreMany([item.id], { deep: true }).then((res) => {
-                if (!res.ok && 'error' in res && res.error.message !== 'Cancelled') {
-                  Alert.alert('Exploration failed', res.error.message);
-                }
-              });
-            }}
-          />
-        ) : null}
-
-        {item.exploration ? (
-          <EnrichedSections exploration={item.exploration} />
-        ) : null}
-
-
-        <View>
-          <Pressable accessibilityRole="button" accessibilityState={{ expanded: tagsOpen }} className="min-h-[44px] justify-center" onPress={() => setTagsOpen(v => !v)}><View className="flex-row items-center gap-2"><Text className="text-muted font-medium">Tags ({item.tags?.length ?? 0})</Text><AppIcon name={tagsOpen ? 'chevron-up' : 'chevron-down'} size={16} /></View></Pressable>
-          {tagsOpen ? <TagEditor item={item} /> : null}
+          <ContentRenderer item={item} contentType={contentType} />
         </View>
+        {item.status === 'ready' && !readerAction(item).resume ? <ExploreCTA item={item} starting={startingResearch} onPress={startResearch} /> : null}
+        {item.exploration?.status === 'enriched' ? <EnrichedSections exploration={item.exploration} /> : null}
+        {item.notes?.trim() ? <CollapsibleSection label="Your notes" defaultOpen>
+          <SourceText text={item.notes} />
+          <Pressable accessibilityRole="button" onPress={() => setEditing(true)} className="min-h-[44px] justify-center"><Text className="text-accent">Edit notes</Text></Pressable>
+        </CollapsibleSection> : null}
+
+
+
+        <CollapsibleSection label="Tags and details" defaultOpen={false}>
+          <Text className="text-muted text-sm mb-3">{sourceChip(item, contentType).label}{item.category ? ` · ${item.category}` : ''}</Text>
+          <TagEditor item={item} />
+          <Text className="text-muted text-xs mt-4">Saved {readerDate(item.created)}</Text>
+        </CollapsibleSection>
 
         {relatedItems.length > 0 ? (
           <View className="gap-3 pt-2">
@@ -410,7 +377,8 @@ const RelatedCard: React.FC<{ item: Item; onOpenItem: (id: string) => void }> = 
     <Pressable
       onPress={() => onOpenItem(item.id)}
       style={({ pressed }) => [pressed && { opacity: 0.9 }]}
-      className="rounded-2xl overflow-hidden bg-card border border-border"
+      accessibilityRole="button"
+      className="rounded-2xl overflow-hidden bg-card border border-border active:opacity-80"
     >
       <View style={{ width: 160 }}>
         <View style={{ height: 110 }} className="relative bg-surface">
@@ -451,11 +419,10 @@ const RelatedCard: React.FC<{ item: Item; onOpenItem: (id: string) => void }> = 
             </View>
           ) : null}
         </View>
-        <View className="px-2.5 py-2 gap-0.5" style={{ height: 60 }}>
+        <View className="px-2.5 py-2 gap-0.5" style={{ minHeight: 60 }}>
           <Text
             className="text-fg"
             style={{ fontFamily: 'Inter_600SemiBold', fontSize: 13, lineHeight: 16 }}
-            numberOfLines={2}
           >
             {item.title ?? item.raw_url ?? 'Saved item'}
           </Text>
@@ -554,6 +521,7 @@ const EditModal: React.FC<EditProps> = ({ item, onClose }) => {
   const [summary, setSummary] = useState(item.summary ?? '');
   const [category, setCategory] = useState(item.category ?? '');
   const [tags, setTags] = useState((item.tags ?? []).join(', '));
+  const [notes, setNotes] = useState(item.notes ?? '');
   const patch = usePatchItem();
   const [error, setError] = useState<string | null>(null);
   const colors = useResolvedColors();
@@ -563,7 +531,8 @@ const EditModal: React.FC<EditProps> = ({ item, onClose }) => {
     setSummary(item.summary ?? '');
     setCategory(item.category ?? '');
     setTags((item.tags ?? []).join(', '));
-  }, [item]);
+    setNotes(item.notes ?? '');
+  }, [item.id]);
 
   const save = async () => {
     setError(null);
@@ -574,6 +543,7 @@ const EditModal: React.FC<EditProps> = ({ item, onClose }) => {
           title: title.trim() || undefined,
           summary: summary.trim() || undefined,
           category: category.trim() || undefined,
+          notes,
           tags: tags
             .split(',')
             .map((t) => t.trim())
@@ -625,6 +595,8 @@ const EditModal: React.FC<EditProps> = ({ item, onClose }) => {
             autoCapitalize="none"
             className="h-11 rounded-xl border border-border bg-card px-3 text-fg"
           />
+          <Text className="text-fg text-sm">Your notes</Text>
+          <TextInput accessibilityLabel="Your notes" multiline value={notes} onChangeText={setNotes} placeholder="Add notes…" placeholderTextColor={colors.muted} className="min-h-[120px] rounded-xl border border-border bg-card p-3 text-fg" textAlignVertical="top" />
           {error ? <Text className="text-danger">{error}</Text> : null}
           <View className="flex-row gap-2 pt-2">
             <View className="flex-1">

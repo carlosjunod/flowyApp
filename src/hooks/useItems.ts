@@ -76,7 +76,7 @@ export const usePatchItem = () => {
   return useMutation({
     mutationFn: async (input: {
       id: string;
-      patch: Partial<Pick<Item, 'title' | 'summary' | 'category' | 'tags'>>;
+      patch: Partial<Pick<Item, 'title' | 'summary' | 'category' | 'tags' | 'notes'>>;
     }) => {
       const res = await api.patchItem(input.id, input.patch);
       if (res.error) throw new Error(res.error.message);
@@ -135,3 +135,18 @@ export const useDebounced = <T,>(value: T, delay: number): T => {
   }, [value, delay]);
   return debounced;
 };
+
+/** Same-category recommendations from the current account, never the opened save. */
+export function useRelatedItems(item: Item | undefined) {
+  const { user } = useAuth();
+  return useQuery<Item[]>({
+    queryKey: ['related', user?.id, item?.id, item?.category],
+    enabled: !!user?.id && !!item?.category && item.user === user.id,
+    queryFn: async () => {
+      if (!item || !user || pb.authStore.model?.id !== user.id) return [];
+      const token = pb.authStore.token;
+      const result = await pb.collection('items').getList<Item>(1, 6, { filter: pb.filter('user = {:user} && category = {:category} && id != {:id}', { user: user.id, category: item.category, id: item.id }), sort: '-created,-id', requestKey: null });
+      return pb.authStore.token === token ? result.items : [];
+    },
+  });
+}

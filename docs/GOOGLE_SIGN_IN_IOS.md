@@ -2,11 +2,11 @@
 
 The iOS login and signup screens use `src/components/auth/GoogleSignIn.tsx`.
 The native boundary is `src/lib/googleSignIn.ios.ts`; the default
-`src/lib/googleSignIn.ts` does not import native Google code on other platforms.
+`src/lib/googleSignIn.ts` does not import native Google code on web. Android uses `src/lib/googleSignIn.android.ts`.
 `src/lib/googleAuth.ts` exchanges the selected identity through the existing
 `api.authGoogle` method and `/api/auth/google` server route. Server verification,
 account linking, PocketBase session format and shared Keychain storage remain
-unchanged. Android implementation is deferred.
+unchanged. Android setup is documented in `docs/GOOGLE_SIGN_IN_ANDROID.md`.
 
 ## Google and Expo configuration
 

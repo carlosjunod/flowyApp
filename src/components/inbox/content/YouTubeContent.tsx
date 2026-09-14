@@ -1,3 +1,5 @@
+import { CollapsibleSection } from '../CollapsibleSection';
+import { SourceText } from './SourceText';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import React, { useMemo, useState } from 'react';
@@ -51,12 +53,12 @@ export const YouTubeContent: React.FC<{ item: Item }> = ({ item }) => {
         title={item.title}
       />
       <ChannelBar item={item} url={url} />
-      <ChaptersTranscript
+      {item.content ? <CollapsibleSection label={hasSegments ? 'Chapters and transcript' : 'Transcript'} defaultOpen={false}><ChaptersTranscript
         segments={segments}
         hasSegments={hasSegments}
         content={item.content ?? ''}
         url={url}
-      />
+      /></CollapsibleSection> : null}
     </View>
   );
 };
@@ -133,11 +135,11 @@ const VideoArea: React.FC<{
       accessibilityLabel="Play video"
       accessibilityRole="button"
       className="mb-3 overflow-hidden rounded-xl border border-border bg-black"
-      style={({ pressed }) => [
+      style={[
         {
           aspectRatio: 16 / 9,
           width: '100%',
-          opacity: pressed ? 0.9 : 1,
+
         },
       ]}
     >
@@ -206,7 +208,7 @@ const VideoArea: React.FC<{
 const ChannelBar: React.FC<{ item: Item; url: string }> = ({ item, url }) => {
   const colors = useResolvedColors();
   const channelName =
-    item.exploration?.primary_link?.title || item.site_name || 'YouTube channel';
+    item.site_name || 'YouTube';
   const initial = channelName.charAt(0).toUpperCase();
 
   return (
@@ -253,8 +255,8 @@ const ChannelBar: React.FC<{ item: Item; url: string }> = ({ item, url }) => {
           hitSlop={6}
           accessibilityRole="link"
           accessibilityLabel="Watch on YouTube"
-          style={({ pressed }) => [
-            { flexDirection: 'row', alignItems: 'center', gap: 4, opacity: pressed ? 0.7 : 1 },
+          style={[
+            { flexDirection: 'row', alignItems: 'center', gap: 4,  },
           ]}
         >
           <Text
@@ -332,14 +334,14 @@ const ChapterList: React.FC<{
   return (
     <View>
       {segments.map((seg, i) => {
-        const isActive = i === 0;
+        const isActive = false;
         return (
           <Pressable
             key={`${seg.time}-${i}`}
             onPress={() =>
               url ? Linking.openURL(youtubeUrlAtSecond(url, seg.seconds)) : undefined
             }
-            style={({ pressed }) => [
+            style={[
               {
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -349,7 +351,7 @@ const ChapterList: React.FC<{
                 borderRadius: 8,
                 backgroundColor: isActive
                   ? colors.accent + '1A' // ~10% alpha
-                  : pressed
+                  : false
                     ? colors.surface
                     : 'transparent',
               },
@@ -402,21 +404,21 @@ const TranscriptView: React.FC<{
 
   if (segments && segments.length >= 2) {
     return (
-      <ScrollView style={{ maxHeight: 360 }} nestedScrollEnabled>
+      <View>
         {segments.map((seg, i) => (
           <Pressable
             key={`${seg.time}-${i}`}
             onPress={() =>
               url ? Linking.openURL(youtubeUrlAtSecond(url, seg.seconds)) : undefined
             }
-            style={({ pressed }) => [
+            style={[
               {
                 flexDirection: 'row',
                 gap: 12,
                 paddingHorizontal: 12,
                 paddingVertical: 8,
                 borderRadius: 6,
-                backgroundColor: pressed ? colors.surface : 'transparent',
+                backgroundColor: 'transparent',
               },
             ]}
           >
@@ -444,7 +446,7 @@ const TranscriptView: React.FC<{
             </Text>
           </Pressable>
         ))}
-      </ScrollView>
+      </View>
     );
   }
 
@@ -453,18 +455,7 @@ const TranscriptView: React.FC<{
       className="rounded-xl border border-border bg-surface"
       style={{ padding: 14 }}
     >
-      <Text
-        style={{
-          fontFamily: 'Inter_400Regular',
-          fontSize: 13,
-          lineHeight: 21,
-          color: colors.muted,
-          fontStyle: content ? 'normal' : 'italic',
-          opacity: content ? 1 : 0.75,
-        }}
-      >
-        {content || 'No transcript captured yet.'}
-      </Text>
+      <SourceText text={content || 'No transcript captured yet.'} />
     </View>
   );
 };

@@ -12,14 +12,16 @@ import { requestGoogleIdentity, type GoogleIdentity } from '@/lib/googleSignIn';
 
 interface Props {
   disabled?: boolean;
+  aiProcessingConsent?: boolean;
   onBusyChange: (busy: boolean) => void;
 }
 
-export function GoogleSignIn({ disabled, onBusyChange }: Props) {
+export function GoogleSignIn({ disabled, aiProcessingConsent = false, onBusyChange }: Props) {
   const { signInWithSession } = useAuth();
   const [busy, setBusy] = useState(false);
   const [consentVisible, setConsentVisible] = useState(false);
   const [accepted, setAccepted] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const identity = useRef<GoogleIdentity | null>(null);
   const running = useRef(false);
@@ -38,6 +40,7 @@ export function GoogleSignIn({ disabled, onBusyChange }: Props) {
     if (result.type === 'consent') {
       identity.current = result.identity;
       setAccepted(false);
+      setTermsAccepted(false);
       setConsentVisible(true);
     } else if (result.type === 'session') {
       identity.current = null;
@@ -50,14 +53,14 @@ export function GoogleSignIn({ disabled, onBusyChange }: Props) {
     }
   };
   const run = async (consent: boolean) => {
-    if (running.current || (consent && !accepted)) return;
+    if (running.current || disabled || (consent && (!accepted || !termsAccepted))) return;
     running.current = true;
     setBusy(true);
     setError(null);
     try {
       const credential = consent ? identity.current : await requestGoogleIdentity();
       if (!mounted.current || !credential) return;
-      await apply(await exchangeGoogleIdentity(credential, api.authGoogle, consent));
+      await apply(await exchangeGoogleIdentity(credential, api.authGoogle, consent || aiProcessingConsent));
     } catch (err) {
       identity.current = null;
       if (mounted.current) {
@@ -73,11 +76,12 @@ export function GoogleSignIn({ disabled, onBusyChange }: Props) {
     if (running.current) return;
     identity.current = null;
     setAccepted(false);
+    setTermsAccepted(false);
     setConsentVisible(false);
     setError(null);
   };
 
-  if (Platform.OS !== 'ios') return null;
+  if (Platform.OS !== 'ios' && Platform.OS !== 'android') return null;
   return (
     <>
       <Button title="Continue with Google" variant="secondary" disabled={disabled || consentVisible} loading={busy} onPress={() => run(false)} />
@@ -92,11 +96,15 @@ export function GoogleSignIn({ disabled, onBusyChange }: Props) {
                 <View className="h-6 w-6 rounded border border-border items-center justify-center"><Text className="text-fg">{accepted ? '✓' : ''}</Text></View>
                 <Text className="flex-1 text-fg leading-6">I agree that Flowy may send my saved content and chat requests to Anthropic, OpenAI, and Voyage AI to summarize, transcribe, search, and answer questions.</Text>
               </Pressable>
+              <Pressable accessibilityRole="checkbox" accessibilityLabel="Accept Terms of Service and Privacy Policy" accessibilityState={{ checked: termsAccepted, disabled: busy }} disabled={busy} onPress={() => setTermsAccepted(!termsAccepted)} className="flex-row items-start gap-3 py-2">
+                <View className="h-6 w-6 rounded border border-border items-center justify-center"><Text className="text-fg">{termsAccepted ? '✓' : ''}</Text></View>
+                <Text className="flex-1 text-fg leading-6">I agree to the Terms of Service and Privacy Policy.</Text>
+              </Pressable>
               <View className="flex-row gap-5">
                 <Text accessibilityRole="link" onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/privacy`)} className="text-accent underline">Privacy Policy</Text>
                 <Text accessibilityRole="link" onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/terms`)} className="text-accent underline">Terms of Service</Text>
               </View>
-              <Button title="Create account" disabled={!accepted} loading={busy} onPress={() => run(true)} />
+              <Button title="Create account" disabled={!accepted || !termsAccepted} loading={busy} onPress={() => run(true)} />
               <Button title="Cancel" variant="ghost" disabled={busy} onPress={cancel} />
             </View>
           </ScrollView>

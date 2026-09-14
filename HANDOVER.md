@@ -245,3 +245,20 @@ Legacy original author headers remain clickable. Author grouping requires a
 persisted key; future processing/cache hits populate it without a bulk backfill.
 No native capability/configuration change. Existing deployed builds have no
 runtime/channel for OTA; ship updated iOS production and Android preview builds.
+
+## Unified reader — 2026-09-14
+
+The paired `codex/unified-reader-ui` branch starts from `9719b96` and retains the
+pending Google iOS/Android changes from the original checkout. The shared
+`src/types/reader.ts` presentation contract is byte-identical to web. Native
+Takeaways colors/card are now used by both apps; author profile and saved-author
+navigation are separate, continuation is visible beside coverage, and full
+research/text/notes remain accessible. Native notes use the existing PATCH
+field. Explicit read/unread is available in the reader and inbox menus; opening
+remains independent. Stored JPEG posters never enter video decoders. Actual OG
+images supplement thumbnails, while favicons remain small source icons.
+
+Validated in the local iPhone 16e iOS 26 simulator with synthetic fixtures,
+including light/dark, long authors, author filtering, reading and continuation.
+This is not a TestFlight release. See `docs/reader-ui-parity.md` for the paired
+source audit, evaluation loop, verification and local launch configuration.

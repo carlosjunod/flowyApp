@@ -42,6 +42,7 @@ export default function SignupScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aiConsent, setAiConsent] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const onSubmit = async () => {
     if (loading || googleBusy) return;
@@ -58,27 +59,29 @@ export default function SignupScreen() {
       setError('Passwords do not match');
       return;
     }
+    if (!termsAccepted) {
+      setError('Please accept the Terms of Service and Privacy Policy to create an account.');
+      return;
+    }
     if (!aiConsent) {
       setError('Please accept the AI processing disclosure to create an account.');
       return;
     }
     setLoading(true);
     const normalizedEmail = email.trim().toLowerCase();
-    console.log('[signup] submitting registerEmail', { email: normalizedEmail });
-    const res = await api.registerEmail(normalizedEmail, password, undefined, true);
-    setLoading(false);
-    if (res.error) {
-      console.log('[signup] registerEmail failed', {
-        code: res.error.code,
-        message: res.error.message,
-        status: res.error.status,
-      });
-      setError(friendlyError(res.error.code));
-      return;
+    try {
+      const res = await api.registerEmail(normalizedEmail, password, undefined, aiConsent);
+      if (res.error) {
+        setError(friendlyError(res.error.code));
+        return;
+      }
+      await signInWithSession(res.data);
+      router.replace('/inbox');
+    } catch {
+      setError('Could not create account. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    console.log('[signup] registerEmail ok', { userId: res.data?.userId });
-    await signInWithSession(res.data);
-    router.replace('/inbox');
   };
 
   return (
@@ -108,19 +111,6 @@ export default function SignupScreen() {
               textContentType="emailAddress"
               className="h-11 rounded-xl border border-border bg-card px-4 text-fg"
             />
-            <Pressable
-              onPress={() => setAiConsent((value) => !value)}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: aiConsent }}
-              className="flex-row items-start gap-3 py-2"
-            >
-              <View className="mt-0.5 h-5 w-5 items-center justify-center rounded border border-border" style={{ backgroundColor: aiConsent ? colors.accent : 'transparent' }}>
-                {aiConsent ? <Text className="text-bg text-xs">✓</Text> : null}
-              </View>
-              <Text className="flex-1 text-muted text-xs leading-5">
-                I agree that Flowy may send my saved content and chat requests to Anthropic, OpenAI, and Voyage AI to summarize, transcribe, search, and answer questions. <Text onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/privacy`)} className="text-accent underline">Privacy Policy</Text> · <Text onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/terms`)} className="text-accent underline">Terms of Service</Text>
-              </Text>
-            </Pressable>
             <TextInput
               value={password}
               onChangeText={setPassword}
@@ -139,15 +129,47 @@ export default function SignupScreen() {
               textContentType="newPassword"
               className="h-11 rounded-xl border border-border bg-card px-4 text-fg"
             />
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityLabel="Accept Terms of Service and Privacy Policy"
+              accessibilityState={{ checked: termsAccepted, disabled: loading || googleBusy }}
+              disabled={loading || googleBusy}
+              onPress={() => setTermsAccepted((value) => !value)}
+              className="flex-row items-start gap-3 py-2"
+              style={{ minHeight: 44 }}
+            >
+              <View className="mt-0.5 h-5 w-5 items-center justify-center rounded border border-border" style={{ backgroundColor: termsAccepted ? colors.accent : 'transparent' }}>
+                {termsAccepted ? <Text className="text-bg text-xs">✓</Text> : null}
+              </View>
+              <Text className="flex-1 text-muted text-sm leading-5">I agree to the Terms of Service and Privacy Policy.</Text>
+            </Pressable>
+            <View className="flex-row gap-5">
+              <Text accessibilityRole="link" onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/terms`)} className="text-accent underline py-2">Terms of Service</Text>
+              <Text accessibilityRole="link" onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/privacy`)} className="text-accent underline py-2">Privacy Policy</Text>
+            </View>
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityLabel="Accept AI processing"
+              accessibilityState={{ checked: aiConsent, disabled: loading || googleBusy }}
+              disabled={loading || googleBusy}
+              onPress={() => setAiConsent((value) => !value)}
+              className="flex-row items-start gap-3 py-2"
+              style={{ minHeight: 44 }}
+            >
+              <View className="mt-0.5 h-5 w-5 items-center justify-center rounded border border-border" style={{ backgroundColor: aiConsent ? colors.accent : 'transparent' }}>
+                {aiConsent ? <Text className="text-bg text-xs">✓</Text> : null}
+              </View>
+              <Text className="flex-1 text-muted text-sm leading-5">I agree that Flowy may send the content I save and my chat requests to Anthropic, OpenAI, and Voyage AI to summarize, transcribe, search, and answer questions.</Text>
+            </Pressable>
             {error ? <Text className="text-danger text-sm">{error}</Text> : null}
             <Button
               title="Create account"
               loading={loading}
-              disabled={googleBusy}
+              disabled={googleBusy || !termsAccepted || !aiConsent}
               onPress={onSubmit}
               className="mt-2"
             />
-            {Platform.OS === 'ios' ? <GoogleSignIn disabled={loading} onBusyChange={setGoogleBusy} /> : null}
+            {Platform.OS === 'ios' || Platform.OS === 'android' ? <GoogleSignIn aiProcessingConsent={termsAccepted && aiConsent} disabled={loading || !termsAccepted || !aiConsent} onBusyChange={setGoogleBusy} /> : null}
           </View>
 
           <View className="flex-row items-center justify-center mt-6 gap-1">

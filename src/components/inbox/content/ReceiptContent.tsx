@@ -141,13 +141,13 @@ const StoreCard: React.FC<{ data: ReceiptData; photoUrl?: string }> = ({ data, p
             onPress={() => setOpen((v) => !v)}
             accessibilityLabel={open ? 'Collapse original photo' : 'View original photo'}
             className="border border-border bg-surface rounded-md"
-            style={({ pressed }) => [
+            style={[
               {
                 width: 48,
                 height: 64,
                 alignItems: 'center',
                 justifyContent: 'center',
-                opacity: pressed ? 0.7 : 1,
+
               },
             ]}
           >
@@ -589,13 +589,13 @@ const Section: React.FC<{
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
         hitSlop={4}
-        style={({ pressed }) => [
+        style={[
           {
             flexDirection: 'row',
             alignItems: 'center',
             gap: 8,
             paddingVertical: 10,
-            opacity: pressed ? 0.7 : 1,
+
           },
         ]}
       >

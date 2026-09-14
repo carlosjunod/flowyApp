@@ -1,3 +1,4 @@
+import { savedMediaKind } from '@/types/reader';
 import { SourceText } from './SourceText';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -211,7 +212,7 @@ const MainSlide: React.FC<{
         }}
       >
         {url ? (
-          slide.kind === 'video' ? (
+          (slide.kind === 'video' && savedMediaKind(slide.r2_key) !== 'image') ? (
             <SlideVideo uri={url} keyId={slide.r2_key} size={containerSize} />
           ) : (
             <Image
@@ -251,7 +252,7 @@ const MainSlide: React.FC<{
         </View>
 
         {/* Prev/Next nav — videos own their controls, so hide on video slides */}
-        {slide.kind !== 'video' && onPrev ? (
+        {(slide.kind !== 'video' || savedMediaKind(slide.r2_key) === 'image') && onPrev ? (
           <Pressable
             onPress={onPrev}
             accessibilityLabel="Previous slide"
@@ -276,7 +277,7 @@ const MainSlide: React.FC<{
             <Feather name="chevron-left" size={16} color="#fff" />
           </Pressable>
         ) : null}
-        {slide.kind !== 'video' && onNext ? (
+        {(slide.kind !== 'video' || savedMediaKind(slide.r2_key) === 'image') && onNext ? (
           <Pressable
             onPress={onNext}
             accessibilityLabel="Next slide"
@@ -381,7 +382,7 @@ const ThumbnailStrip: React.FC<{
             ]}
           >
             {url ? (
-              s.kind === 'video' ? (
+              (s.kind === 'video' && savedMediaKind(s.r2_key) !== 'image') ? (
                 <Feather name="film" size={18} color={colors.muted} />
               ) : (
                 <Image
@@ -391,7 +392,7 @@ const ThumbnailStrip: React.FC<{
                 />
               )
             ) : (
-              <Feather name={s.kind === 'video' ? 'film' : 'image'} size={18} color="#FFFFFF" />
+              <Feather name={(s.kind === 'video' && savedMediaKind(s.r2_key) !== 'image') ? 'film' : 'image'} size={18} color="#FFFFFF" />
             )}
           </Pressable>
         );

@@ -1,3 +1,4 @@
+import { distinctOverview } from '@/types/reader';
 import React, { useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 import type { Item } from '@/types';
@@ -41,22 +42,22 @@ function Entry({ entry, index, item }: { entry: SemanticEntry; index: number; it
     }) : null}
   </View>;
 }
-export function SemanticContent({ item }: { item: Item }) {
+export function SemanticContent({ item, action }: { item: Item; action?: React.ReactNode }) {
   const content = item.type === 'receipt' ? null : readSemanticContent(item.structured_content);
   if (!content || (content.layout === 'generic' && !semanticCoverageMessage(content))) return null;
-  return <SemanticBody key={`${item.id}:${content.sourceHash}`} item={item} content={content} />;
+  return <SemanticBody key={`${item.id}:${content.sourceHash}`} item={item} content={content} action={action} />;
 }
-function SemanticBody({ item, content }: { item: Item; content: SemanticContentV1 }) {
+function SemanticBody({ item, content, action }: { item: Item; content: SemanticContentV1; action?: React.ReactNode }) {
   const [visible, setVisible] = useState(12);
-  return <View className="mb-6 gap-3">
+  return <View className="gap-3">
     <Text accessibilityRole="header" className="text-fg text-lg font-semibold">{semanticLabel(content)}</Text>
-    {semanticCoverageMessage(content) ? <Text accessibilityLiveRegion="polite" className="text-muted text-xs">{semanticCoverageMessage(content)}</Text> : null}
-    {content.overview ? <Text selectable className="text-muted text-sm leading-6">{content.overview}</Text> : null}
+    {semanticCoverageMessage(content) ? <Text accessibilityLiveRegion="polite" className="text-muted text-sm leading-6">{semanticCoverageMessage(content)}</Text> : null}
+    {action}
+    {distinctOverview(content.overview, item.summary) ? <Text selectable className="text-muted text-sm leading-6">{content.overview}</Text> : null}
     {content.entries.length ? <>
       <Text className="text-muted text-xs">Extracted from the saved source.{content.coverage === 'unknown' ? ' Source completeness has not been verified.' : ''}</Text>
       <View className="rounded-xl border border-border bg-card overflow-hidden">{content.entries.slice(0, visible).map((entry, index) => <Entry key={entry.id} entry={entry} index={index} item={item} />)}</View>
       {visible < content.entries.length ? <Pressable accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => setVisible(n => n + 12)}><Text className="text-accent text-sm">Show more ({content.entries.length - visible} remaining)</Text></Pressable> : null}
     </> : null}
-    <Text accessibilityRole="header" className="text-muted text-xs uppercase font-semibold mt-3">Original content</Text>
   </View>;
 }

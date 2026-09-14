@@ -1,7 +1,6 @@
 import { SourceText } from './SourceText';
 import React, { useState } from 'react';
-import Markdown from 'react-native-markdown-display';
-import { safeSemanticUrl } from '@/types/semantic';
+import { CollapsibleSection } from '../CollapsibleSection';
 import { Pressable, Text, View } from 'react-native';
 
 import { useResolvedColors } from '@/lib/theme';
@@ -20,7 +19,7 @@ type Tab = 'visual' | 'transcript';
  * Mirrors apps/web/components/inbox/content/GenericContent.tsx.
  */
 export const GenericContent: React.FC<{ item: Item }> = ({ item }) => {
-  const [tab, setTab] = useState<Tab>(item.content ? 'transcript' : 'visual');
+  const [tab, setTab] = useState<Tab>('transcript');
   const colors = useResolvedColors();
 
   const visualParts: string[] = [];
@@ -39,23 +38,22 @@ export const GenericContent: React.FC<{ item: Item }> = ({ item }) => {
   const visualText = visualParts.join('\n\n');
   const transcriptText = item.content ?? '';
 
-  const active = tab === 'visual' ? visualText || transcriptText : transcriptText || visualText;
-  if (!active) return null;
+  const active = tab === 'visual' ? visualText : transcriptText;
   const emptyLabel =
     tab === 'visual'
       ? 'No visual summary available for this item.'
       : 'No transcript or extracted text yet.';
 
-  return (
+  const body = (
     <View>
-      <ContentTabs
+      {visualText ? <ContentTabs
         tabs={[
-          ...(visualText ? [{ id: 'visual' as const, label: 'Image notes' }] : []),
-          ...(transcriptText ? [{ id: 'transcript' as const, label: 'Full text' }] : []),
+          { id: 'transcript', label: 'Full text' },
+          { id: 'visual', label: 'Image notes' },
         ]}
         active={tab}
         onChange={setTab}
-      />
+      /> : null}
       <View
         className="rounded-xl border border-border bg-surface"
         style={{
@@ -67,6 +65,8 @@ export const GenericContent: React.FC<{ item: Item }> = ({ item }) => {
       </View>
     </View>
   );
+  return ['audio', 'video', 'screen_recording', 'tiktok'].includes(item.type)
+    ? <CollapsibleSection label="Transcript and image notes" defaultOpen={false}>{body}</CollapsibleSection> : body;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -98,7 +98,8 @@ export function ContentTabs<Id extends string>({
             onPress={() => onChange(t.id)}
             accessibilityRole="button"
             accessibilityState={{ selected: isActive }}
-            style={({ pressed }) => [
+            className="active:opacity-80"
+            style={
               {
                 flex: 1,
                 paddingHorizontal: 12,
@@ -107,9 +108,7 @@ export function ContentTabs<Id extends string>({
                 paddingVertical: 10,
                 borderRadius: 8,
                 backgroundColor: isActive ? colors.fg : 'transparent',
-                opacity: pressed ? 0.85 : 1,
-              },
-            ]}
+              }}
           >
             <Text
               style={{
