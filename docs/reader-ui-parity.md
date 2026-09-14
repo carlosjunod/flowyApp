@@ -143,3 +143,15 @@ Final review snapshots: `web-iteration3-dark-390.png`,
 `web-iteration3-long-dark-360.png` and `native-iteration3-inbox.png` in
 `/tmp/flowy-ui-review/`. Native reader observations are also recorded in the
 local task's simulator tool outputs.
+
+## Deployed web revision
+
+Railway production deployment `242e0308-cefc-4d0b-a8df-7e24f89d7ee5`
+completed with `SUCCESS` from web commit `b2fa7c7` on 2026-09-14.
+`https://tryflowy.app/` and `/login` return HTTP 200 after deployment.
+The deployed source was a clean git archive, without local fixture environment
+files. Native source `b1b9eb2` is running in the local development client.
+Both source branches are pushed as `codex/unified-reader-ui`; origin/main and
+the original dirty checkouts were not rewritten. No TestFlight release occurred.
+The only open acceptance check is the physical native return swipe described
+above; its logic tests and all web browser navigation checks pass.
