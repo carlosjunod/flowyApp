@@ -336,3 +336,7 @@ incluyen apertura de URLs, nombres accesibles completos y recuperación ante err
 Los adaptadores no comprueban el layout nativo del Markdown. La comprobación
 visual nueva es de la web; este cambio móvil requiere un próximo build/OTA y
 validación visual en dispositivo. No cambia el contrato API ni las capacidades.
+
+Fuente publicada en `main`: `01807b72f5af0e898805b839758bb77b88fee673`.
+Incluye estos ajustes de lectura y los cambios previos de Deep Dive e imágenes.
+Esta publicación de código no distribuye un nuevo binario ni OTA.
