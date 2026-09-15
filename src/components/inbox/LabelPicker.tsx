@@ -19,6 +19,8 @@ export function LabelPicker({
   leading,
   actions,
   onClear,
+  children,
+  activeFilter,
 }: {
   labels: LabelCount[];
   selected: string | null;
@@ -32,11 +34,14 @@ export function LabelPicker({
   leading?: ReactNode;
   actions?: ReactNode;
   onClear?: () => void;
+  children?: ReactNode;
+  activeFilter?: ReactNode;
 }) {
   const colors = useResolvedColors();
   const sorted = useMemo(() => orderLabels(labels, order), [labels, order]);
   const pills = (
     <>
+      {activeFilter}
       {onClear && (
         <Pressable
           onPress={onClear}
@@ -104,7 +109,7 @@ export function LabelPicker({
               disabled={disabled}
               accessibilityRole="button"
               accessibilityLabel={
-                expanded ? "Collapse labels" : "Show all labels"
+                expanded ? "Collapse filters" : "Show all filters"
               }
               accessibilityState={{ expanded }}
               onPress={onExpand}
@@ -119,6 +124,7 @@ export function LabelPicker({
           )}
         </View>
       </View>
+      {expanded ? children : null}
       {expanded ? (
         <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled>
           <View className="flex-row flex-wrap gap-2 pb-1">{pills}</View>

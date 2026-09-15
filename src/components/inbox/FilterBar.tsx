@@ -1,4 +1,5 @@
 import React from 'react';
+import type { ReadingFilter } from '@/types/inbox-presentation';
 import { LabelSection } from './LabelSection';
 import { Feather } from '@expo/vector-icons';
 import { Pressable, Text, TextInput, View } from 'react-native';
@@ -6,8 +7,8 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 import { useResolvedColors } from '@/lib/theme';
 
 type Props = {
-  unread?: boolean;
-  onUnreadChange?: (value: boolean) => void;
+  reading?: ReadingFilter;
+  onReadingChange?: (value: ReadingFilter) => void;
   search: string;
   onSearchChange: (value: string) => void;
   tag: string | null;
@@ -17,7 +18,7 @@ type Props = {
 };
 
 export const FilterBar: React.FC<Props> = ({
-  unread, onUnreadChange,
+  reading, onReadingChange,
   search,
   onSearchChange,
   tag, onTagChange,
@@ -37,13 +38,8 @@ export const FilterBar: React.FC<Props> = ({
       />
       {search ? <Pressable accessibilityRole="button" accessibilityLabel="Clear search" className="w-11 h-11 items-center justify-center" onPress={() => onSearchChange('')}><Feather name="x" size={18} color={colors.muted} /></Pressable> : null}
       </View>
-      <LabelSection category={category} onCategory={onCategoryChange} tag={tag} onTag={onTagChange} />
-      <View className="flex-row">
-        {onUnreadChange ? <Pressable accessibilityRole="button" accessibilityState={{ selected: !!unread }}
-          onPress={() => onUnreadChange(!unread)} className={`px-3.5 h-11 rounded-full items-center justify-center ${unread ? 'bg-fg' : 'bg-card border border-border'}`}>
-          <Text className={unread ? 'text-bg' : 'text-fg'}>Unread</Text>
-        </Pressable> : null}
-      </View>
+      <LabelSection reading={reading} onReading={onReadingChange} category={category} onCategory={onCategoryChange} tag={tag} onTag={onTagChange} />
+
     </View>
   );
 };

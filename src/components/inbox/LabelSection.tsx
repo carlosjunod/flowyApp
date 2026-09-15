@@ -14,17 +14,22 @@ import { useLabels } from "@/hooks/useLabels";
 import type { LabelKind, LabelPreview } from "@/types/labels";
 import type { LabelOrder } from "@/lib/labels";
 import { LabelPicker } from "./LabelPicker";
+import type { ReadingFilter } from "@/types/inbox-presentation";
 
 export function LabelSection({
   category,
   onCategory,
   tag,
   onTag,
+  reading = "all",
+  onReading,
 }: {
   category: string | null;
   onCategory: (value: string | null) => void;
   tag: string | null;
   onTag: (value: string | null) => void;
+  reading?: ReadingFilter;
+  onReading?: (value: ReadingFilter) => void;
 }) {
   const colors = useResolvedColors();
   const { query, preview: loadPreview, change } = useLabels();
@@ -132,6 +137,7 @@ export function LabelSection({
             ? () => {
                 onCategory(null);
                 onTag(null);
+                onReading?.("all");
               }
             : undefined
         }
@@ -143,7 +149,26 @@ export function LabelSection({
         expanded={expanded}
         onExpand={() => setExpanded((v) => !v)}
         allCount={query.data?.totalItems}
-      />
+        activeFilter={!expanded && reading !== "all" && onReading ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="Clear reading filter" onPress={() => onReading("all")} style={{ minHeight: 44, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, borderRadius: 24, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.accent }}>
+            <Text style={{ color: colors.accent, fontSize: 13 }}>{reading === "unread" ? "Unread" : "Read"}</Text>
+            <Feather name="x" size={14} color={colors.accent} />
+          </Pressable>
+        ) : null}
+      >
+        {onReading ? (
+          <View accessibilityLabel="Reading status" style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+            <Text style={{ color: colors.muted, fontSize: 12 }}>Reading</Text>
+            <View style={{ flexDirection: "row", padding: 2, borderRadius: 26, backgroundColor: colors.card }}>
+              {(["all", "unread", "read"] as const).map(value => (
+                <Pressable key={value} accessibilityRole="button" accessibilityLabel={value === "all" ? "All reading states" : value === "unread" ? "Unread" : "Read"} accessibilityState={{ selected: reading === value }} onPress={() => onReading(value)} style={{ minHeight: 44, paddingHorizontal: 12, justifyContent: "center", borderRadius: 24, backgroundColor: reading === value ? colors.fg : colors.card }}>
+                  <Text style={{ color: reading === value ? colors.bg : colors.muted, fontSize: 13, fontFamily: "Inter_500Medium" }}>{value === "all" ? "All" : value === "unread" ? "Unread" : "Read"}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
+      </LabelPicker>
       {query.isLoading && (
         <Text className="text-muted text-xs">Loading labels…</Text>
       )}

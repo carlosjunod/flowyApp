@@ -10,17 +10,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, type ItemsResponse } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { pb } from '@/lib/pb';
+import type { ReadingFilter } from '@/types/inbox-presentation';
 import type { Item, SortDir, SortField } from '@/types';
 
 export const PAGE_SIZE = 20;
 
 export type ItemsPage = ItemsResponse;
 
-type ItemsParams = { tag?: string | null; author?: string; sortField: SortField; sortDir: SortDir; userId: string | null; search?: string; category?: string | null; unread?: boolean };
+type ItemsParams = { tag?: string | null; author?: string; sortField: SortField; sortDir: SortDir; userId: string | null; search?: string; category?: string | null; unread?: boolean; reading?: ReadingFilter };
 export const normalizeCategory = (value?: string | null): string => { const key = value?.trim().toLowerCase() ?? ''; return key === 'tech' ? 'technology' : key; };
 
 export const itemsQueryKey = (p: ItemsParams): readonly unknown[] =>
-  ['items', p.userId, p.sortField, p.sortDir, p.search?.trim() ?? '', normalizeCategory(p.category), !!p.unread, p.author ?? '', p.tag?.trim().toLowerCase() ?? ''] as const;
+  ['items', p.userId, p.sortField, p.sortDir, p.search?.trim() ?? '', normalizeCategory(p.category), !!p.unread, p.author ?? '', p.tag?.trim().toLowerCase() ?? '', p.reading ?? 'all'] as const;
 
 export const useItems = (params: ItemsParams) => {
   return useInfiniteQuery<ItemsPage, Error, InfiniteData<ItemsPage>, readonly unknown[], number>({
@@ -31,7 +32,7 @@ export const useItems = (params: ItemsParams) => {
       if (!params.userId || pb.authStore.model?.id !== params.userId) throw new Error('No session');
       const token = pb.authStore.token;
       const result = await api.listItems({ page: pageParam, perPage: PAGE_SIZE,
-        ...(params.author ? { author: params.author } : {}), tag: params.tag?.trim().toLowerCase() || undefined, unread: params.unread || undefined, q: params.search?.trim(), category: normalizeCategory(params.category),
+        ...(params.reading && params.reading !== 'all' ? { reading: params.reading } : {}), ...(params.author ? { author: params.author } : {}), tag: params.tag?.trim().toLowerCase() || undefined, unread: params.unread || undefined, q: params.search?.trim(), category: normalizeCategory(params.category),
         sort: params.sortField === 'created' ? 'date' : params.sortField, direction: params.sortDir });
       if (pb.authStore.model?.id !== params.userId || pb.authStore.token !== token) throw new Error('Session changed');
       if (result.error) throw new Error(result.error.message);

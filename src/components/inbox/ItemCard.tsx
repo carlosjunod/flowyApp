@@ -10,7 +10,6 @@ import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { ItemActionsMenu } from './ItemActionsMenu';
 import { Pressable, Text, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { hostOf, thumbnailFor } from '@/lib/thumbnails';
 import { useSelection } from '@/lib/selection';
@@ -64,7 +63,7 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item, size =
   };
 
   return (
-    <Animated.View entering={FadeIn.duration(180)}>
+    <View style={{ flex: 1 }}>
       <Pressable
         accessibilityRole={selection.mode ? 'checkbox' : 'button'}
         accessibilityLabel={`${item.title ?? item.raw_url ?? 'Saved item'}${item.read_at ? ', marked as read' : ', no read mark recorded'}${", " + presentation.label + (presentation.notice ? ", " + presentation.notice : "")}`}
@@ -74,8 +73,7 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item, size =
         onPress={handlePress}
         onLongPress={handleLongPress}
         delayLongPress={300}
-        style={({ pressed }) => [
-          {
+        style={{
             elevation: 2,
             backgroundColor: presentation.deep ? colors.inboxDeep : colors.card,
             borderWidth: selected || active ? 2 : 1,
@@ -84,10 +82,8 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item, size =
             shadowOpacity: 0.08,
             shadowRadius: 12,
             shadowOffset: { width: 0, height: 4 },
-          },
-          pressed && !pending && { transform: [{ scale: 0.98 }], opacity: 0.97 },
-        ]}
-        className={`bg-card rounded-[20px] overflow-hidden ${
+        }}
+        className={`flex-1 active:opacity-90 rounded-[20px] overflow-hidden ${
           selected || (!selection.mode && active) ? 'border-2 border-accent' : ''
         }`}
       >
@@ -119,8 +115,8 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item, size =
             className="text-fg"
             style={{
               fontFamily: 'Inter_600SemiBold',
-              fontSize: size === 'small' ? 15 : size === 'large' ? 19 : 17,
-              lineHeight: size === 'small' ? 20 : 24,
+              fontSize: size === 'small' ? 15 : size === 'large' ? 19 : 16,
+              lineHeight: size === 'large' ? 24 : 22,
               letterSpacing: -0.2,
             }}
             numberOfLines={2}
@@ -148,7 +144,7 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item, size =
         </View>
       </Pressable>
       {!selection.mode ? <View style={{ position: 'absolute', top: 8, right: 8 }}><ItemActionsMenu item={item} variant="compact" /></View> : null}
-    </Animated.View>
+    </View>
   );
 };
 
@@ -186,7 +182,7 @@ const ImageLed: React.FC<LedProps> = ({
     {domainLabel ? (
       <View
         className="absolute top-2.5 left-2.5 flex-row items-center gap-1.5 rounded-full px-2 py-1"
-        style={{ backgroundColor: 'rgba(255,255,255,0.92)', maxWidth: '85%' }}
+        style={{ backgroundColor: 'rgba(255,255,255,0.92)', right: 56 }}
       >
         {faviconUri ? (
           <Image
@@ -223,7 +219,7 @@ const ImageLed: React.FC<LedProps> = ({
       </View>
     ) : null}
     {item.media && item.media.length > 1 ? (
-      <View className="absolute top-2.5 right-2.5 px-1.5 py-0.5 rounded-full bg-black/60">
+      <View className="absolute bottom-2.5 right-2.5 px-1.5 py-0.5 rounded-full bg-black/60">
         <Text
           className="text-white text-[10px]"
           style={{ fontFamily: 'Inter_600SemiBold' }}
@@ -257,7 +253,7 @@ type EditorialProps = {
 };
 
 const Editorial: React.FC<EditorialProps> = ({ item, faviconUri, domainLabel, selected, selectionMode }) => (
-  <View className="bg-surface pl-3 pr-14 pt-3 pb-2 flex-row items-center gap-2">
+  <View className="bg-surface min-h-14 pl-3 pr-14 py-3 flex-row items-center gap-2">
     {faviconUri ? <Image source={{ uri: faviconUri }} style={{ width: 18, height: 18, borderRadius: 3 }} /> : <AppIcon type={item.type} size={18} />}
     <Text className="text-muted text-xs flex-1" numberOfLines={1}>{domainLabel ?? item.type}</Text>
     {selectionMode ? <Feather name={selected ? 'check-circle' : 'circle'} size={22} color={selected ? '#A74326' : '#6B6258'} /> : null}

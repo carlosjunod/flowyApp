@@ -105,15 +105,17 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
     assert.equal(adaptive.inboxColumns(layout.inboxWidth), columns, `${width}x${height} inbox density`);
     if (split) assert.equal(layout.inboxWidth + layout.chatWidth + 1, width);
   }
-  for (const [width, height, columns] of [[390,844,1], [430,932,1], [744,1133,2], [768,1024,2], [834,1194,3], [1024,1366,3], [1024,768,2], [1086,820,2], [1194,834,3], [1366,1024,3]]) {
+  for (const [width, height, columns] of [[320,568,2], [390,844,2], [430,932,2], [744,1133,2], [768,1024,2], [834,1194,3], [1024,1366,3], [1024,768,2], [1086,820,2], [1194,834,2], [1366,1024,2]]) {
     const layout = adaptive.adaptiveLayout(width, height);
-    assert.equal(adaptive.inboxCardColumns(layout.inboxWidth, 1, layout.split), columns, `${width}x${height} card density`);
+    assert.equal(adaptive.inboxCardColumns(layout.inboxWidth, 1), columns, `${width}x${height} card density`);
   }
-  assert.equal(adaptive.inboxCardColumns(595, 1, true), 2);
-  assert.equal(adaptive.inboxCardColumns(596, 1, true), 3);
+  assert.equal(adaptive.inboxCardColumns(595, 1), 2);
+  assert.equal(adaptive.inboxCardColumns(596, 1), 2);
   assert.equal(adaptive.inboxCardColumns(834, 1.5), 2);
-  assert.equal(adaptive.inboxCardColumns(596, 1.5, true), 2);
-  passed('Cards fit two columns on iPad and three in larger panes, with phone and larger text fallbacks');
+  assert.equal(adaptive.inboxCardColumns(596, 1.5), 2);
+  assert.equal(adaptive.inboxCardColumns(1440, 1), 5);
+  assert.equal(adaptive.inboxCardColumns(320, 2), 2);
+  passed('Cards use two phone columns and grow with pane width, respecting larger text on tablets');
   assert.equal(adaptive.adaptiveLayout(1024, 768, 1.5).split, false);
   assert.equal(adaptive.inboxColumns(768, 1.5), 1);
   assert.equal(adaptive.adaptiveLayout(800, 600).split, false);
@@ -204,6 +206,11 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   assert.notDeepEqual(unreadOptions.queryKey, items.useItems({ userId: 'account-a', sortField: 'created', sortDir: 'desc' }).queryKey);
   assert.equal(searchParams.tag, undefined, 'clearing the tag removes it from requests');
   assert.notDeepEqual(options.queryKey, items.useItems({ userId: 'account-a', sortField: 'created', sortDir: 'desc', search: ' older ', category: ' Tech ', tag: 'Other' }).queryKey);
+  const readOptions = items.useItems({ userId: 'account-a', sortField: 'created', sortDir: 'desc', reading: 'read' });
+  await readOptions.queryFn({ pageParam: 2 });
+  assert.equal(searchParams.reading, 'read');
+  assert.equal(searchParams.page, 2);
+  assert.notDeepEqual(readOptions.queryKey, unreadOptions.queryKey);
   passed('Global search pagination category tag unread filters and cache keys');
   const runner = hookRunner();
   const streams = [];

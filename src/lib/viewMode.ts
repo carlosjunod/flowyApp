@@ -3,7 +3,7 @@ import type { ViewMode } from '@/types';
 import { isCardSize, type CardSize } from '@/types/inbox-presentation';
 import { localSecureStore } from './secureStore';
 
-const isViewMode = (value: unknown): value is ViewMode => value === 'grid' || value === 'list' || value === 'detail';
+const isViewMode = (value: unknown): value is ViewMode => value === 'grid' || value === 'list';
 
 function usePreference<T extends string>(key: string, fallback: T, valid: (value: unknown) => value is T): [T, (value: T) => void] {
   const [value, setValue] = useState(fallback);
@@ -22,5 +22,5 @@ function usePreference<T extends string>(key: string, fallback: T, valid: (value
   return [value, update];
 }
 
-export const useViewMode = () => usePreference<ViewMode>('tryflowy.viewMode', 'list', isViewMode);
+export const useViewMode = () => usePreference<ViewMode>('tryflowy.viewMode', 'grid', isViewMode);
 export const useCardSize = () => usePreference<CardSize>('tryflowy.cardSize', 'medium', isCardSize);

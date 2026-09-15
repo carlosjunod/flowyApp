@@ -1,6 +1,6 @@
 import { useLocalSearchParams, router } from 'expo-router';
 import { useAdaptivePane } from '@/components/navigation/AdaptiveTabs';
-import { inboxCardColumns, inboxColumns } from '@/lib/adaptiveLayout';
+import { inboxCardColumns } from '@/lib/adaptiveLayout';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { Feather } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
@@ -28,7 +28,8 @@ import { BulkImportSheet } from '@/components/inbox/BulkImportSheet';
 import { FilterBar } from '@/components/inbox/FilterBar';
 import { ItemCard } from '@/components/inbox/ItemCard';
 import { ItemRow } from '@/components/inbox/ItemRow';
-import { ItemDetailRow } from '@/components/inbox/ItemDetailRow';
+// Summary view temporarily hidden; keep the implementation for reactivation.
+// import { ItemDetailRow } from '@/components/inbox/ItemDetailRow';
 import { SelectionActionBar } from '@/components/inbox/SelectionActionBar';
 import { Shimmer } from '@/components/ui/Shimmer';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -44,18 +45,18 @@ import {
 import { useAuth } from '@/lib/auth';
 import { pb } from '@/lib/pb';
 import { useResolvedColors } from '@/lib/theme';
-import { useViewMode, useCardSize } from '@/lib/viewMode';
+import { useViewMode } from '@/lib/viewMode';
+import type { ReadingFilter } from '@/types/inbox-presentation';
 import type { Item, ViewMode } from '@/types';
 
 export default function InboxScreen() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { fontScale } = useWindowDimensions();
-  const { width, split, visible: paneVisible, selectedItemId, onOpenItem } = useAdaptivePane();
+  const { width, visible: paneVisible, selectedItemId, onOpenItem } = useAdaptivePane();
   const colors = useResolvedColors();
   const selection = useSelection();
   const [viewMode, setViewMode] = useViewMode();
-  const [cardSize, setCardSize] = useCardSize();
   const [bulkOpen, setBulkOpen] = useState(false);
   const [captureStatus, setCaptureStatus] = useState<'idle' | 'working' | 'done'>('idle');
   const reducedMotion = useReducedMotion();
@@ -73,7 +74,7 @@ export default function InboxScreen() {
   const clearAuthor = () => router.setParams({ author: '' });
   const [searchInput, setSearchInput] = useState('');
   const search = useDebounced(searchInput, 200);
-  const [unread, setUnread] = useState(false);
+  const [reading, setReading] = useState<ReadingFilter>('all');
   const [tag, setTag] = useState<string | null>(null);
   const [category, setCategory] = useState<string | null>(null);
 
@@ -81,7 +82,7 @@ export default function InboxScreen() {
     userId: user?.id ?? null,
     sortField: 'created',
     sortDir: 'desc',
-    search, category, tag, unread, author,
+    search, category, tag, reading, author,
   });
 
   const items = useMemo(() => flattenPages(query.data), [query.data]);
@@ -125,8 +126,8 @@ export default function InboxScreen() {
   };
 
   const columns = viewMode === 'grid'
-    ? inboxCardColumns(width, fontScale, split, cardSize)
-    : inboxColumns(width, fontScale);
+    ? inboxCardColumns(width, fontScale)
+    : 1;
 
 
   return (
@@ -145,12 +146,12 @@ export default function InboxScreen() {
           <Pressable onPress={() => setBulkOpen(true)} accessibilityRole="button" accessibilityLabel="Save a link" className="h-11 rounded-full bg-primary px-4 justify-center"><Text className="text-bg font-semibold">{captureStatus === 'working' ? 'Saving…' : captureStatus === 'done' ? 'Saved' : 'Save'}</Text></Pressable>
         </View>
       </View>
-      <ViewModeToggle value={viewMode} onChange={onViewModeChange} cardSize={cardSize} onCardSize={setCardSize} />
+      <ViewModeToggle value={viewMode} onChange={onViewModeChange} />
       {user && items.length > 0 ? <DigestInvitation key={user.id} userId={user.id} /> : null}
       <BulkImportSheet onStatusChange={setCaptureStatus} visible={bulkOpen && paneVisible} onClose={() => setBulkOpen(false)} />
       <FilterBar
-        unread={unread}
-        onUnreadChange={setUnread}
+        reading={reading}
+        onReadingChange={setReading}
         search={searchInput}
         onSearchChange={setSearchInput}
         tag={tag}
@@ -158,11 +159,10 @@ export default function InboxScreen() {
         category={category}
         onCategoryChange={setCategory}
       />
-      {unread ? <Text className="text-xs text-muted px-4 pt-1">Items without a read mark, including older saves with no recorded reading state.</Text> : null}
       {query.isError ? <View className="px-4 py-3 flex-row items-center gap-2"><Text accessibilityRole="alert" className="text-danger flex-1 text-sm">Your inbox could not be loaded. Check your connection and try again.</Text><Button title="Retry" variant="secondary" onPress={() => { void query.refetch(); }} /></View> : null}
       {query.isLoading ? <View accessibilityLabel="Loading saved content" className="px-4 gap-3 pt-3">{[1, 2, 3].map(n => <View key={n} className="h-20 bg-surface rounded-xl overflow-hidden relative"><Shimmer /></View>)}</View> : null}
-      {!query.isLoading && !query.isError ? <Text className="text-xs text-muted px-4 pt-2">{query.data?.pages[0]?.totalItems ?? 0} {search || category || tag || unread || author ? 'results' : 'saved items'}</Text> : null}
-      {viewMode === 'grid' || viewMode === 'detail' || columns > 1 ? (
+      {!query.isLoading && !query.isError ? <Text className="text-xs text-muted px-4 pt-2">{query.data?.pages[0]?.totalItems ?? 0} {search || category || tag || reading !== 'all' || author ? 'results' : 'saved items'}</Text> : null}
+      {viewMode === 'grid' ? (
         <FlatList
           key={`${viewMode}-${columns}`}
           data={visible}
@@ -180,23 +180,26 @@ export default function InboxScreen() {
             <View
               style={
                 columns > 1
-                  ? { flex: 1 / columns }
+                  ? { width: (width - 32 - (columns - 1) * 12) / columns }
                   : { paddingHorizontal: 16 }
               }
             >
-              {viewMode === 'grid' ? <ItemCard item={item} size={cardSize} onOpen={onOpenItem} active={item.id === selectedItemId} /> : viewMode === 'detail' ? <ItemDetailRow item={item} inColumn onOpen={onOpenItem} active={item.id === selectedItemId} /> : <ItemRow item={item} inColumn onOpen={onOpenItem} active={item.id === selectedItemId} />}
+              <ItemCard item={item} onOpen={onOpenItem} active={item.id === selectedItemId} />
+              {/* Summary view temporarily hidden.
+              <ItemDetailRow item={item} inColumn onOpen={onOpenItem} active={item.id === selectedItemId} />
+              */}
             </View>
           )}
           ListEmptyComponent={query.isLoading || query.isError ? null :
             <EmptyState
               onSave={() => setBulkOpen(true)}
-              hasFilters={!!search || !!category || !!tag || unread || !!author}
+              hasFilters={!!search || !!category || !!tag || reading !== 'all' || !!author}
               search={search}
               category={category}
               onClearFilters={() => {
                 setSearchInput('');
                 setCategory(null);
-                setUnread(false);
+                setReading('all');
                 clearAuthor();
                 setTag(null);
               }}
@@ -235,13 +238,13 @@ export default function InboxScreen() {
           ListEmptyComponent={query.isLoading || query.isError ? null :
             <EmptyState
               onSave={() => setBulkOpen(true)}
-              hasFilters={!!search || !!category || !!tag || unread || !!author}
+              hasFilters={!!search || !!category || !!tag || reading !== 'all' || !!author}
               search={search}
               category={category}
               onClearFilters={() => {
                 setSearchInput('');
                 setCategory(null);
-                setUnread(false);
+                setReading('all');
                 clearAuthor();
                 setTag(null);
               }}

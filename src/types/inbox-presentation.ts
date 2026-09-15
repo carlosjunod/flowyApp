@@ -1,5 +1,7 @@
 import type { Item } from './index';
 
+export type ReadingFilter = 'all' | 'unread' | 'read';
+
 /** Portable display rules, mirrored byte-for-byte in the native client. */
 export type CardSize = 'small' | 'medium' | 'large';
 export const CARD_SIZES = ['small', 'medium', 'large'] as const;

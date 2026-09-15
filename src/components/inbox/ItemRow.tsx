@@ -6,10 +6,9 @@ import { SemanticPreview } from './content/SemanticContent';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { ItemActionsMenu } from './ItemActionsMenu';
 import { Pressable, Text, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { hostOf, thumbnailFor } from '@/lib/thumbnails';
 import { useSelection } from '@/lib/selection';
@@ -49,6 +48,8 @@ export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColum
   const selection = useSelection();
   const selected = selection.selectedIds.has(item.id);
   const thumb = thumbnailFor(item);
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+  const hasPhoto = thumb.kind === 'image' && thumb.uri !== failedUri;
   const url = item.source_url ?? item.raw_url;
   const host = url ? hostOf(url) : null;
   const domainLabel = host ? stripWww(host) : null;
@@ -72,7 +73,7 @@ export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColum
     .join(' · ');
 
   return (
-    <Animated.View entering={FadeIn.duration(180)}>
+    <View>
       <Pressable
         accessibilityRole={selection.mode ? 'checkbox' : 'button'}
         accessibilityLabel={`${item.title ?? item.raw_url ?? 'Saved item'}${item.read_at ? ', marked as read' : ', no read mark recorded'}${", " + presentation.label + (presentation.notice ? ", " + presentation.notice : "")}`}
@@ -82,8 +83,7 @@ export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColum
         onPress={handlePress}
         onLongPress={handleLongPress}
         delayLongPress={300}
-        style={({ pressed }) => [
-          {
+        style={{
             minHeight: 64,
             backgroundColor: presentation.deep ? colors.inboxDeep : colors.card,
             borderWidth: selected || active ? 2 : 1,
@@ -93,10 +93,8 @@ export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColum
             shadowRadius: 8,
             shadowOffset: { width: 0, height: 2 },
             elevation: 1,
-          },
-          pressed && !pending && { opacity: 0.92, transform: [{ scale: 0.995 }] },
-        ]}
-        className={`flex-row items-center gap-3 ${inColumn ? '' : 'mx-4'} mb-2 pl-3 pr-14 py-3 rounded-2xl bg-card ${
+        }}
+        className={`flex-row items-start gap-3 ${inColumn ? '' : 'mx-4'} mb-2 pl-3 pr-14 py-3 rounded-2xl active:opacity-90 ${
           selected || (!selection.mode && active) ? 'border-2 border-accent' : ''
         }`}
       >
@@ -111,16 +109,17 @@ export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColum
         ) : null}
         <View
           className="rounded-lg bg-surface items-center justify-center overflow-hidden border border-border"
-          style={{ width: detailed ? 56 : 40, height: detailed ? 56 : 40 }}
+          style={{ width: 64, height: 64, flexShrink: 0 }}
         >
-          {thumb.kind === 'image' ? (
+          {hasPhoto && thumb.kind === 'image' ? (
             <Image
               source={{ uri: thumb.uri }}
               contentFit="cover"
-              style={{ width: detailed ? 56 : 40, height: detailed ? 56 : 40 }}
+              onError={() => setFailedUri(thumb.uri)}
+              style={{ width: 64, height: 64, flexShrink: 0 }}
             />
           ) : (
-            <AppIcon name={thumb.icon} size={20} />
+            <AppIcon name={thumb.kind === 'icon' ? thumb.icon : 'link'} size={24} />
           )}
           {item.media && item.media.length > 1 ? (
             <View className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-accent items-center justify-center">
@@ -133,7 +132,7 @@ export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColum
             </View>
           ) : null}
         </View>
-        <View className="flex-1 gap-0.5">
+        <View className="flex-1 min-w-0 gap-0.5">
           <Text
             className="text-fg"
             style={{ fontFamily: 'Inter_500Medium', fontSize: 15 }}
@@ -154,6 +153,6 @@ export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColum
         </View>
       </Pressable>
       {!selection.mode ? <View style={{ position: 'absolute', top: 10, right: inColumn ? 8 : 24 }}><ItemActionsMenu item={item} variant="compact" /></View> : null}
-    </Animated.View>
+    </View>
   );
 };

@@ -1,3 +1,4 @@
+import type { ReadingFilter } from '@/types/inbox-presentation';
 import type { LabelFacets, LabelPreview, LabelKind, LabelChange } from '@/types/labels';
 import type { ChatTurn, HistoryOperation } from './chatContract';
 import type { DigestChatContext } from '@/types';
@@ -139,7 +140,7 @@ export const api = {
   listLabels: () => request<LabelFacets>('/api/labels'),
   previewLabel: (kind: LabelKind, name: string) => request<LabelPreview>('/api/labels', { method: 'POST', body: JSON.stringify({ op: 'preview', kind, name }) }),
   changeLabel: (change: LabelChange) => request<{ count: number }>('/api/labels', { method: 'POST', body: JSON.stringify({ op: 'apply', ...change }) }),
-  listItems: (params: { tag?: string; author?: string; q?: string; category?: string; sort?: string; direction?: string; page?: number; perPage?: number; unread?: boolean }) => {
+  listItems: (params: { tag?: string; author?: string; q?: string; category?: string; sort?: string; direction?: string; page?: number; perPage?: number; unread?: boolean; reading?: ReadingFilter }) => {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== "") query.set(key, String(value));
     return request<ItemsResponse>(`/api/items?${query.toString()}`);
