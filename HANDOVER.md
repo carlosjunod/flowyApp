@@ -4,8 +4,10 @@
 
 Native Storage P0–P3 and UI refinements are integrated into main at `6c28839`,
 preserving the newer Inbox changes. Server PB migrations 38/39, worker and web
-have deployed successfully. Production signed R2 PUT/GET works; browser CORS
-configuration remains pending Cloudflare login and does not govern iOS uploads.
+have deployed successfully. Production R2 browser CORS is configured for
+`https://tryflowy.app`, PUT and Content-Type. Positive/negative preflight and a
+signed PUT with Origin plus byte-matching GET passed; the synthetic probe was
+removed. CORS does not govern iOS uploads and requires no new native build.
 
 EAS accepted production **1.0.0 (27)** from `6c28839aa028f3d58db676ff2ad8d0b0b21717e4`,
 using production endpoints and existing signing credentials. The build archive
@@ -16,8 +18,9 @@ still fails during chatSync generic transpilation; see server TESTING.md.
 - Build: https://expo.dev/accounts/r3db3ard_85/projects/tryflowy/builds/6c180478-79e0-4361-89fc-b82ef391f6ab
 - Automatic submission: https://expo.dev/accounts/r3db3ard_85/projects/tryflowy/submissions/6adcad23-16f1-4b46-b875-a8450125bc6b
 
-Build triggered and submission scheduled; completion and Apple/TestFlight tester
-availability are not yet confirmed. Unrelated local edits remain uncommitted.
+EAS reports build FINISHED (2026-09-15 05:17:22 UTC) and automatic submission
+FINISHED with no error. Apple processing and TestFlight tester availability have
+not been independently confirmed. Unrelated local edits remain uncommitted.
 
 
 > **Monthly digests — 2026-09-12:** Settings and history support optional paid/Beta monthly reports alongside daily and weekly. Day 1–28, local time/timezone and independent channel opt-ins use the coordinated server contract; monthly covers the previous complete calendar month and takes priority on overlapping schedules. Allowances are unchanged. TypeScript, four monthly settings/API scenario groups, four engagement groups and iOS Metro/Hermes export pass. No report generation, delivery, device changes or deployment occurred. See `docs/DIGESTS.md` for rollout and remaining device checks.
