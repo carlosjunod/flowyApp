@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 import type { Item } from '@/types';
 import { readSemanticContent, semanticLabel, semanticCoverageMessage, semanticEvidenceLabel, safeSemanticUrl, type SemanticContentV1, type SemanticEntry } from '@/types/semantic';
+import { ResourceLink } from '../ResourceLink';
 
 export function SemanticPreview({ item, compact = false }: { item: Item; compact?: boolean }) {
   const content = item.type === 'receipt' ? null : readSemanticContent(item.structured_content);
@@ -19,15 +20,24 @@ function ExternalLink({ url, label }: { url: string; label: string }) {
     <Text className="text-accent text-sm underline">{label}</Text>
   </Pressable>{error ? <Text accessibilityRole="alert" className="text-muted text-xs">Could not open this link. Try again.</Text> : null}</View>;
 }
-function Entry({ entry, index, item }: { entry: SemanticEntry; index: number; item: Item }) {
+function Entry({ entry, index, item, numbered }: { entry: SemanticEntry; index: number; item: Item; numbered: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const source = safeSemanticUrl(item.source_url ?? item.raw_url);
-  return <View className="p-4 border-b border-border gap-2">
-    <Text selectable className="text-fg text-base font-semibold">{index + 1}. {entry.name}</Text>
+  return <View className="py-5 border-b border-border gap-2" style={{ minWidth: 0, maxWidth: '100%' }}>
+    <Text selectable className="text-fg text-base font-semibold">{numbered ? `${index + 1}. ` : ''}{entry.name}</Text>
     <Text className="text-muted text-xs capitalize">{entry.kind}</Text>
+    {[...entry.links].sort((a, b) => Number(b.relation === 'canonical') - Number(a.relation === 'canonical')).map(link => <ResourceLink key={link.url} url={link.url}
+      title={entry.kind === 'repository' && new URL(link.url).hostname === 'github.com' ? new URL(link.url).pathname.slice(1) : entry.name}
+      primary={link.relation === 'canonical'} provenance={link.origin === 'source' ? 'In saved source' : 'Verified match'} />)}
     {entry.description ? <Text selectable className="text-muted text-sm leading-6">{entry.description}</Text> : null}
-    {entry.links.map(link => <ExternalLink key={link.url} url={link.url} label={`${new URL(link.url).hostname.replace(/^www\./, '')} · ${link.origin === 'source' ? 'in source' : 'verified match'}`} />)}
-    {entry.resolution === 'ambiguous' ? <Text className="text-muted text-xs">Exact match needs more context.</Text> : !entry.links.length ? <Text className="text-muted text-xs">No verified link yet.</Text> : null}
+    {entry.linkable === false ? null : entry.resolution === 'ambiguous' ? <Text className="text-muted text-xs">The official destination could not be confirmed.</Text> : !entry.links.length ? <Text className="text-muted text-xs">No verified link yet.</Text> : null}
+    {entry.searchResults?.length ? <View className="mt-3 gap-1" style={{ minWidth: 0 }}>
+      <View className="flex-row items-baseline gap-2"><Text accessibilityRole="header" className="text-fg text-sm font-semibold">Related links</Text><Text className="text-muted text-xs">{entry.searchResults.length}</Text></View>
+      <Text className="text-muted text-xs leading-5 mb-1">From web search. These matches are not verified.</Text>
+      {entry.searchResults.map(result => <View key={result.url} className="border-b border-border">
+        <ResourceLink url={result.url} title={result.title} />
+      </View>)}
+    </View> : null}
     <Pressable accessibilityRole="button" accessibilityState={{ expanded }} style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => setExpanded(v => !v)}>
       <Text className="text-muted text-xs underline">{expanded ? 'Hide source evidence' : 'Show source evidence'}</Text>
     </Pressable>
@@ -53,10 +63,10 @@ function SemanticBody({ item, content, action }: { item: Item; content: Semantic
     <Text accessibilityRole="header" className="text-fg text-lg font-semibold">{semanticLabel(content)}</Text>
     {semanticCoverageMessage(content) ? <Text accessibilityLiveRegion="polite" className="text-muted text-sm leading-6">{semanticCoverageMessage(content)}</Text> : null}
     {action}
-    {distinctOverview(content.overview, item.summary) ? <Text selectable className="text-muted text-sm leading-6">{content.overview}</Text> : null}
+    {(content.layout !== 'entity' || !content.entries[0]?.description) && distinctOverview(content.overview, item.summary) ? <Text selectable className="text-muted text-sm leading-6">{content.overview}</Text> : null}
     {content.entries.length ? <>
       <Text className="text-muted text-xs">Extracted from the saved source.{content.coverage === 'unknown' ? ' Source completeness has not been verified.' : ''}</Text>
-      <View className="rounded-xl border border-border bg-card overflow-hidden">{content.entries.slice(0, visible).map((entry, index) => <Entry key={entry.id} entry={entry} index={index} item={item} />)}</View>
+      <View style={{ minWidth: 0, maxWidth: '100%' }}>{content.entries.slice(0, visible).map((entry, index) => <Entry key={entry.id} entry={entry} index={index} item={item} numbered={content.layout === 'list'} />)}</View>
       {visible < content.entries.length ? <Pressable accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => setVisible(n => n + 12)}><Text className="text-accent text-sm">Show more ({content.entries.length - visible} remaining)</Text></Pressable> : null}
     </> : null}
   </View>;

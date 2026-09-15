@@ -1,9 +1,28 @@
 import React from 'react';
-import Markdown, { MarkdownIt } from 'react-native-markdown-display';
+import { Platform, ScrollView, Text, View } from 'react-native';
+import Markdown, { MarkdownIt, type ASTNode, type RenderRules } from 'react-native-markdown-display';
 import { useResolvedColors } from '@/lib/theme';
 import { safeSemanticUrl } from '@/types/semantic';
 const parser = MarkdownIt({ html: false, linkify: true });
+const tableColumns = (node: ASTNode): number => node.type === 'tr' ? node.children.length : Math.max(1, ...node.children.map(tableColumns));
 export function SourceText({ text }: { text: string }) {
   const colors = useResolvedColors();
-  return <Markdown markdownit={parser} onLinkPress={url => Boolean(safeSemanticUrl(url))} style={{ body: { color: colors.fg, fontSize: 15, lineHeight: 22 }, link: { color: colors.accent }, code_inline: { color: colors.fg }, code_block: { color: colors.fg }, fence: { color: colors.fg } }}>{text}</Markdown>;
+  const code: RenderRules['fence'] = node => <ScrollView key={node.key} horizontal nestedScrollEnabled directionalLockEnabled
+    accessibilityLabel="Code block" showsHorizontalScrollIndicator
+    style={{ maxWidth: '100%', flexGrow: 0, marginVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }}
+    contentContainerStyle={{ padding: 12 }}>
+    <Text selectable style={{ color: colors.fg, fontSize: 13, lineHeight: 20, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>{node.content}</Text>
+  </ScrollView>;
+  const rules: RenderRules = {
+    code_block: code, fence: code,
+    table: (node, children) => <ScrollView key={node.key} horizontal nestedScrollEnabled directionalLockEnabled
+      accessibilityLabel="Table" showsHorizontalScrollIndicator style={{ maxWidth: '100%', flexGrow: 0, marginVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+      <View style={{ width: Math.max(320, tableColumns(node) * 160) }}>{children}</View>
+    </ScrollView>,
+  };
+  return <View style={{ minWidth: 0, maxWidth: '100%' }}><Markdown markdownit={parser} rules={rules} onLinkPress={url => Boolean(safeSemanticUrl(url))} style={{
+    body: { color: colors.fg, fontSize: 15, lineHeight: 22, flexShrink: 1 }, link: { color: colors.accent },
+    code_inline: { color: colors.fg, backgroundColor: colors.surface },
+    tr: { borderColor: colors.border }, th: { padding: 12, backgroundColor: colors.surface }, td: { padding: 12 },
+  }}>{text}</Markdown></View>;
 }

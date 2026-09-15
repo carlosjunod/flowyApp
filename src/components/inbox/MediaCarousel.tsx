@@ -1,4 +1,4 @@
-import { Image } from 'expo-image';
+import { ReaderImage } from './ReaderImage';
 import React, { useCallback, useState } from 'react';
 import {
   FlatList,
@@ -50,12 +50,7 @@ export const MediaCarousel: React.FC<Props> = ({ slides, width, height = 240 }) 
           scrollEventThrottle={16}
           renderItem={({ item }) => (
             <View style={{ width, height }} className="bg-surface">
-              <Image
-                source={{ uri: `${ENV.R2_PUBLIC_URL}/${item.r2_key}` }}
-                style={{ width: '100%', height: '100%' }}
-                contentFit="contain"
-                transition={150}
-              />
+              <ReaderImage uri={`${ENV.R2_PUBLIC_URL}/${item.r2_key}`} label={item.summary ?? `Image ${item.index + 1}`} />
             </View>
           )}
         />

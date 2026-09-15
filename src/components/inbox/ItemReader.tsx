@@ -23,6 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EnrichedSections } from '@/components/inbox/EnrichedSections';
 import { ExploreCTA } from '@/components/inbox/ExploreCTA';
+import { ReaderImage } from '@/components/inbox/ReaderImage';
 import { ReaderSwipe } from '@/components/inbox/ReaderSwipe';
 import { SourceChip } from '@/components/inbox/SourceChip';
 import { TagEditor } from '@/components/inbox/TagEditor';
@@ -290,12 +291,7 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
               }}
             >
               {heroUri ? (
-                <Image
-                  source={{ uri: heroUri }}
-                  style={{ width: '100%', height: '100%' }}
-                  contentFit="contain"
-                  transition={200}
-                />
+                <ReaderImage uri={heroUri} label={item.title ?? 'Saved image'} />
               ) : (
                 <View className="flex-1 items-center justify-center">
                   <AppIcon type={item.type} size={48} />
@@ -327,7 +323,7 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
           <ContentRenderer item={item} contentType={contentType} />
         </View>
         {item.status === 'ready' && !readerAction(item).resume ? <ExploreCTA item={item} starting={startingResearch} onPress={startResearch} /> : null}
-        {item.exploration?.status === 'enriched' ? <EnrichedSections exploration={item.exploration} /> : null}
+        {item.exploration && ['enriched', 'no_match', 'error'].includes(item.exploration.status) ? <EnrichedSections exploration={item.exploration} /> : null}
         {item.notes?.trim() ? <CollapsibleSection label="Your notes" defaultOpen>
           <SourceText text={item.notes} />
           <Pressable accessibilityRole="button" onPress={() => setEditing(true)} className="min-h-[44px] justify-center"><Text className="text-accent">Edit notes</Text></Pressable>

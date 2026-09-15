@@ -18,8 +18,12 @@ export interface SemanticEntry {
   kind: SemanticKind;
   name: string;
   description?: string;
+  /** False for enumerated steps, ideas or ingredients without an external identity. */
+  linkable?: boolean;
   evidence: { quote: string; section?: string; slideIndex?: number; seconds?: number; origin?: SemanticSourceKind }[];
   links: { url: string; relation: 'mentioned' | 'canonical' | 'reference'; origin: 'source' | 'lookup'; verifiedAt?: string }[];
+  /** Actual search results mentioning this resource; not verified canonical links. */
+  searchResults?: { url: string; title: string }[];
   resolution: 'unresolved' | 'resolved' | 'ambiguous';
   lastResolutionAttemptAt?: string;
 }
@@ -86,12 +90,15 @@ export function readSemanticContent(value: unknown): SemanticContentV1 | null {
       ((value.layout === 'narrative' || value.layout === 'generic') && value.entries.length)) return null;
   const ids = new Set<string>();
   for (const e of value.entries) {
+    if (record(e) && e.linkable !== undefined && typeof e.linkable !== 'boolean') return null;
     if (!record(e) || !str(e.id, 80) || ids.has(e.id) || !kinds.includes(String(e.kind)) || !str(e.name, 200) ||
         !optionalString(e.description, 600) || !optionalString(e.lastResolutionAttemptAt, 40) ||
         (e.lastResolutionAttemptAt !== undefined && !Number.isFinite(Date.parse(String(e.lastResolutionAttemptAt)))) || !['unresolved', 'resolved', 'ambiguous'].includes(String(e.resolution)) ||
         !Array.isArray(e.evidence) || !e.evidence.length || e.evidence.length > 3 ||
         !Array.isArray(e.links) || e.links.length > 5) return null;
     ids.add(e.id);
+    if (e.searchResults !== undefined && (!Array.isArray(e.searchResults) || e.searchResults.length > 4 ||
+        !e.searchResults.every(result => record(result) && safeSemanticUrl(result.url) && str(result.title, 300)))) return null;
     for (const proof of e.evidence) {
       if (!record(proof) || !str(proof.quote, 600) || !optionalString(proof.section, 120) ||
           !optionalIndex(proof.slideIndex) || !optionalIndex(proof.seconds) ||
@@ -127,7 +134,7 @@ export function semanticCoverageMessage(content: SemanticContentV1): string | un
   const state = content.extraction;
   if (state?.sourceStatus === 'insufficient') return 'The saved source does not contain enough readable text. The original is still available below.';
   if (canResumeSemantic(content)) return 'Part of the saved source still needs to be read. Continue extraction to recover the remaining content.';
-  if (state?.issues.includes('announced_count_mismatch') && state.announced) return `The source announces ${state.announced.count} resources; ${content.entries.length} ${content.entries.length === 1 ? 'was' : 'were'} recovered. Review the source for missing or additional entries.`;
+  if (state?.issues.includes('announced_count_mismatch') && state.announced) return `The source announces ${state.announced.count} items; ${content.entries.length} ${content.entries.length === 1 ? 'was' : 'were'} recovered. Review the source for missing or additional entries.`;
   if (content.coverage === 'partial') return 'Some content could not be extracted.';
   return undefined;
 }

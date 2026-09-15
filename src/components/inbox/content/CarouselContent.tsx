@@ -1,4 +1,5 @@
 import { savedMediaKind } from '@/types/reader';
+import { ReaderImage } from '../ReaderImage';
 import { SourceText } from './SourceText';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -215,13 +216,7 @@ const MainSlide: React.FC<{
           (slide.kind === 'video' && savedMediaKind(slide.r2_key) !== 'image') ? (
             <SlideVideo uri={url} keyId={slide.r2_key} size={containerSize} />
           ) : (
-            <Image
-              source={{ uri: url }}
-              style={{ width: '100%', height: '100%' }}
-              contentFit="contain"
-              transition={150}
-              accessibilityLabel={slide.summary ?? `Slide ${idx + 1} of ${count}`}
-            />
+            <ReaderImage uri={url} label={slide.summary ?? `Slide ${idx + 1} of ${count}`} />
           )
         ) : (
           <PlaceholderSlide idx={idx} />

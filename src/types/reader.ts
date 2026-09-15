@@ -10,7 +10,7 @@ export const READER_COPY = {
   original: 'Original content',
   savedText: 'Saved text',
   research: 'Related sources',
-  researchHint: 'Find useful links mentioned in this save and summarize what they add.',
+  researchHint: 'Find links for the resources in this save and summarize what they add.',
   noSummary: 'No summary is available yet. You can read the original below.',
   pendingSummary: 'Your summary will appear when processing finishes.',
 } as const;
@@ -29,16 +29,22 @@ export function readerAction(item: ReaderItem, starting = false) {
   const resource = semantic?.layout === 'entity' || semantic?.layout === 'list';
   const busy = starting || item.exploration?.status === 'exploring';
   const failed = item.exploration?.status === 'error';
-  const complete = !resume && !resource && item.exploration?.status === 'enriched' && Boolean(item.exploration.deep_analysis);
+  const unresolved = resource && semantic.entries.some(entry => entry.linkable !== false && entry.resolution !== 'resolved');
+  const complete = !resume && !unresolved && item.exploration?.status === 'enriched' && Boolean(item.exploration.deep_analysis);
   const receipt = item.type === 'receipt';
-  const label = busy ? (resume ? 'Reading saved content…' : receipt ? 'Analyzing receipt…' : 'Researching links…')
+  const label = busy ? (resume ? 'Reading saved content…' : receipt ? 'Analyzing receipt…' : 'Deep Dive in progress…')
     : resume ? (failed ? 'Retry extraction' : 'Continue extraction')
-    : complete ? (receipt ? 'Receipt analyzed' : 'Research complete')
-    : failed ? (receipt ? 'Retry analysis' : 'Retry research')
-    : receipt ? 'Analyze this receipt' : resource ? 'Find resource links' : 'Research related links';
+    : complete ? (receipt ? 'Receipt analyzed' : 'Deep Dive complete')
+    : failed ? (receipt ? 'Retry analysis' : 'Retry Deep Dive')
+    : receipt ? 'Analyze this receipt' : 'Deep Dive';
   return { resume, busy, complete, failed, label, disabled: busy || complete || item.status !== 'ready',
     coverage: semantic ? semanticCoverageMessage(semantic) : undefined,
-    hint: resume ? 'Completed work is kept. Read the remaining saved content.' : READER_COPY.researchHint };
+    hint: resume ? 'Completed work is kept. Read the remaining saved content.'
+      : !busy && item.exploration?.status === 'no_match'
+        ? resource && semantic.entries.every(entry => entry.linkable === false)
+          ? 'Your list is ready. These entries do not identify external resources to research.'
+          : 'No verified links were found. Your saved content is kept; you can try Deep Dive again.'
+        : READER_COPY.researchHint };
 }
 
 export function readerSummary(item: ReaderItem) {

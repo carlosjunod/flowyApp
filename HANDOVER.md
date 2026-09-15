@@ -278,3 +278,61 @@ Ten logic/delegation scenarios pass in `npm run test:reader-navigation`.
 Actual iOS Simulator navigation confirms related-save → Back → Inbox. Automated
 physical drag delivery cannot be asserted: the tool sends down/up without
 movement. No debug instrumentation remains. See `docs/reader-ui-parity.md`.
+
+## 2026-09-14 — Deep Dive, enumeraciones generales y fondo de imágenes
+
+Cambios locales coordinados con `../Flowy`: `src/types/reader.ts` unifica el CTA en
+Deep Dive y muestra finalización/reintento/sin coincidencias; `src/types/semantic.ts`
+incorpora `entries[].linkable` opcional y validado. Las enumeraciones generales del
+extractor servidor v3 conservan pasos/ideas/ingredientes además de recursos. Las
+entradas sin destino externo no muestran una promesa de enlace ni disparan búsquedas.
+`ItemReader` también deja consultar resultados/notas cuando la investigación falla.
+
+`src/components/inbox/ReaderImage.tsx` usa dos capas de la misma URL: cover desenfocado
+como fondo y contain centrado para la imagen completa. Se aplica al hero de ItemReader,
+MediaCarousel y los renderizadores de reels/carruseles. El frame del reel tiene altura
+explícita para evitar que Yoga reduzca su ancho por la combinación aspectRatio/maxHeight.
+No cambia la reproducción de vídeo ni requiere dependencias o prebuild nuevos.
+
+Validación y límites finales se registran en `../Flowy/TESTING.md`; cambios preparados
+localmente, sin distribución OTA/TestFlight ni re-procesamiento de datos existentes.
+
+Validación de esta entrega: TypeScript nativo y once escenarios de componentes
+nativos adaptados a DOM pasan (incluyen CTA de Deep Dive, reintento/finalización
+de listas y entradas sin enlace). Metro compiló iOS. La comprobación visual del
+lector en el simulador queda pendiente: el cliente volvió al servidor 8081 en
+vez de mantener la sesión sintética aislada de 8082 y no completó el login.
+La web sí fue inspeccionada a 390 y 1440px; no se afirma paridad visual probada en
+dispositivo físico ni una publicación.
+
+
+## 2026-09-14 — Resultados relacionados de Deep Dive (OpenMAIC)
+
+El contrato semántico incorpora `entries[].searchResults` opcional (máximo cuatro
+pares URL/título provenientes del buscador), separado de los enlaces canónicos.
+`src/components/inbox/content/SemanticContent.tsx` muestra los títulos, dominios
+y «Related search results» con incertidumbre explícita; `ExternalLink` mantiene
+apertura y error accesibles. Los resultados pueden llegar mientras Deep Dive
+continúa: el worker guarda checkpoints antes del análisis profundo. Tipos y
+copy de lector permanecen idénticos a web/worker. Typecheck nativo y pruebas de
+los componentes reales con primitivas adaptadas pasan. Cambios locales; no se
+ha distribuido un build/OTA móvil por este cambio.
+
+## 2026-09-14 — README contenido y enlaces con Impeccable
+
+`src/components/inbox/content/SourceText.tsx` conserva el código y las tablas en
+ScrollViews horizontales propios, limitados al ancho del lector. Los wrappers
+de `CollapsibleSection.tsx` y `EnrichedSections.tsx` mantienen ese límite.
+El nuevo `src/components/inbox/ResourceLink.tsx` comparte la presentación de
+recursos semánticos y extractos: dominio, título de dos líneas con nombre
+accesible completo, flecha externa y una fila pulsable de al menos 64px.
+`content/SemanticContent.tsx` prioriza el enlace confirmado antes de la descripción;
+los resultados relacionados son filas neutrales con incertidumbre explícita.
+Se mantienen los colores y tipografías existentes en ambos temas.
+
+TypeScript y exportación Expo iOS/Hermes pasan. Trece pruebas del componente
+nativo real con adaptadores en `../Flowy/tests/unit/native-inbox-reading.test.tsx`
+incluyen apertura de URLs, nombres accesibles completos y recuperación ante error.
+Los adaptadores no comprueban el layout nativo del Markdown. La comprobación
+visual nueva es de la web; este cambio móvil requiere un próximo build/OTA y
+validación visual en dispositivo. No cambia el contrato API ni las capacidades.

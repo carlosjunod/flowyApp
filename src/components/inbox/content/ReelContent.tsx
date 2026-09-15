@@ -2,7 +2,7 @@ import { savedMediaKind } from '@/types/reader';
 import { SourceText } from './SourceText';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { Feather } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { ReaderImage } from '../ReaderImage';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import React, { useEffect, useState } from 'react';
 import { CollapsibleSection } from '../CollapsibleSection';
@@ -48,12 +48,11 @@ export const ReelContent: React.FC<{ item: Item }> = ({ item }) => {
       >
         {videoUrl && !failed ? (
           isImage ? (
-            <Image
-              source={{ uri: videoUrl }}
-              style={{ width: '100%', aspectRatio: 9 / 16, maxHeight: 320 }}
+            <ReaderImage
+              uri={videoUrl}
+              style={{ height: 320 }}
               onError={() => setFailed(true)}
-              contentFit="contain"
-              accessibilityLabel={item.title ?? 'Reel preview'}
+              label={item.title ?? 'Reel preview'}
             />
           ) : (
             <ReelVideo uri={videoUrl} onError={() => setFailed(true)} />

@@ -46,7 +46,7 @@ export const CollapsibleSection: React.FC<Props> = ({
   };
 
   return (
-    <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border + 'B0' }}>
+    <View style={{ minWidth: 0, maxWidth: '100%', borderBottomWidth: 1, borderBottomColor: colors.border + 'B0' }}>
       <Pressable
         onPress={toggle}
         accessibilityRole="button"
@@ -98,7 +98,7 @@ export const CollapsibleSection: React.FC<Props> = ({
           </View>
         ) : null}
       </Pressable>
-      {open ? <View style={{ paddingBottom: 16 }}>{children}</View> : null}
+      {open ? <View style={{ minWidth: 0, maxWidth: '100%', paddingBottom: 16 }}>{children}</View> : null}
     </View>
   );
 };
