@@ -195,6 +195,10 @@ function renderInfoPlist(props) {
   <string>${props.appGroup}</string>
   <key>PB_BASE_URL</key>
   <string>${props.pbBaseUrl}</string>
+  ${[props.apiBaseUrl, props.pbBaseUrl].every(value => {
+    try { return ['localhost', '127.0.0.1', '[::1]'].includes(new URL(value).hostname); }
+    catch { return false; }
+  }) ? '<key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>' : ''}
   <key>NSExtension</key>
   <dict>
     <key>NSExtensionAttributes</key>

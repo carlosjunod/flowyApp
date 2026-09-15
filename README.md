@@ -310,3 +310,19 @@ frees its files after server cleanup confirms removal.
 Binary capture requires the paired server file API (migration 38 and P0/P1/P2
 worker/web changes). Protocol, per-format limits and release checks are recorded
 in `HANDOVER.md` and the server's `docs/file-storage.md`.
+
+
+### Storage management and Impeccable UI (P3)
+
+Settings → Storage opens a dedicated native screen, matching the web's hierarchy:
+capacity, future-document retention, then searchable files. File rows show size,
+date and analysis/removal state; Preview and Options expand inline. Policies
+require an explicit save. Removing an original requires contextual confirmation
+and keeps the saved item, extracted text and notes. Space remains charged until
+server cleanup succeeds. Duplicates match actual content within the account.
+
+Requires paired server migration 39/hooks, worker and web routes from
+`Flowy-document-storage`, in addition to migration 38. The detailed Spanish QA
+checklist lives at `../Flowy-document-storage/docs/file-storage-manual-checklist.md`.
+Local development uses web 4003, PB 8093, Redis 6383, S3 9193 and Metro 8083; the
+ShareExtension allows HTTP uploads only to loopback in DEBUG. Release stays HTTPS.

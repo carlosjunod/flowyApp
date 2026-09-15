@@ -169,6 +169,9 @@ export type ChatMessage = {
 };
 
 export type ApiErrorCode =
+  | 'ORIGINAL_REQUIRED'
+  | 'INVALID_RETENTION'
+
   | 'LABEL_CHANGED'
   | 'LABELS_UNAVAILABLE'
   | 'AI_PROCESSING_CONSENT_REQUIRED'

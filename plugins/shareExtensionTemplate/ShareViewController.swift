@@ -12,6 +12,17 @@ import CoreText
 private let APP_GROUP = (Bundle.main.infoDictionary?["APP_GROUP"] as? String) ?? "group.app.tryflowy"
 private let API_BASE_URL = (Bundle.main.infoDictionary?["API_BASE_URL"] as? String) ?? "http://localhost:4000"
 private let PB_BASE_URL = (Bundle.main.infoDictionary?["PB_BASE_URL"] as? String) ?? "https://pb.tryflowy.app"
+// Local simulator testing uses an isolated loopback S3 service. Release builds
+// continue to require HTTPS, including all non-loopback destinations.
+private func isAllowedUploadURL(_ url: URL) -> Bool {
+  if url.scheme == "https" { return true }
+  #if DEBUG
+  return url.scheme == "http" && ["localhost", "127.0.0.1", "[::1]"].contains(url.host ?? "")
+  #else
+  return false
+  #endif
+}
+
 private let AUTH_KEY = "pb_auth"
 private let MAX_IMAGES = 10
 private let MAX_FILES = 10
@@ -506,7 +517,7 @@ final class ShareViewController: UIViewController {
     try ShareRequestError.validate(response)
     let session = try JSONDecoder().decode(Session.self, from: body).data
     for ticket in session.uploads {
-      guard sources.indices.contains(ticket.index), let url = URL(string: ticket.url), url.scheme == "https" else { throw URLError(.badURL) }
+      guard sources.indices.contains(ticket.index), let url = URL(string: ticket.url), isAllowedUploadURL(url) else { throw URLError(.badURL) }
       var put = URLRequest(url: url, timeoutInterval: 120); put.httpMethod = "PUT"
       ticket.headers.forEach { put.setValue($0.value, forHTTPHeaderField: $0.key) }
       let (_, result) = try await URLSession.shared.upload(for: put, fromFile: sources[ticket.index])

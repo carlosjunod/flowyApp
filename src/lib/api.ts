@@ -1,3 +1,4 @@
+import type { StorageFiles, FileRetention, FilePreview } from '@/types/files';
 import type { OriginalFile, StorageUsage, UploadSession } from '@/types/files';
 import { validateFiles } from '@/types/files';
 import type { LabelFacets, LabelPreview, LabelKind, LabelChange } from '@/types/labels';
@@ -175,6 +176,11 @@ export const api = {
   ingest: ingestWithOriginals,
   listOriginalFiles: (id: string) => request<OriginalFile[]>(`/api/files?item=${encodeURIComponent(id)}`),
   downloadOriginal: (id: string) => request<{ url: string }>(`/api/files/${id}/download`, { method: 'POST' }),
+  previewFile: (id: string) => request<FilePreview>(`/api/files/${id}/preview`),
+  removeOriginal: (id: string) => request<{queued:boolean}>(`/api/files/${id}`, {method:'DELETE'}),
+  fileRetention: (id: string, retention: FileRetention) => request<{updated:boolean}>(`/api/files/${id}`, {method:'PATCH',body:JSON.stringify({retention})}),
+  storagePreference: (retention: FileRetention) => request<{retention:FileRetention}>('/api/storage/preferences', {method:'PATCH',body:JSON.stringify({retention})}),
+  storageFiles: (q: {page:number;search:string;sort:string;duplicates:boolean}) => request<StorageFiles>(`/api/storage/files?${new URLSearchParams({page:String(q.page),search:q.search,sort:q.sort,duplicates:q.duplicates?'1':'0'})}`),
   storageUsage: () => request<StorageUsage>('/api/storage'),
 
   itemEngagement: async (accountId: string, id: string, action: ItemEngagementAction): Promise<ApiResult<ItemEngagement>> => {

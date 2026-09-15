@@ -372,3 +372,33 @@ Generated bundle IDs/App Group remain `app.tryflowy.client.ShareExtension` /
 `group.app.tryflowy`. No signing/provisioning/portal changes. Server-hosted tests
 exercise the actual native originals component and binary API protocol with
 synthetic transport. This does not claim a full app/device or TestFlight run.
+
+
+## P3 retention and Storage UI — 2026-09-14
+
+Continues the paired document-storage worktrees before merge. New native route
+`app/(app)/storage.tsx` is linked from Settings and registered in the app stack.
+`StorageUsage`, `StorageManager`, `StorageFileRow`, `StorageAction` and the inline
+`FileRetentionPicker` implement capacity, search/sort/duplicates, text preview,
+explicit retention saves and original-only removal with contextual confirmation.
+Refresh preserves current rows and filters. OriginalFiles retains removed-source
+metadata and text previews, and retries only when a source remains available.
+
+API parity: GET storage/files, PATCH storage/preferences, PATCH/DELETE files/:id,
+and GET files/:id/preview. Portable file types include availability, removal,
+retention and preview metadata. Deploy server migration 39/hooks plus worker/web
+first; preferences apply only to future documents unless edited per file.
+Automatic removal requires complete extraction. Partial/error sources remain.
+
+Local validation: clean prebuild and full iPhone 16e iOS 26.0 app + ShareExtension
+Xcode build succeeded; native TypeScript and iOS Metro/Hermes export pass. The
+actual native app was signed into the disposable local account and Storage's
+Word body/table preview, options, removal cancellation and unsaved-policy close
+were exercised, together with the duplicate empty state and light/dark themes. A NativeWind action-layout issue found visually was corrected.
+This is focused simulator verification, not a full Share Sheet, VoiceOver, Dynamic
+Type or physical-device acceptance run; use the server's manual checklist.
+
+The generated extension points to loopback API/PB for QA; the canonical plugin
+adds local-network permission only when both hosts are loopback, and Swift allows
+HTTP upload URLs only in DEBUG on loopback. Production URLs still require HTTPS.
+No signing/provisioning/Apple portal changes. No merge or deployment performed.

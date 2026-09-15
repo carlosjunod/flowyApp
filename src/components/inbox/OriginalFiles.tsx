@@ -1,27 +1,28 @@
-import { useEffect, useState } from 'react';
-import { Linking, Pressable, Text, View } from 'react-native';
-import { api } from '@/lib/api';
-import { pb } from '@/lib/pb';
-import type { Item } from '@/types';
+import { FileTextPreview } from "./FileTextPreview";
+import { useEffect, useState } from "react";
+import { Linking, Pressable, Text, View } from "react-native";
+import { api } from "@/lib/api";
+import { pb } from "@/lib/pb";
+import type { Item } from "@/types";
 import {
   analysisLabel,
   formatFileBytes,
   type OriginalFile,
-} from '@/types/files';
+} from "@/types/files";
 export function OriginalFiles({ item }: { item: Item }) {
   const [files, setFiles] = useState<OriginalFile[]>([]),
-    [error, setError] = useState(''),
+    [error, setError] = useState(""),
     [version, setVersion] = useState(0),
     [busy, setBusy] = useState(false);
   useEffect(() => {
     let cancelled = false;
     const token = pb.authStore.token;
     setFiles([]);
-    setError('');
+    setError("");
     if (item.r2_key || item.document_processing)
       void api.listOriginalFiles(item.id).then((result) => {
         if (cancelled || pb.authStore.token !== token) return;
-        if (result.error) setError('Could not load original files.');
+        if (result.error) setError("Could not load original files.");
         else setFiles(result.data || []);
       });
     return () => {
@@ -30,7 +31,7 @@ export function OriginalFiles({ item }: { item: Item }) {
   }, [item.id, item.user, item.updated, version]);
   async function download(id: string) {
     setBusy(true);
-    setError('');
+    setError("");
     const token = pb.authStore.token;
     try {
       const result = await api.downloadOriginal(id);
@@ -38,7 +39,7 @@ export function OriginalFiles({ item }: { item: Item }) {
       if (pb.authStore.token !== token) return;
       await Linking.openURL(result.data.url);
     } catch {
-      setError('Could not open the original. Please try again.');
+      setError("Could not open the original. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -55,12 +56,17 @@ export function OriginalFiles({ item }: { item: Item }) {
           <View className="flex-1">
             <Text className="text-fg">{file.name}</Text>
             <Text className="mt-1 text-xs text-muted">
-              {formatFileBytes(file.size)} ·{' '}
+              {file.originalAvailable === false && file.analysis.state !== 'uploading'
+                ? file.removalPending
+                  ? "Original awaiting cleanup · "
+                  : "Original removed · "
+                : ""}
+              {formatFileBytes(file.size)} ·{" "}
               {analysisLabel(file.analysis.state)}
             </Text>
             {file.analysis.pages !== undefined ? (
               <Text className="mt-1 text-xs text-muted">
-                {file.analysis.processedPages || 0} of {file.analysis.pages}{' '}
+                {file.analysis.processedPages || 0} of {file.analysis.pages}{" "}
                 pages processed
               </Text>
             ) : null}
@@ -69,10 +75,15 @@ export function OriginalFiles({ item }: { item: Item }) {
                 {file.analysis.message}
               </Text>
             ) : null}
+            <FileTextPreview id={file.id} />
           </View>
           <Pressable
             accessibilityRole="button"
-            disabled={busy || file.analysis.state === 'uploading'}
+            disabled={
+              busy ||
+              file.originalAvailable === false ||
+              file.analysis.state === "uploading"
+            }
             onPress={() => void download(file.id)}
             className="min-h-[44px] justify-center px-2"
           >
@@ -80,24 +91,28 @@ export function OriginalFiles({ item }: { item: Item }) {
           </Pressable>
         </View>
       ))}
-      {item.document_processing?.state === 'partial' ? (
+      {item.document_processing?.state === "partial" ? (
         <Text className="my-2 text-sm text-muted">
-          The analysis covers part of these documents. The originals are saved
-          in full.
+          The analysis covers part of these documents. Available originals can
+          be downloaded in full.
         </Text>
       ) : null}
-      {files.some((f) => ['partial', 'error'].includes(f.analysis.state)) ? (
+      {files.some(
+        (f) =>
+          f.originalAvailable !== false &&
+          ["partial", "error"].includes(f.analysis.state),
+      ) ? (
         <Pressable
           accessibilityRole="button"
           disabled={
-            busy || item.status === 'pending' || item.status === 'processing'
+            busy || item.status === "pending" || item.status === "processing"
           }
           onPress={() => {
             setBusy(true);
             void api
               .reloadItem(item.id)
               .then((result) => {
-                if (result.error) setError('Could not restart analysis.');
+                if (result.error) setError("Could not restart analysis.");
                 else setVersion((v) => v + 1);
               })
               .finally(() => setBusy(false));

@@ -29,6 +29,10 @@ export interface OriginalFile {
   mime: string;
   size: number;
   analysis: FileAnalysis;
+  originalAvailable?: boolean;
+  retention?: FileRetention;
+  retainUntil?: number;
+  removalPending?: boolean;
 }
 export interface DocumentProcessing {
   state: FileAnalysisState;
@@ -93,6 +97,8 @@ export function validateFiles(files: FileDescriptor[]): void {
   if (total > FILE_LIMITS.batch) throw new Error('BATCH_TOO_LARGE');
 }
 export function formatFileBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < MIB) return `${(bytes / 1024).toFixed(1)} KB`;
   return bytes >= 1024 * MIB
     ? `${(bytes / (1024 * MIB)).toFixed(1)} GB`
     : `${(bytes / MIB).toFixed(1)} MB`;
@@ -124,4 +130,33 @@ export function isDocumentItem(item: {
         (f) => f.mime === 'application/pdf' || /\.pdf$/i.test(f.name),
       ))
   );
+}
+
+export const RETENTION_OPTIONS = [
+  { value: 'keep', label: 'Keep originals' },
+  { value: 'after_analysis', label: 'Discard after successful analysis' },
+  { value: '7_days', label: 'Keep for 7 days' },
+  { value: '30_days', label: 'Keep for 30 days' },
+  { value: '90_days', label: 'Keep for 90 days' },
+] as const;
+export type FileRetention = (typeof RETENTION_OPTIONS)[number]['value'];
+export interface ManagedFile extends OriginalFile {
+  itemId: string;
+  created: string;
+  duplicateCount: number;
+  canRemove: boolean;
+}
+export interface StorageFiles {
+  files: ManagedFile[];
+  page: number;
+  totalPages: number;
+  totalFiles: number;
+  duplicateBytes: number;
+  retention: FileRetention;
+}
+export interface FilePreview {
+  name: string;
+  text: string;
+  truncated: boolean;
+  analysis: FileAnalysis;
 }
