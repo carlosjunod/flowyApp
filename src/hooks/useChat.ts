@@ -13,13 +13,13 @@ export function useChatState(accountId: string) {
     ref = useRef(engine);
   ref.current = engine;
   const [unread, setUnread] = useState(false),
-    visible = useRef(false),
+    visible = useRef(new Set<string>()),
     previousRun = useRef<string | null>(null);
   useEffect(() => {
     if (
       previousRun.current &&
       !engine.generatingId &&
-      (!visible.current || engine.active.id !== previousRun.current)
+      (visible.current.size === 0 || engine.active.id !== previousRun.current)
     )
       setUnread(true);
     previousRun.current = engine.generatingId;
@@ -55,8 +55,9 @@ export function useChatState(accountId: string) {
     messages: active.messages,
     draft: active.draft,
     pending: engine.generatingId === active.id || active.pending === true,
-    setVisible: (value: boolean) => {
-      visible.current = value;
+    setVisible: (value: boolean, owner = 'screen') => {
+      if (value) visible.current.add(owner);
+      else visible.current.delete(owner);
       if (value) {
         setUnread(false);
         void ref.current.refresh();

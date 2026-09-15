@@ -333,3 +333,6 @@ accessible retry announcements, and inline save errors that retain the selection
 The local iPhone 16e review included extra-extra-large text. Native TypeScript and
 iOS Metro/Hermes export pass. The fixed-rubric self-assessment and remaining manual
 checks are in `../Flowy-document-storage/docs/storage-design-review.md`.
+
+
+Floating inbox chat: [behavior, validation and distribution](docs/FLOATING-CHAT.md).

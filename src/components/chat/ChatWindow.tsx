@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, ScrollView, Pressable, Text, View } from 'react-native';
 
 import { useResolvedColors } from '@/lib/theme';
 import type { ChatMessage as ChatMessageType } from '@/types';
@@ -10,6 +10,8 @@ import { Spinner } from '@/components/ui/Spinner';
 
 type Props = {
   messages: ChatMessageType[];
+  compact?: boolean;
+  onShowSources?: (ids: string[]) => void;
   ready: boolean;
   onRetry: () => void;
   retryDisabled: boolean;
@@ -27,7 +29,7 @@ const EXAMPLE_PROMPTS = [
   'Summarize my most recent saves',
 ] as const;
 
-export const ChatWindow: React.FC<Props> = ({ messages, onPromptTap, ready, onRetry, retryDisabled }) => {
+export const ChatWindow: React.FC<Props> = ({ messages, onPromptTap, ready, onRetry, retryDisabled, onShowSources, compact = false }) => {
   const colors = useResolvedColors();
   const ref = useRef<FlatList<ChatMessageType>>(null);
   const following = useRef(true);
@@ -36,7 +38,11 @@ export const ChatWindow: React.FC<Props> = ({ messages, onPromptTap, ready, onRe
   useEffect(() => { following.current = true; setShowLatest(false); }, [latestUserId]);
   const follow = () => { if (following.current) ref.current?.scrollToEnd({ animated: false }); else setShowLatest(true); };
   if (!ready) return <View className="flex-1 items-center justify-center"><Spinner /><Text className="text-muted pt-3">Loading conversations…</Text></View>;
-  if (messages.length === 0) return <WelcomeState onPromptTap={onPromptTap} />;
+  if (messages.length === 0) return compact ? <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 20, gap: 16 }}>
+    <Text style={{ color: colors.fg, fontSize: 22, fontFamily: 'Inter_600SemiBold' }}>Find a thought you saved.</Text>
+    <Text style={{ color: colors.muted, fontSize: 14, lineHeight: 21 }}>Ask about your saved content. Follow the sources to see where each answer comes from.</Text>
+    {EXAMPLE_PROMPTS.slice(0, 2).map(prompt => <Pressable key={prompt} accessibilityRole="button" disabled={!onPromptTap || retryDisabled} onPress={() => onPromptTap?.(prompt)} style={{ minHeight: 44, paddingVertical: 10, borderBottomWidth: 1, borderColor: colors.border }}><Text style={{ color: colors.fg, fontSize: 14 }}>{prompt}</Text></Pressable>)}
+  </ScrollView> : <WelcomeState onPromptTap={onPromptTap} />;
   return (
     <View className="flex-1">
       <FlatList ref={ref} data={messages} keyExtractor={m => m.id}
@@ -51,7 +57,7 @@ export const ChatWindow: React.FC<Props> = ({ messages, onPromptTap, ready, onRe
           setShowLatest(!nearEnd);
         }} scrollEventThrottle={100}
         onContentSizeChange={follow}
-        renderItem={({ item, index }) => <ChatMessage message={item} onRetry={index === messages.length - 1 ? onRetry : undefined} retryDisabled={retryDisabled} />}
+        renderItem={({ item, index }) => <ChatMessage message={item} onShowSources={onShowSources} onRetry={index === messages.length - 1 ? onRetry : undefined} retryDisabled={retryDisabled} />}
         contentContainerStyle={{ paddingVertical: 8 }} />
       {showLatest ? <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, bottom: 12, alignItems: 'center', backgroundColor: 'transparent' }}>
         <Pressable accessibilityRole="button" accessibilityLabel="Go to latest" onPress={() => { following.current = true; setShowLatest(false); ref.current?.scrollToEnd({ animated: false }); }}

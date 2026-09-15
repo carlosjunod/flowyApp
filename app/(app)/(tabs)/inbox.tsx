@@ -1,3 +1,5 @@
+import { InboxFloatingChat } from '@/components/chat/InboxFloatingChat';
+import { ChatSourceResults } from '@/components/inbox/ChatSourceResults';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useAdaptivePane } from '@/components/navigation/AdaptiveTabs';
 import { inboxCardColumns } from '@/lib/adaptiveLayout';
@@ -57,6 +59,11 @@ export default function InboxScreen() {
   const colors = useResolvedColors();
   const selection = useSelection();
   const [viewMode, setViewMode] = useViewMode();
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatSources, setChatSources] = useState<string[] | null>(null);
+  const showChatSources = useCallback((ids: string[]) => setChatSources([...new Set(ids)]), []);
+  useEffect(() => { setChatOpen(false); setChatSources(null); }, [user?.id]);
+  useEffect(() => { if (!paneVisible) setChatOpen(false); }, [paneVisible]);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [captureStatus, setCaptureStatus] = useState<'idle' | 'working' | 'done'>('idle');
   const reducedMotion = useReducedMotion();
@@ -132,6 +139,7 @@ export default function InboxScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
+      <View style={{ flex: 1, display: chatSources ? 'none' : 'flex' }} accessibilityElementsHidden={chatOpen} importantForAccessibility={chatOpen ? 'no-hide-descendants' : 'auto'}>
       <PersonalizationInvitation />
       {author ? <View className="mx-4 px-3 flex-row flex-wrap items-center justify-between gap-x-3 rounded-xl border border-border bg-surface"><Text className="text-fg text-sm py-2" style={{ flexShrink: 1 }}>Your saves · @{author.replace(/^instagram:/, '')}</Text><Pressable accessibilityRole="button" accessibilityLabel="Clear author filter" onPress={clearAuthor} style={{ minHeight: 44, justifyContent: 'center' }}><Text className="text-accent font-medium">Clear</Text></Pressable></View> : null}
       <View className="flex-row items-center justify-between px-4 pt-2 pb-1">
@@ -265,6 +273,9 @@ export default function InboxScreen() {
         />
       )}
       <SelectionActionBar />
+      </View>
+      {chatSources ? <View style={{ flex: 1 }} accessibilityElementsHidden={chatOpen} importantForAccessibility={chatOpen ? 'no-hide-descendants' : 'auto'}><ChatSourceResults key={chatSources.join(',')} userId={user?.id} ids={chatSources} onClose={() => setChatSources(null)} onOpenItem={onOpenItem} /></View> : null}
+      {paneVisible && !bulkOpen && !selection.mode ? <InboxFloatingChat open={chatOpen} onOpenChange={setChatOpen} onShowSources={showChatSources} /> : null}
     </SafeAreaView>
   );
 }

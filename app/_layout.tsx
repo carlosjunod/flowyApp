@@ -5,7 +5,7 @@ import {
   Inter_500Medium,
   Inter_600SemiBold,
 } from '@expo-google-fonts/inter';
-import { InstrumentSerif_400Regular } from '@expo-google-fonts/instrument-serif';
+import { InstrumentSerif_400Regular, InstrumentSerif_400Regular_Italic } from '@expo-google-fonts/instrument-serif';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { useShareIntent } from 'expo-share-intent';
 import { useFonts } from 'expo-font';
@@ -113,6 +113,7 @@ export default function RootLayout() {
     Inter_500Medium,
     Inter_600SemiBold,
     InstrumentSerif_400Regular,
+    InstrumentSerif_400Regular_Italic,
   });
 
   if (!fontsLoaded) return null;

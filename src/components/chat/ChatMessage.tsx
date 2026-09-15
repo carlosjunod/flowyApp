@@ -1,3 +1,4 @@
+import { answerSources } from '@/lib/chatSources';
 import { Feather } from '@expo/vector-icons';
 import { copyWithCitations, prepareCitations, ITEM_PROTOCOL } from '@/lib/chatCitations';
 import * as Clipboard from 'expo-clipboard';
@@ -11,12 +12,13 @@ import type { ChatMessage as ChatMessageType, CitedItem } from '@/types';
 
 import { CitedItemsRail, InlineItemChip } from './ItemChip';
 
-type Props = { message: ChatMessageType; onRetry?: () => void; retryDisabled?: boolean };
+type Props = { message: ChatMessageType; onRetry?: () => void; retryDisabled?: boolean; onShowSources?: (ids: string[]) => void };
 
-export const ChatMessage = React.memo(function ChatMessage({ message, onRetry, retryDisabled }: Props) {
+export const ChatMessage = React.memo(function ChatMessage({ message, onRetry, retryDisabled, onShowSources }: Props) {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [copyLabel, setCopyLabel] = useState('Copy');
   const colors = useResolvedColors();
+  const sources = useMemo(() => answerSources(message), [message]);
   const isUser = message.role === 'user';
   const items = message.citations ?? [];
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
@@ -180,6 +182,10 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onRetry, r
               </Pressable>
             ) : null}
           </View>
+          {onShowSources && sources.items.length > 0 ? <Pressable accessibilityRole="button" onPress={() => onShowSources(sources.items.map(item => item.id))}
+            style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 12, marginTop: 4 }}>
+            <Text style={{ color: colors.fg, fontSize: 14, fontFamily: 'Inter_500Medium' }}>View {sources.items.length} {sources.cited ? (sources.items.length === 1 ? 'source' : 'sources') : (sources.items.length === 1 ? 'related save' : 'related saves')} in inbox ↗</Text>
+          </Pressable> : null}
           {railItems.length ? (
             <View style={{ paddingTop: 4 }}>
               <Pressable accessibilityRole="button" accessibilityLabel={`${railLabel}, ${railItems.length}`} accessibilityState={{ expanded: sourcesOpen }}
