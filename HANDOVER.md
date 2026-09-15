@@ -340,3 +340,83 @@ validación visual en dispositivo. No cambia el contrato API ni las capacidades.
 Fuente publicada en `main`: `01807b72f5af0e898805b839758bb77b88fee673`.
 Incluye estos ajustes de lectura y los cambios previos de Deep Dive e imágenes.
 Esta publicación de código no distribuye un nuevo binario ni OTA.
+
+
+## Original files and storage — 2026-09-14, paired worktrees
+
+Branch `codex/document-storage-p0-p2` pairs with the server worktree
+`Flowy-document-storage`. New binary saves reserve storage, PUT to signed R2
+staging URLs and complete through the server. Expo, canonical iOS share template
+and macOS uploader use the same contract; PDF/Office/video originals in the iOS
+share extension are copied to temporary files and uploaded with URLSession
+`fromFile`, avoiding base64 expansion and retaining native format hints; URL/text capture retains its existing
+endpoints. Retries of a retained selection preserve upload request IDs. iOS
+preserves mixed PDF/Office batches and explicitly rejects document/photo mixtures
+and multiple videos. macOS validates all selected file sizes and the 100 MiB
+combined limit before saving.
+
+Readers list original files, sizes, analysis coverage, download links and retry
+for incomplete extraction. Settings includes used/reserved/pending-deletion
+storage. Defaults: images 5 MiB, PDFs 25 MiB, other files 50 MiB, 10 files / 100 MiB
+per batch; quota derives from the server plan. See server `docs/file-storage.md`
+for quotas, actual retention, public-bucket limits and deployment configuration.
+
+Deploy server migration 38/hooks, worker binaries and web API before shipping
+these client builds. The old server does not support the new direct-upload
+protocol. This branch has not been released or merged.
+
+Validation: native TypeScript; clean iOS prebuild; typecheck of the generated
+Swift source; **Xcode simulator build of the ShareExtension target succeeded**
+with code signing disabled; macOS shared uploader/loader Swift typecheck.
+Generated bundle IDs/App Group remain `app.tryflowy.client.ShareExtension` /
+`group.app.tryflowy`. No signing/provisioning/portal changes. Server-hosted tests
+exercise the actual native originals component and binary API protocol with
+synthetic transport. This does not claim a full app/device or TestFlight run.
+
+
+## P3 retention and Storage UI — 2026-09-14
+
+Continues the paired document-storage worktrees before merge. New native route
+`app/(app)/storage.tsx` is linked from Settings and registered in the app stack.
+`StorageUsage`, `StorageManager`, `StorageFileRow`, `StorageAction` and the inline
+`FileRetentionPicker` implement capacity, search/sort/duplicates, text preview,
+explicit retention saves and original-only removal with contextual confirmation.
+Refresh preserves current rows and filters. OriginalFiles retains removed-source
+metadata and text previews, and retries only when a source remains available.
+
+API parity: GET storage/files, PATCH storage/preferences, PATCH/DELETE files/:id,
+and GET files/:id/preview. Portable file types include availability, removal,
+retention and preview metadata. Deploy server migration 39/hooks plus worker/web
+first; preferences apply only to future documents unless edited per file.
+Automatic removal requires complete extraction. Partial/error sources remain.
+
+Local validation: clean prebuild and full iPhone 16e iOS 26.0 app + ShareExtension
+Xcode build succeeded; native TypeScript and iOS Metro/Hermes export pass. The
+actual native app was signed into the disposable local account and Storage's
+Word body/table preview, options, removal cancellation and unsaved-policy close
+were exercised, together with the duplicate empty state and light/dark themes. A NativeWind action-layout issue found visually was corrected.
+This is focused simulator verification, not a full Share Sheet, VoiceOver, Dynamic
+Type or physical-device acceptance run; use the server's manual checklist.
+
+The generated extension points to loopback API/PB for QA; the canonical plugin
+adds local-network permission only when both hosts are loopback, and Swift allows
+HTTP upload URLs only in DEBUG on loopback. Production URLs still require HTTPS.
+No signing/provisioning/Apple portal changes. No merge or deployment performed.
+
+## Storage design loop — 2026-09-14
+
+Three Impeccable iterations completed in the paired worktrees, reaching a weighted
+self-assessment of 9.26/10 (target 9.2; maximum four iterations). Native file actions
+now show Options, filename targets include accessible size/date, and the layout
+uses less space before the file list. Extracted text has a clear heading, layout
+notice, partial-analysis coverage and inline retry; retry results are announced.
+Failed retention saves preserve the selection and offer another attempt without
+claiming an unconfirmed server result. Header wrapping and secondary text were
+checked with extra-extra-large preferred text size on iPhone 16e, iOS 26.0;
+the simulator was restored to large afterward.
+
+Native TypeScript and final iOS Metro/Hermes export pass. Actual Word body/table
+preview and native accessibility tree were inspected. Full VoiceOver and physical
+device acceptance remain manual. No server contract or native configuration change
+in this refinement; no merge/deployment. See the paired server's
+`docs/storage-design-review.md` and `docs/file-storage-manual-checklist.md`.

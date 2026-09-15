@@ -85,6 +85,7 @@ export type ItemExploration = {
 };
 
 export type Item = {
+  document_processing?: import('./files').DocumentProcessing;
   source_metadata?: import('./source').SourceMetadata;
   author_key?: string;
   id: string;
@@ -168,6 +169,9 @@ export type ChatMessage = {
 };
 
 export type ApiErrorCode =
+  | 'ORIGINAL_REQUIRED'
+  | 'INVALID_RETENTION'
+
   | 'LABEL_CHANGED'
   | 'LABELS_UNAVAILABLE'
   | 'AI_PROCESSING_CONSENT_REQUIRED'

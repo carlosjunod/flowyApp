@@ -4,7 +4,11 @@ struct APIConfiguration {
     let baseURL: URL
     let environment: String
     let apiVersion = "1"
-    static let maxFileBytes = 5 * 1024 * 1024
+    static let maxFileBytes = 50 * 1024 * 1024
+    static func fileLimit(name: String, mime: String) -> Int {
+        let mb = (mime == "application/pdf" || name.lowercased().hasSuffix(".pdf")) ? 25 : mime.hasPrefix("image/") ? 5 : 50
+        return mb * 1024 * 1024
+    }
     static let maxItems = 10
     static let callbackScheme = "flowy-mac"
     static var current: APIConfiguration {

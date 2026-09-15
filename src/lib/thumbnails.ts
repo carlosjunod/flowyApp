@@ -1,3 +1,4 @@
+import { isDocumentItem } from '@/types/files';
 import { savedMediaKind } from '@/types/reader';
 import type { Item } from '@/types';
 
@@ -25,6 +26,7 @@ export type Thumb =
   | { kind: 'icon'; icon: ItemIconName };
 
 export const thumbnailFor = (item: Item): Thumb => {
+  if(isDocumentItem(item))return {kind:'icon',icon:itemTypeIcon[item.type]};
   if (item.r2_key && savedMediaKind(item.r2_key) !== 'video') {
     return { kind: 'image', uri: `${ENV.R2_PUBLIC_URL}/${item.r2_key}` };
   }

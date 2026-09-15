@@ -12,6 +12,17 @@ import CoreText
 private let APP_GROUP = (Bundle.main.infoDictionary?["APP_GROUP"] as? String) ?? "group.app.tryflowy"
 private let API_BASE_URL = (Bundle.main.infoDictionary?["API_BASE_URL"] as? String) ?? "http://localhost:4000"
 private let PB_BASE_URL = (Bundle.main.infoDictionary?["PB_BASE_URL"] as? String) ?? "https://pb.tryflowy.app"
+// Local simulator testing uses an isolated loopback S3 service. Release builds
+// continue to require HTTPS, including all non-loopback destinations.
+private func isAllowedUploadURL(_ url: URL) -> Bool {
+  if url.scheme == "https" { return true }
+  #if DEBUG
+  return url.scheme == "http" && ["localhost", "127.0.0.1", "[::1]"].contains(url.host ?? "")
+  #else
+  return false
+  #endif
+}
+
 private let AUTH_KEY = "pb_auth"
 private let MAX_IMAGES = 10
 private let MAX_FILES = 10
@@ -36,6 +47,8 @@ private struct ShareFile: Codable {
   let name: String
   let mime: String
   let data: String
+  var localURL: URL? = nil
+  private enum CodingKeys: String, CodingKey { case name, mime, data }
 }
 
 private struct IngestPayload: Codable {
@@ -132,7 +145,8 @@ final class ShareViewController: UIViewController {
   private var savedID: String?
   private var authToken: String?
 
-  deinit { processTask?.cancel() }
+  private let originalDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("flowy-originals-\(UUID().uuidString)", isDirectory: true)
+  deinit { processTask?.cancel(); try? FileManager.default.removeItem(at: originalDirectory) }
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -203,6 +217,8 @@ final class ShareViewController: UIViewController {
     }
   }
 
+  private var payloadError: String?
+
   private func process(token: String? = Keychain.readToken()) async {
     guard let token, !token.isEmpty else {
       state.update(.signInRequired)
@@ -210,7 +226,7 @@ final class ShareViewController: UIViewController {
     }
     authToken = token
     guard let payload = await extractPayload() else {
-      state.update(.failure("This item could not be read. Try sharing a link, photo or file."))
+      state.update(.failure(payloadError ?? "This item could not be read. Try sharing a link, photo or file."))
       return
     }
     guard !Task.isCancelled else { return }
@@ -314,6 +330,14 @@ final class ShareViewController: UIViewController {
   private func extractPayload() async -> IngestPayload? {
     guard let items = extensionContext?.inputItems as? [NSExtensionItem] else { return nil }
 
+    payloadError = nil
+    try? FileManager.default.removeItem(at: originalDirectory)
+    let providers = items.flatMap { $0.attachments ?? [] }
+    guard providers.count <= MAX_FILES else { payloadError = "Choose up to 10 files per save."; return nil }
+    if providers.count > 1 && providers.contains(where: { $0.hasItemConformingToTypeIdentifier(UTType.movie.identifier) }) {
+      payloadError = "Share one video at a time."; return nil
+    }
+
     // Pass 1: prefer a video (screen_recording) if present
     for item in items {
       guard let attachments = item.attachments else { continue }
@@ -343,92 +367,32 @@ final class ShareViewController: UIViewController {
       }
     }
 
-    // Pass 3: collect PDFs across all items
-    var pdfs: [ShareFile] = []
-    for item in items {
-      guard let attachments = item.attachments else { continue }
-      for provider in attachments where pdfs.count < MAX_FILES {
-        if provider.hasItemConformingToTypeIdentifier(UTType.pdf.identifier) {
-          if let pdf = await loadFile(provider, typeIdentifier: UTType.pdf.identifier, fallbackMime: "application/pdf") {
-            pdfs.append(pdf)
-          }
-        }
+    // Preserve every document in a mixed PDF/Office batch in source order.
+    let photos = providers.filter { $0.hasItemConformingToTypeIdentifier(UTType.image.identifier) }
+    let documents = providers.filter { !$0.hasItemConformingToTypeIdentifier(UTType.image.identifier) && ($0.hasItemConformingToTypeIdentifier(UTType.pdf.identifier) || $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) || $0.hasItemConformingToTypeIdentifier(UTType.data.identifier)) }
+    if !photos.isEmpty && !documents.isEmpty { payloadError = "Share documents and photos separately."; return nil }
+    if !documents.isEmpty {
+      var files: [ShareFile] = []
+      for provider in documents {
+        let pdf = provider.hasItemConformingToTypeIdentifier(UTType.pdf.identifier)
+        let identifier = pdf ? UTType.pdf.identifier : provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) ? UTType.fileURL.identifier : UTType.data.identifier
+        guard let file = await loadFile(provider, typeIdentifier: identifier, fallbackMime: pdf ? "application/pdf" : "application/octet-stream") else { return nil }
+        files.append(file)
       }
-    }
-
-    if pdfs.count > 1 {
-      return IngestPayload(
-        type: IngestType.pdf.rawValue,
+      let allPdf = files.allSatisfy { $0.mime == "application/pdf" || $0.name.lowercased().hasSuffix(".pdf") }
+      return IngestPayload(type: allPdf ? IngestType.pdf.rawValue : IngestType.file.rawValue,
         raw_url: nil, raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
-        raw_pdf: nil, raw_pdfs: pdfs, raw_file: nil, raw_files: nil
-      )
+        raw_pdf: nil, raw_pdfs: allPdf ? files : nil, raw_file: nil, raw_files: allPdf ? nil : files)
     }
-    if let single = pdfs.first {
-      return IngestPayload(
-        type: IngestType.pdf.rawValue,
-        raw_url: nil, raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
-        raw_pdf: single, raw_pdfs: nil, raw_file: nil, raw_files: nil
-      )
-    }
-
-    // Pass 4: collect all images across all items
-    var images: [String] = []
-    for item in items {
-      guard let attachments = item.attachments else { continue }
-      for provider in attachments where images.count < MAX_IMAGES {
-        if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-          if let b64 = await loadImageBase64(provider) {
-            images.append(b64)
-          }
-        }
+    if !photos.isEmpty {
+      var images: [String] = []
+      for provider in photos {
+        guard let image = await loadImageBase64(provider) else { return nil }
+        images.append(image)
       }
-    }
-
-    if images.count > 1 {
-      return IngestPayload(
-        type: IngestType.screenshot.rawValue,
-        raw_url: nil, raw_image: nil, raw_images: images, raw_video: nil, video_mime: nil,
-        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil
-      )
-    }
-    if let single = images.first {
-      return IngestPayload(
-        type: IngestType.screenshot.rawValue,
-        raw_url: nil, raw_image: single, raw_images: nil, raw_video: nil, video_mime: nil,
-        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil
-      )
-    }
-
-    // Pass 5: collect generic files (any other shared documents)
-    var files: [ShareFile] = []
-    for item in items {
-      guard let attachments = item.attachments else { continue }
-      for provider in attachments where files.count < MAX_FILES {
-        if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
-          if let file = await loadFile(provider, typeIdentifier: UTType.fileURL.identifier, fallbackMime: "application/octet-stream") {
-            files.append(file)
-          }
-        } else if provider.hasItemConformingToTypeIdentifier(UTType.data.identifier) {
-          if let file = await loadFile(provider, typeIdentifier: UTType.data.identifier, fallbackMime: "application/octet-stream") {
-            files.append(file)
-          }
-        }
-      }
-    }
-
-    if files.count > 1 {
-      return IngestPayload(
-        type: IngestType.file.rawValue,
-        raw_url: nil, raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
-        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: files
-      )
-    }
-    if let single = files.first {
-      return IngestPayload(
-        type: IngestType.file.rawValue,
-        raw_url: nil, raw_image: nil, raw_images: nil, raw_video: nil, video_mime: nil,
-        raw_pdf: nil, raw_pdfs: nil, raw_file: single, raw_files: nil
-      )
+      return IngestPayload(type: IngestType.screenshot.rawValue, raw_url: nil,
+        raw_image: nil, raw_images: images, raw_video: nil, video_mime: nil,
+        raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil)
     }
 
     return nil
@@ -469,53 +433,45 @@ final class ShareViewController: UIViewController {
     return nil
   }
 
-  private func loadFile(_ provider: NSItemProvider, typeIdentifier: String, fallbackMime: String) async -> ShareFile? {
-    guard let obj = try? await provider.loadItem(forTypeIdentifier: typeIdentifier, options: nil) else {
-      return nil
-    }
-    var data: Data?
-    var name = provider.suggestedName ?? "file"
-    var mime = fallbackMime
+  private func stagedFile(_ obj: NSSecureCoding, name suggestedName: String, mime fallbackMime: String) throws -> ShareFile {
+    var name = suggestedName, mime = fallbackMime
+    let destination = originalDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: originalDirectory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
     if let url = obj as? URL {
-      data = try? Data(contentsOf: url)
+      guard url.isFileURL else { throw URLError(.badURL) }
       if !url.lastPathComponent.isEmpty { name = url.lastPathComponent }
-      if let utType = UTType(filenameExtension: url.pathExtension),
-         let inferred = utType.preferredMIMEType {
-        mime = inferred
+      mime = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? mime
+      let info = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+      let cap = (mime == "application/pdf" || name.lowercased().hasSuffix(".pdf")) ? 25 : mime.hasPrefix("image/") ? 5 : 50
+      guard info.isRegularFile == true, let size = info.fileSize, size > 0, size <= cap * 1024 * 1024 else {
+        throw NSError(domain: "flowy.share", code: 413, userInfo: [NSLocalizedDescriptionKey: "\(name) is empty or exceeds the \(cap) MB limit."])
       }
-    } else if let raw = obj as? Data {
-      data = raw
-    } else if let str = obj as? String {
-      data = str.data(using: .utf8)
+      try FileManager.default.copyItem(at: url, to: destination)
+    } else {
+      let bytes = (obj as? Data) ?? (obj as? String)?.data(using: .utf8)
+      let cap = mime == "application/pdf" || name.lowercased().hasSuffix(".pdf") ? 25 : mime.hasPrefix("image/") ? 5 : 50
+      guard let bytes, !bytes.isEmpty, bytes.count <= cap * 1024 * 1024 else { throw NSError(domain: "flowy.share", code: 413, userInfo: [NSLocalizedDescriptionKey: "The file is empty or exceeds its format limit."]) }
+      try bytes.write(to: destination, options: .atomic)
     }
-    guard let bytes = data else { return nil }
-    return ShareFile(name: name, mime: mime, data: bytes.base64EncodedString())
+    return ShareFile(name: name, mime: mime, data: "", localURL: destination)
+  }
+
+  private func loadFile(_ provider: NSItemProvider, typeIdentifier: String, fallbackMime: String) async -> ShareFile? {
+    do {
+      let obj = try await provider.loadItem(forTypeIdentifier: typeIdentifier, options: nil)
+      let declaredType = provider.registeredTypeIdentifiers.compactMap { UTType($0) }.first { $0.preferredMIMEType != nil }
+      let mime = fallbackMime == "application/octet-stream" ? (declaredType?.preferredMIMEType ?? fallbackMime) : fallbackMime
+      var name = provider.suggestedName ?? "file"
+      if URL(fileURLWithPath: name).pathExtension.isEmpty, let ext = declaredType?.preferredFilenameExtension { name += ".\(ext)" }
+      return try stagedFile(obj, name: name, mime: mime)
+    } catch { payloadError = error.localizedDescription; return nil }
   }
 
   private func loadVideoPayload(_ provider: NSItemProvider) async -> IngestPayload? {
-    guard let obj = try? await provider.loadItem(forTypeIdentifier: UTType.movie.identifier, options: nil) else {
-      return nil
-    }
-    var data: Data?
-    var mime = "video/mp4"
-    if let url = obj as? URL {
-      data = try? Data(contentsOf: url)
-      let ext = url.pathExtension.lowercased()
-      if ext == "mov" { mime = "video/quicktime" }
-      if ext == "m4v" { mime = "video/x-m4v" }
-    } else if let raw = obj as? Data {
-      data = raw
-    }
-    guard let bytes = data else { return nil }
-    return IngestPayload(
-      type: IngestType.screen_recording.rawValue,
-      raw_url: nil,
-      raw_image: nil,
-      raw_images: nil,
-      raw_video: bytes.base64EncodedString(),
-      video_mime: mime,
-      raw_pdf: nil, raw_pdfs: nil, raw_file: nil, raw_files: nil
-    )
+    guard let file = await loadFile(provider, typeIdentifier: UTType.movie.identifier, fallbackMime: "video/mp4") else { return nil }
+    return IngestPayload(type: IngestType.screen_recording.rawValue, raw_url: nil,
+      raw_image: nil, raw_images: nil, raw_video: nil, video_mime: file.mime,
+      raw_pdf: nil, raw_pdfs: nil, raw_file: file, raw_files: nil)
   }
 
   private func coerceImage(_ obj: NSSecureCoding) -> UIImage? {
@@ -525,7 +481,57 @@ final class ShareViewController: UIViewController {
     return nil
   }
 
+  private var uploadRequestID = UUID().uuidString
+
+  private func postFiles(payload: IngestPayload, token: String) async throws -> String? {
+    var files = (payload.raw_pdfs ?? payload.raw_pdf.map { [$0] } ?? []) + (payload.raw_files ?? payload.raw_file.map { [$0] } ?? [])
+    for (index, data) in (payload.raw_images ?? payload.raw_image.map { [$0] } ?? []).enumerated() {
+      files.append(ShareFile(name: "image-\(index + 1).jpg", mime: "image/jpeg", data: data))
+    }
+    if let video = payload.raw_video { files.append(ShareFile(name: "recording.mp4", mime: payload.video_mime ?? "video/mp4", data: video)) }
+    if files.isEmpty { return nil }
+    guard files.count <= 10 else { throw NSError(domain: "flowy.share", code: 413, userInfo: [NSLocalizedDescriptionKey: "Choose up to 10 files."]) }
+    var descriptors: [[String: Any]] = [], sources: [URL] = []
+    var total = 0
+    for file in files {
+      let source: URL
+      if let local = file.localURL { source = local }
+      else {
+        guard let data = Data(base64Encoded: file.data), !data.isEmpty else { throw URLError(.cannotDecodeRawData) }
+        guard let local = try stagedFile(data as NSData, name: file.name, mime: file.mime).localURL else { throw URLError(.cannotCreateFile) }
+        source = local
+      }
+      let size = try source.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+      let cap = (file.mime == "application/pdf" || file.name.lowercased().hasSuffix(".pdf")) ? 25 : file.mime.hasPrefix("image/") ? 5 : 50
+      guard size > 0, size <= cap * 1024 * 1024 else { throw NSError(domain: "flowy.share", code: 413, userInfo: [NSLocalizedDescriptionKey: "\(file.name) exceeds the \(cap) MB limit."]) }
+      total += size
+      descriptors.append(["name": file.name, "mime": file.mime, "size": size]); sources.append(source)
+    }
+    guard total <= 100 * 1024 * 1024 else { throw NSError(domain: "flowy.share", code: 413, userInfo: [NSLocalizedDescriptionKey: "Choose a batch smaller than 100 MB."]) }
+    struct Ticket: Decodable { let index: Int; let url: String; let headers: [String: String] }
+    struct Session: Decodable { struct Value: Decodable { let itemId: String; let uploads: [Ticket] }; let data: Value }
+    var reserve = URLRequest(url: URL(string: "\(API_BASE_URL)/api/files/uploads")!, timeoutInterval: 60)
+    reserve.httpMethod = "POST"; reserve.setValue("application/json", forHTTPHeaderField: "Content-Type"); reserve.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    reserve.httpBody = try JSONSerialization.data(withJSONObject: ["type": payload.type, "files": descriptors, "requestId": uploadRequestID])
+    let (body, response) = try await URLSession.shared.data(for: reserve)
+    try ShareRequestError.validate(response)
+    let session = try JSONDecoder().decode(Session.self, from: body).data
+    for ticket in session.uploads {
+      guard sources.indices.contains(ticket.index), let url = URL(string: ticket.url), isAllowedUploadURL(url) else { throw URLError(.badURL) }
+      var put = URLRequest(url: url, timeoutInterval: 120); put.httpMethod = "PUT"
+      ticket.headers.forEach { put.setValue($0.value, forHTTPHeaderField: $0.key) }
+      let (_, result) = try await URLSession.shared.upload(for: put, fromFile: sources[ticket.index])
+      try ShareRequestError.validate(result)
+    }
+    var complete = URLRequest(url: URL(string: "\(API_BASE_URL)/api/files/uploads/\(session.itemId)/complete")!, timeoutInterval: 120)
+    complete.httpMethod = "POST"; complete.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    let (_, completion) = try await URLSession.shared.data(for: complete)
+    try ShareRequestError.validate(completion)
+    return session.itemId
+  }
+
   private func postIngest(payload: IngestPayload, token: String) async throws -> String {
+    if let id = try await postFiles(payload: payload, token: token) { return id }
     guard let url = URL(string: "\(API_BASE_URL)/api/ingest") else {
       throw NSError(domain: "flowy.share", code: -2, userInfo: [NSLocalizedDescriptionKey: "Bad API URL"])
     }

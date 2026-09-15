@@ -27,11 +27,7 @@ struct FlowyAPIClient {
         defer { session.finishTasksAndInvalidate() }
         let result: (Data, URLResponse)
         if let file = item.fileURL {
-            let boundary = "Flowy-\(UUID().uuidString)"
-            let body = try multipart(file: file, item: item, boundary: boundary)
-            defer { try? FileManager.default.removeItem(at: body) }
-            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-            result = try await session.upload(for: request, fromFile: body)
+            return try await saveFile(file, item: item, token: account.token, session: session)
         } else {
             let payload: [String: String]
             if let url = item.url { payload = ["type": "url", "url": url.absoluteString] }
@@ -43,12 +39,36 @@ struct FlowyAPIClient {
         }
         return try Self.decode(result, as: SavedFlowyItem.self)
     }
+    private func saveFile(_ file: URL, item: SharedItem, token: String, session: URLSession) async throws -> SavedFlowyItem {
+        let size = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        let mime = item.mimeType ?? "application/octet-stream", name = item.filename ?? file.lastPathComponent
+        let cap = APIConfiguration.fileLimit(name: name, mime: mime)
+        guard size > 0, size <= cap else { throw FlowyError.message("The file exceeds the limit for this format.") }
+        struct Ticket: Decodable { let index: Int; let url: URL; let headers: [String: String] }
+        struct Upload: Decodable { let itemId: String; let uploads: [Ticket] }
+        var reserve = URLRequest(url: configuration.endpoint("api/files/uploads"))
+        reserve.httpMethod = "POST"; reserve.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization"); reserve.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let type = mime.hasPrefix("image/") ? "screenshot" : (mime == "application/pdf" || name.lowercased().hasSuffix(".pdf")) ? "pdf" : "file"
+        reserve.httpBody = try JSONSerialization.data(withJSONObject: ["type": type, "requestId": item.uploadRequestId, "files": [["name": name, "mime": mime, "size": size]]])
+        let upload = try Self.decode(try await session.data(for: reserve), as: Upload.self)
+        for ticket in upload.uploads {
+            guard ticket.index == 0, ticket.url.scheme == "https" else { throw FlowyError.message("Invalid upload destination.") }
+            var put = URLRequest(url: ticket.url); put.httpMethod = "PUT"
+            ticket.headers.forEach { put.setValue($0.value, forHTTPHeaderField: $0.key) }
+            let (_, response) = try await session.upload(for: put, fromFile: file)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw FlowyError.message("The upload did not finish. Try again.") }
+        }
+        var complete = URLRequest(url: configuration.endpoint("api/files/uploads/\(upload.itemId)/complete"))
+        complete.httpMethod = "POST"; complete.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        return try Self.decode(try await session.data(for: complete), as: SavedFlowyItem.self)
+    }
+
     static func decode<T: Decodable>(_ result: (Data, URLResponse), as: T.Type) throws -> T {
         guard let response = result.1 as? HTTPURLResponse else { throw FlowyError.message("Couldn't reach Flowy.") }
         switch response.statusCode {
         case 401: throw FlowyError.message("Your session expired. Open Flowy to reconnect your account.")
         case 403: throw FlowyError.message("Open Flowy on the web and review your AI processing consent before saving.")
-        case 413: throw FlowyError.message("This file is too large. The Mac integration accepts files up to 5 MB.")
+        case 413: throw FlowyError.message("The file or batch exceeds its limit, or your storage is full. Check Storage in Flowy.")
         case 429: throw FlowyError.message("Please wait a moment before trying again.")
         default: break
         }
@@ -57,28 +77,5 @@ struct FlowyAPIClient {
             throw FlowyError.message("Couldn't save or connect. Check your connection and try again.")
         }
         return value
-    }
-    private func multipart(file: URL, item: SharedItem, boundary: String) throws -> URL {
-        let size = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-        guard size > 0, size <= APIConfiguration.maxFileBytes else { throw FlowyError.message("Files must be between 1 byte and 5 MB.") }
-        let body = FileManager.default.temporaryDirectory.appendingPathComponent("Flowy-upload-\(UUID().uuidString)")
-        FileManager.default.createFile(atPath: body.path, contents: nil, attributes: [.posixPermissions: 0o600])
-        do {
-            let output = try FileHandle(forWritingTo: body)
-            defer { try? output.close() }
-            let name = (item.filename ?? "Shared file").replacingOccurrences(of: "[^a-zA-Z0-9._ -]", with: "_", options: .regularExpression)
-            let mime = item.mimeType ?? "application/octet-stream"
-            try output.write(contentsOf: Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"\(name)\"\r\nContent-Type: \(mime)\r\n\r\n".utf8))
-            let input = try FileHandle(forReadingFrom: file)
-            defer { try? input.close() }
-            var copied = 0
-            while let chunk = try input.read(upToCount: 64 * 1024), !chunk.isEmpty {
-                copied += chunk.count
-                guard copied <= APIConfiguration.maxFileBytes else { throw FlowyError.message("File exceeds 5 MB.") }
-                try output.write(contentsOf: chunk)
-            }
-            try output.write(contentsOf: Data("\r\n--\(boundary)--\r\n".utf8))
-            return body
-        } catch { try? FileManager.default.removeItem(at: body); throw error }
     }
 }

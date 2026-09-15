@@ -47,6 +47,18 @@ export default function SettingsScreen() {
           <DeleteAccountSection />
         </Section>
 
+        <Section title="Storage">
+          <Link href="/storage" asChild>
+            <Pressable accessibilityRole="link" className="rounded-xl border border-border bg-card px-4 py-3 flex-row items-center gap-3" style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+              <Feather name="hard-drive" size={20} color={colors.muted} />
+              <View className="flex-1">
+                <Text className="text-base text-fg">Storage</Text>
+                <Text className="text-xs text-muted mt-1">Original files, space and retention.</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={colors.muted} />
+            </Pressable>
+          </Link>
+        </Section>
         <Section title="Personalization">
           <Link href="/personalization" asChild>
             <Pressable accessibilityRole="link" className="rounded-xl border border-border bg-card px-4 py-3 flex-row items-center gap-3">

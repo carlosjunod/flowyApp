@@ -20,6 +20,15 @@ struct SharedItemLoader: Sendable {
             }
         }
         guard !items.isEmpty, items.count <= APIConfiguration.maxItems else { throw FlowyError.message("No supported content was received, or more than 10 items were shared.") }
+        var totalBytes = 0
+        for item in items {
+            guard let file = item.fileURL else { continue }
+            let size = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+            let limit = APIConfiguration.fileLimit(name: item.filename ?? file.lastPathComponent, mime: item.mimeType ?? "application/octet-stream")
+            guard size > 0, size <= limit else { throw FlowyError.message("A file exceeds the limit for its format.") }
+            totalBytes += size
+        }
+        guard totalBytes <= 100 * 1024 * 1024 else { throw FlowyError.message("Shared files exceed the 100 MB batch limit.") }
         return items
     }
     private func textItem(_ text: String) throws -> SharedItem {
@@ -99,7 +108,7 @@ struct SharedItemLoader: Sendable {
         defer { if access { source.stopAccessingSecurityScopedResource() } }
         let values = try source.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentTypeKey])
         guard values.isRegularFile == true, values.isSymbolicLink != true else { throw FlowyError.message("Share individual files. Folders and aliases are not supported.") }
-        guard let size = values.fileSize, size > 0, size <= APIConfiguration.maxFileBytes else { throw FlowyError.message("Files must be between 1 byte and 5 MB.") }
+        guard let size = values.fileSize, size > 0, size <= APIConfiguration.maxFileBytes else { throw FlowyError.message("Files must be between 1 byte and 50 MB.") }
         let destination = directory.appendingPathComponent(UUID().uuidString)
         FileManager.default.createFile(atPath: destination.path, contents: nil, attributes: [.posixPermissions: 0o600])
         let input = try FileHandle(forReadingFrom: source), output = try FileHandle(forWritingTo: destination)
@@ -107,7 +116,7 @@ struct SharedItemLoader: Sendable {
         var copied = 0
         while let chunk = try input.read(upToCount: 64 * 1024), !chunk.isEmpty {
             copied += chunk.count
-            guard copied <= APIConfiguration.maxFileBytes else { throw FlowyError.message("File exceeds 5 MB.") }
+            guard copied <= APIConfiguration.maxFileBytes else { throw FlowyError.message("File exceeds 50 MB.") }
             try output.write(contentsOf: chunk)
         }
         let resolved = type ?? values.contentType ?? UTType(filenameExtension: source.pathExtension)

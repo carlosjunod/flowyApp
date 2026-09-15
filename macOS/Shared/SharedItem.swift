@@ -2,6 +2,7 @@ import Foundation
 
 enum SharedItemType { case url, text, image, pdf, file }
 struct SharedItem {
+    let uploadRequestId = UUID().uuidString
     let type: SharedItemType
     var text: String? = nil
     var url: URL? = nil

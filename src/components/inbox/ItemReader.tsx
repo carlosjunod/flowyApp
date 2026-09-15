@@ -32,6 +32,7 @@ import { SourceIdentity } from '@/components/inbox/content/SourceIdentity';
 import { SemanticContent } from '@/components/inbox/content/SemanticContent';
 import { SourceText } from '@/components/inbox/content/SourceText';
 import { CollapsibleSection } from '@/components/inbox/CollapsibleSection';
+import { OriginalFiles } from '@/components/inbox/OriginalFiles';
 import { ContentRenderer } from '@/components/inbox/content/ContentRenderer';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -123,7 +124,7 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
   // own primary media, so the static hero would just duplicate it. receipt
   // and generic don't, so they keep the hero block.
   const contentType = getContentType(item);
-  const showHero = contentType === 'generic';
+  const showHero = contentType === 'generic' && item.type !== 'pdf' && item.type !== 'file';
 
   const heroWidth = width - 32;
   const heroHeight = photoOpen ? Math.min(700, Math.round(heroWidth * 1.25)) : Math.min(200, Math.round(heroWidth * 0.55));
@@ -320,6 +321,7 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
             ) : null}
           </Pressable>
         ) : null}
+          <OriginalFiles item={item} />
           <ContentRenderer item={item} contentType={contentType} />
         </View>
         {item.status === 'ready' && !readerAction(item).resume ? <ExploreCTA item={item} starting={startingResearch} onPress={startResearch} /> : null}

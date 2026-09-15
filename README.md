@@ -298,3 +298,38 @@ Validation: `npm run typecheck`, plus 52 paired web/native tests and the web
 acceptance runner documented in the sibling server's `TESTING.md`. Native type
 parity includes the existing optional exploration `deep` flag. No dependencies,
 entitlements, API shapes or native project configuration changed.
+
+
+### Original files and storage
+
+Saved PDF, Word and PowerPoint originals can be downloaded from the item reader.
+The reader displays full/partial/failed analysis separately from whether the
+original was saved. Settings shows storage usage and quota; deleting a saved item
+frees its files after server cleanup confirms removal.
+
+Binary capture requires the paired server file API (migration 38 and P0/P1/P2
+worker/web changes). Protocol, per-format limits and release checks are recorded
+in `HANDOVER.md` and the server's `docs/file-storage.md`.
+
+
+### Storage management and Impeccable UI (P3)
+
+Settings → Storage opens a dedicated native screen, matching the web's hierarchy:
+capacity, future-document retention, then searchable files. File rows show size,
+date and analysis/removal state; Preview and Options expand inline. Policies
+require an explicit save. Removing an original requires contextual confirmation
+and keeps the saved item, extracted text and notes. Space remains charged until
+server cleanup succeeds. Duplicates match actual content within the account.
+
+Requires paired server migration 39/hooks, worker and web routes from
+`Flowy-document-storage`, in addition to migration 38. The detailed Spanish QA
+checklist lives at `../Flowy-document-storage/docs/file-storage-manual-checklist.md`.
+Local development uses web 4003, PB 8093, Redis 6383, S3 9193 and Metro 8083; the
+ShareExtension allows HTTP uploads only to loopback in DEBUG. Release stays HTTPS.
+
+Storage's three-round Impeccable refinement adds visible Options, 44px filename
+controls with grouped metadata, a clearer extracted-text preview with retry and
+accessible retry announcements, and inline save errors that retain the selection.
+The local iPhone 16e review included extra-extra-large text. Native TypeScript and
+iOS Metro/Hermes export pass. The fixed-rubric self-assessment and remaining manual
+checks are in `../Flowy-document-storage/docs/storage-design-review.md`.
