@@ -1,5 +1,25 @@
 # FlowyApp — Parity Red-Priority Handover
 
+## Storage publication — 2026-09-15
+
+Native Storage P0–P3 and UI refinements are integrated into main at `6c28839`,
+preserving the newer Inbox changes. Server PB migrations 38/39, worker and web
+have deployed successfully. Production signed R2 PUT/GET works; browser CORS
+configuration remains pending Cloudflare login and does not govern iOS uploads.
+
+EAS accepted production **1.0.0 (27)** from `6c28839aa028f3d58db676ff2ad8d0b0b21717e4`,
+using production endpoints and existing signing credentials. The build archive
+contains Storage and the share template and excludes local env/generated ios.
+TypeScript and the paired server's 80 checks pass. The unchanged UI-model harness
+still fails during chatSync generic transpilation; see server TESTING.md.
+
+- Build: https://expo.dev/accounts/r3db3ard_85/projects/tryflowy/builds/6c180478-79e0-4361-89fc-b82ef391f6ab
+- Automatic submission: https://expo.dev/accounts/r3db3ard_85/projects/tryflowy/submissions/6adcad23-16f1-4b46-b875-a8450125bc6b
+
+Build triggered and submission scheduled; completion and Apple/TestFlight tester
+availability are not yet confirmed. Unrelated local edits remain uncommitted.
+
+
 > **Monthly digests — 2026-09-12:** Settings and history support optional paid/Beta monthly reports alongside daily and weekly. Day 1–28, local time/timezone and independent channel opt-ins use the coordinated server contract; monthly covers the previous complete calendar month and takes priority on overlapping schedules. Allowances are unchanged. TypeScript, four monthly settings/API scenario groups, four engagement groups and iOS Metro/Hermes export pass. No report generation, delivery, device changes or deployment occurred. See `docs/DIGESTS.md` for rollout and remaining device checks.
 
 > **Item reading state — 2026-09-12:** Shared phone/landscape ItemReader records first opening automatically, independently of the reversible **Mark as read / Mark as unread** action. Inbox cards/rows show a discreet dot/check; **Unread** filters the full server library. Older saves show no read mark recorded, not a claim that they were never read. Requires the coordinated Flowy engagement migration and API before shipping. Realtime remains active for ready items and foreground/30-second reconciliation covers missed events. Requests, detail caches and late responses are account-bound. See `docs/ITEM-READING.md` for rollout and validation.
