@@ -1,3 +1,4 @@
+import { StorageUsage } from '@/components/settings/StorageUsage';
 import { Feather } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { Link } from 'expo-router';
@@ -47,6 +48,7 @@ export default function SettingsScreen() {
           <DeleteAccountSection />
         </Section>
 
+        <StorageUsage key={user?.id} />
         <Section title="Personalization">
           <Link href="/personalization" asChild>
             <Pressable accessibilityRole="link" className="rounded-xl border border-border bg-card px-4 py-3 flex-row items-center gap-3">

@@ -85,6 +85,7 @@ export type ItemExploration = {
 };
 
 export type Item = {
+  document_processing?: import('./files').DocumentProcessing;
   source_metadata?: import('./source').SourceMetadata;
   author_key?: string;
   id: string;

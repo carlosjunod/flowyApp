@@ -298,3 +298,15 @@ Validation: `npm run typecheck`, plus 52 paired web/native tests and the web
 acceptance runner documented in the sibling server's `TESTING.md`. Native type
 parity includes the existing optional exploration `deep` flag. No dependencies,
 entitlements, API shapes or native project configuration changed.
+
+
+### Original files and storage
+
+Saved PDF, Word and PowerPoint originals can be downloaded from the item reader.
+The reader displays full/partial/failed analysis separately from whether the
+original was saved. Settings shows storage usage and quota; deleting a saved item
+frees its files after server cleanup confirms removal.
+
+Binary capture requires the paired server file API (migration 38 and P0/P1/P2
+worker/web changes). Protocol, per-format limits and release checks are recorded
+in `HANDOVER.md` and the server's `docs/file-storage.md`.

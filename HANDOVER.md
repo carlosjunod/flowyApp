@@ -340,3 +340,35 @@ validación visual en dispositivo. No cambia el contrato API ni las capacidades.
 Fuente publicada en `main`: `01807b72f5af0e898805b839758bb77b88fee673`.
 Incluye estos ajustes de lectura y los cambios previos de Deep Dive e imágenes.
 Esta publicación de código no distribuye un nuevo binario ni OTA.
+
+
+## Original files and storage — 2026-09-14, paired worktrees
+
+Branch `codex/document-storage-p0-p2` pairs with the server worktree
+`Flowy-document-storage`. New binary saves reserve storage, PUT to signed R2
+staging URLs and complete through the server. Expo, canonical iOS share template
+and macOS uploader use the same contract; PDF/Office/video originals in the iOS
+share extension are copied to temporary files and uploaded with URLSession
+`fromFile`, avoiding base64 expansion and retaining native format hints; URL/text capture retains its existing
+endpoints. Retries of a retained selection preserve upload request IDs. iOS
+preserves mixed PDF/Office batches and explicitly rejects document/photo mixtures
+and multiple videos. macOS validates all selected file sizes and the 100 MiB
+combined limit before saving.
+
+Readers list original files, sizes, analysis coverage, download links and retry
+for incomplete extraction. Settings includes used/reserved/pending-deletion
+storage. Defaults: images 5 MiB, PDFs 25 MiB, other files 50 MiB, 10 files / 100 MiB
+per batch; quota derives from the server plan. See server `docs/file-storage.md`
+for quotas, actual retention, public-bucket limits and deployment configuration.
+
+Deploy server migration 38/hooks, worker binaries and web API before shipping
+these client builds. The old server does not support the new direct-upload
+protocol. This branch has not been released or merged.
+
+Validation: native TypeScript; clean iOS prebuild; typecheck of the generated
+Swift source; **Xcode simulator build of the ShareExtension target succeeded**
+with code signing disabled; macOS shared uploader/loader Swift typecheck.
+Generated bundle IDs/App Group remain `app.tryflowy.client.ShareExtension` /
+`group.app.tryflowy`. No signing/provisioning/portal changes. Server-hosted tests
+exercise the actual native originals component and binary API protocol with
+synthetic transport. This does not claim a full app/device or TestFlight run.

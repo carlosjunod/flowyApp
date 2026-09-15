@@ -1,3 +1,5 @@
+import type { OriginalFile, StorageUsage, UploadSession } from '@/types/files';
+import { validateFiles } from '@/types/files';
 import type { LabelFacets, LabelPreview, LabelKind, LabelChange } from '@/types/labels';
 import type { ChatTurn, HistoryOperation } from './chatContract';
 import type { DigestChatContext } from '@/types';
@@ -126,6 +128,32 @@ async function personalizationRequest(
 
 export type ItemsResponse = { items: Item[]; page: number; perPage: number; totalItems: number; totalPages: number; categories: string[] };
 
+const fileUploadRequests = new WeakMap<IngestPayload, { token: string; id: string }>();
+async function ingestWithOriginals(payload: IngestPayload): Promise<ApiResult<IngestResponse>> {
+  const files = [...(payload.raw_pdfs ?? (payload.raw_pdf ? [payload.raw_pdf] : [])), ...(payload.raw_files ?? (payload.raw_file ? [payload.raw_file] : [])),
+    ...(payload.raw_images ?? (payload.raw_image ? [payload.raw_image] : [])).map((data, index) => ({ name: `image-${index + 1}.jpg`, mime: 'image/jpeg', data })),
+    ...(payload.raw_video ? [{ name: 'recording.mp4', mime: payload.video_mime || 'video/mp4', data: payload.raw_video }] : [])];
+  if (!files.length) return request<IngestResponse>('/api/ingest', { method: 'POST', body: JSON.stringify(payload) });
+  const token = pb.authStore.token;
+  const previousRequest = fileUploadRequests.get(payload);
+  const requestId = previousRequest?.token === token ? previousRequest.id : `upload-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  fileUploadRequests.set(payload, { token, id: requestId });
+  try {
+    const bytes = files.map(f => Uint8Array.from(atob(f.data.replace(/^data:[^,]*;base64,/, '')), c => c.charCodeAt(0)));
+    const descriptors = files.map((f, index) => ({ name: f.name, mime: f.mime, size: bytes[index]!.length }));
+    validateFiles(descriptors);
+    const created = await request<UploadSession>('/api/files/uploads', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ type: payload.type, files: descriptors, requestId }) });
+    if (created.error || !created.data) return { data: null, error: created.error! };
+    for (const upload of created.data.uploads) {
+      if (pb.authStore.token !== token) throw new Error('UNAUTHORIZED');
+      const response = await fetch(upload.url, { method: 'PUT', headers: upload.headers, body: bytes[upload.index] as unknown as BodyInit, signal: AbortSignal.timeout(120000) });
+      if (!response.ok) throw new Error('UPLOAD_FAILED');
+    }
+    if (pb.authStore.token !== token) throw new Error('UNAUTHORIZED');
+    return request<IngestResponse>(`/api/files/uploads/${created.data.itemId}/complete`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+  } catch (e) { return { data: null, error: { code: 'NETWORK_ERROR', message: e instanceof Error ? e.message : 'UPLOAD_FAILED' } }; }
+}
+
 export const api = {
   getAiProcessingConsent: () => request<{ accepted: boolean; version: string }>('/api/account/ai-consent'),
   acceptAiProcessingConsent: () => request<{ accepted: boolean; version: string }>('/api/account/ai-consent', { method: 'POST' }),
@@ -144,11 +172,10 @@ export const api = {
     for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== "") query.set(key, String(value));
     return request<ItemsResponse>(`/api/items?${query.toString()}`);
   },
-  ingest: (payload: IngestPayload) =>
-    request<IngestResponse>('/api/ingest', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
+  ingest: ingestWithOriginals,
+  listOriginalFiles: (id: string) => request<OriginalFile[]>(`/api/files?item=${encodeURIComponent(id)}`),
+  downloadOriginal: (id: string) => request<{ url: string }>(`/api/files/${id}/download`, { method: 'POST' }),
+  storageUsage: () => request<StorageUsage>('/api/storage'),
 
   itemEngagement: async (accountId: string, id: string, action: ItemEngagementAction): Promise<ApiResult<ItemEngagement>> => {
     const token = pb.authStore.token;
