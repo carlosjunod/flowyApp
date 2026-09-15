@@ -449,3 +449,25 @@ in this refinement; no merge/deployment. See the paired server's
 Login and signup share `src/components/auth/SocialSignIn.tsx`: existing accounts enter immediately; new accounts receive separate unchecked terms/privacy and AI-processing acceptances, then explicitly create the account. Apple is now present on iOS signup too. `src/components/auth/GoogleSignIn.tsx` remains a compatibility wrapper. Pending provider credentials remain in memory and clear on cancellation, failure, success or unmount. `src/lib/googleAuth.ts` also supports Apple's optional email and expired-token response. `scripts/test-google-auth.cjs` covers both providers, cancellation, one-time-code preservation, absent Apple email and duplicate/late requests.
 
 The paired server `/api/auth/apple` now defers one-time-code exchange until the new-account consent check passes. Deploy that change before native distribution. No API shape, audience, entitlement, environment variable or dependency changed. Native TypeScript and iOS export pass; local component adapters cover 27 regression groups. No fresh physical-device Apple/Google authorization or TestFlight publication is claimed.
+
+## Recipe reader — 2026-09-15
+
+`src/components/inbox/content/RecipeContent.tsx` and the existing semantic reader
+show ingredients and ordered preparation, original ingredient evidence and
+half/double/triple quantities; +/- servings is available with a source yield.
+`src/types/semantic.ts` mirrors server V1 optional recipe metadata and deterministic
+fraction/range arithmetic. Quantities are view state; preparation is unchanged.
+Requires server extractor revision 4 with `CONTENT_TEMPLATES_ENABLED=1` and new or
+explicitly reprocessed content. No new native permission/API/migration. Local
+TypeScript and component checks are separate from an iPhone run or TestFlight;
+neither distribution nor a physical-device recipe check has been performed.
+
+### Recipe design refinement with Impeccable — 2026-09-15
+
+The recipe reader now separates a 48px serving stepper from its batch presets,
+right-aligns ingredient quantities, and provides one Original quantities
+expander. Preparation uses 16px/26px text, 20px section headings and a quiet
+number column. Explicit `useResolvedColors` styles retain the native palette
+and implement pressed, disabled, selected and expanded states. Unknown yields
+retain the same control height. TypeScript and real-component tests with DOM
+platform adapters pass; actual iPhone layout/VoiceOver remain unverified.

@@ -20,6 +20,7 @@ export interface SemanticEntry {
   description?: string;
   /** False for enumerated steps, ideas or ingredients without an external identity. */
   linkable?: boolean;
+  recipe?: { role: 'ingredient' | 'step'; amount?: string; unit?: string };
   evidence: { quote: string; section?: string; slideIndex?: number; seconds?: number; origin?: SemanticSourceKind }[];
   links: { url: string; relation: 'mentioned' | 'canonical' | 'reference'; origin: 'source' | 'lookup'; verifiedAt?: string }[];
   /** Actual search results mentioning this resource; not verified canonical links. */
@@ -40,6 +41,8 @@ export interface SemanticContentV1 {
   extractorVersion: number;
   /** Optional for V1 records. Progress contains references only, never copies of source text. */
   extraction?: SemanticExtraction;
+  /** Yield is optional: an unknown yield still supports batch multipliers. */
+  recipe?: { servings?: number; quote?: string };
 }
 export const SEMANTIC_MAX_ENTRIES = 120;
 export function safeSemanticUrl(value: unknown): string | undefined {
@@ -88,6 +91,11 @@ export function readSemanticContent(value: unknown): SemanticContentV1 | null {
   if ((value.layout === 'entity' && value.entries.length !== 1) ||
       (value.layout === 'list' && !value.entries.length) ||
       ((value.layout === 'narrative' || value.layout === 'generic') && value.entries.length)) return null;
+  if (value.recipe !== undefined) {
+    if (!record(value.recipe) || value.layout !== 'list' || !optionalString(value.recipe.quote, 600)) return null;
+    const servings = value.recipe.servings;
+    if (servings !== undefined && (typeof servings !== 'number' || !Number.isFinite(servings) || servings <= 0 || servings > 1000 || !str(value.recipe.quote, 600))) return null;
+  }
   const ids = new Set<string>();
   for (const e of value.entries) {
     if (record(e) && e.linkable !== undefined && typeof e.linkable !== 'boolean') return null;
@@ -96,6 +104,10 @@ export function readSemanticContent(value: unknown): SemanticContentV1 | null {
         (e.lastResolutionAttemptAt !== undefined && !Number.isFinite(Date.parse(String(e.lastResolutionAttemptAt)))) || !['unresolved', 'resolved', 'ambiguous'].includes(String(e.resolution)) ||
         !Array.isArray(e.evidence) || !e.evidence.length || e.evidence.length > 3 ||
         !Array.isArray(e.links) || e.links.length > 5) return null;
+    if (e.recipe !== undefined && (!value.recipe || !record(e.recipe) || !['ingredient', 'step'].includes(String(e.recipe.role)) ||
+        !optionalString(e.recipe.unit, 60) || !optionalString(e.recipe.amount, 40) ||
+        (e.recipe.amount !== undefined && !parseRecipeAmount(String(e.recipe.amount))) ||
+        (e.recipe.role === 'step' && (e.recipe.amount !== undefined || e.recipe.unit !== undefined)) || e.linkable !== false)) return null;
     ids.add(e.id);
     if (e.searchResults !== undefined && (!Array.isArray(e.searchResults) || e.searchResults.length > 4 ||
         !e.searchResults.every(result => record(result) && safeSemanticUrl(result.url) && str(result.title, 300)))) return null;
@@ -118,6 +130,7 @@ export function readSemanticContent(value: unknown): SemanticContentV1 | null {
 const singular: Record<SemanticKind, string> = { repository: 'repository', movie: 'movie', book: 'book', product: 'product', place: 'place', paper: 'paper', other: 'item' };
 const plural: Record<SemanticKind, string> = { repository: 'repositories', movie: 'movies', book: 'books', product: 'products', place: 'places', paper: 'papers', other: 'items' };
 export function semanticLabel(content: SemanticContentV1): string {
+  if (content.recipe) return `Recipe${content.coverage === 'partial' ? ' · partial' : ''}`;
   if (content.layout === 'list') {
     const kind = content.entries[0]?.kind ?? 'other';
     const uniform = content.entries.every(e => e.kind === kind);
@@ -140,4 +153,25 @@ export function semanticCoverageMessage(content: SemanticContentV1): string | un
 }
 export function semanticEvidenceLabel(origin?: SemanticSourceKind): string {
   return origin === 'caption' ? 'Original caption' : origin === 'ocr' ? 'Text read from image' : origin === 'transcript' ? 'Audio transcript' : origin === 'comment' ? 'Reader comment' : 'Saved text';
+}
+
+/** Parse only explicit numeric amounts. Written quantities remain in source text. */
+export function parseRecipeAmount(raw: string): number[] | undefined {
+  const fractions: Record<string, string> = { '¼': '1/4', '½': '1/2', '¾': '3/4', '⅓': '1/3', '⅔': '2/3', '⅛': '1/8', '⅜': '3/8', '⅝': '5/8', '⅞': '7/8' };
+  const normalized = raw.replace(/(\d)([¼½¾⅓⅔⅛⅜⅝⅞])/g, '$1 $2').replace(/[¼½¾⅓⅔⅛⅜⅝⅞]/g, c => fractions[c]!).trim();
+  const parts = normalized.split(/\s*[-–]\s*/);
+  if (!parts.length || parts.length > 2) return undefined;
+  const values = parts.map(part => {
+    const fraction = /^(?:(\d+)\s+)?(\d+)\/(\d+)$/.exec(part);
+    if (fraction) return Number(fraction[1] ?? 0) + Number(fraction[2]) / Number(fraction[3]);
+    return /^\d+(?:[.,]\d+)?$/.test(part) ? Number(part.replace(',', '.')) : NaN;
+  });
+  return values.every(n => Number.isFinite(n) && n > 0 && n <= 1_000_000) && (values.length === 1 || values[0]! <= values[1]!) ? values : undefined;
+}
+export function recipeIngredientLabel(entry: SemanticEntry, factor: number): string {
+  const amount = entry.recipe?.amount;
+  const values = amount ? parseRecipeAmount(amount) : undefined;
+  const safeFactor = Number.isFinite(factor) && factor > 0 && factor <= 100 ? factor : 1;
+  const scaled = values?.map(n => Number((n * safeFactor).toPrecision(6)).toString()).join('–');
+  return [scaled, entry.recipe?.unit, entry.name].filter(Boolean).join(' ');
 }

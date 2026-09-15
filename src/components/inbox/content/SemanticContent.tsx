@@ -1,3 +1,4 @@
+import { RecipeContent } from './RecipeContent';
 import { distinctOverview } from '@/types/reader';
 import React, { useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
@@ -59,15 +60,17 @@ export function SemanticContent({ item, action }: { item: Item; action?: React.R
 }
 function SemanticBody({ item, content, action }: { item: Item; content: SemanticContentV1; action?: React.ReactNode }) {
   const [visible, setVisible] = useState(12);
+  const entries = content.entries.filter(e => !content.recipe || !e.recipe);
   return <View className="gap-3">
     <Text accessibilityRole="header" className="text-fg text-lg font-semibold">{semanticLabel(content)}</Text>
     {semanticCoverageMessage(content) ? <Text accessibilityLiveRegion="polite" className="text-muted text-sm leading-6">{semanticCoverageMessage(content)}</Text> : null}
     {action}
     {(content.layout !== 'entity' || !content.entries[0]?.description) && distinctOverview(content.overview, item.summary) ? <Text selectable className="text-muted text-sm leading-6">{content.overview}</Text> : null}
-    {content.entries.length ? <>
+    {content.recipe ? <RecipeContent content={content} /> : null}
+    {entries.length ? <>
       <Text className="text-muted text-xs">Extracted from the saved source.{content.coverage === 'unknown' ? ' Source completeness has not been verified.' : ''}</Text>
-      <View style={{ minWidth: 0, maxWidth: '100%' }}>{content.entries.slice(0, visible).map((entry, index) => <Entry key={entry.id} entry={entry} index={index} item={item} numbered={content.layout === 'list'} />)}</View>
-      {visible < content.entries.length ? <Pressable accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => setVisible(n => n + 12)}><Text className="text-accent text-sm">Show more ({content.entries.length - visible} remaining)</Text></Pressable> : null}
+      <View style={{ minWidth: 0, maxWidth: '100%' }}>{entries.slice(0, visible).map((entry, index) => <Entry key={entry.id} entry={entry} index={index} item={item} numbered={content.layout === 'list'} />)}</View>
+      {visible < entries.length ? <Pressable accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => setVisible(n => n + 12)}><Text className="text-accent text-sm">Show more ({entries.length - visible} remaining)</Text></Pressable> : null}
     </> : null}
   </View>;
 }
