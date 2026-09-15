@@ -17,11 +17,21 @@ export function FileRetentionPicker({
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false),
-    [draft, setDraft] = useState(value);
+    [draft, setDraft] = useState(value),
+    [saveError, setSaveError] = useState(false);
   const colors = useResolvedColors();
   useEffect(() => setDraft(value), [value]);
+  async function save() {
+    setSaveError(false);
+    try {
+      if (await onSave(draft)) setOpen(false);
+      else setSaveError(true);
+    } catch {
+      setSaveError(true);
+    }
+  }
   return (
-    <View className={compact ? '' : 'border-y border-border py-5'}>
+    <View className={compact ? '' : 'border-y border-border py-4'}>
       <View className="flex-row items-center justify-between gap-2">
         <View className="flex-1">
           <Text className="font-sans text-sm font-medium text-fg">
@@ -39,6 +49,7 @@ export function FileRetentionPicker({
           onPress={() => {
             setOpen((v) => !v);
             setDraft(value);
+            setSaveError(false);
           }}
         />
       </View>
@@ -58,7 +69,10 @@ export function FileRetentionPicker({
                 accessibilityLabel={o.label}
                 accessibilityState={{ checked: draft === o.value, disabled }}
                 disabled={disabled}
-                onPress={() => setDraft(o.value)}
+                onPress={() => {
+                  setDraft(o.value);
+                  setSaveError(false);
+                }}
                 className="min-h-[48px] flex-row items-center gap-3 border-b border-border py-3"
                 style={({ pressed }) => ({
                   opacity: disabled ? 0.4 : pressed ? 0.6 : 1,
@@ -75,7 +89,7 @@ export function FileRetentionPicker({
               </Pressable>
             ))}
           </View>
-          <Text className="my-3 font-sans text-xs leading-5 text-muted">
+          <Text className="my-3 font-sans text-[13px] leading-5 text-muted">
             {compact
               ? 'This original only. '
               : 'New PDF, Word and PowerPoint uploads on all your devices. Existing files keep their policy. '}
@@ -83,6 +97,15 @@ export function FileRetentionPicker({
               ? 'Keep the original until you choose to remove it.'
               : 'Removed originals cannot be recovered. Extracted text stays. Partial or failed documents keep their originals until analysis is complete.'}
           </Text>
+          {saveError ? (
+            <Text
+              accessibilityRole="alert"
+              className="mb-3 font-sans text-sm leading-5 text-fg"
+            >
+              Could not confirm the save. Your selection is still here. Try
+              again.
+            </Text>
+          ) : null}
           <View className="items-start">
             <StorageAction
               title={
@@ -90,16 +113,12 @@ export function FileRetentionPicker({
               }
               tone="primary"
               disabled={disabled || draft === value}
-              onPress={() =>
-                void onSave(draft).then((ok) => {
-                  if (ok) setOpen(false);
-                })
-              }
+              onPress={() => void save()}
             />
           </View>
         </View>
       ) : !compact ? (
-        <Text className="mt-3 font-sans text-xs leading-5 text-muted">
+        <Text className="mt-2 font-sans text-[13px] leading-5 text-muted">
           Your extracted text stays available when an original is removed.
         </Text>
       ) : null}

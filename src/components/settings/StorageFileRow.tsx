@@ -66,6 +66,9 @@ export function StorageFileRow({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={file.name}
+              accessibilityValue={{
+                text: `${formatFileBytes(file.size)}, ${new Date(file.created.replace(' ', 'T')).toLocaleDateString()}`,
+              }}
               accessibilityHint="Opens the saved item"
               onPress={() => router.push(`/item/${file.itemId}`)}
               className="min-h-[44px] justify-center"
@@ -74,48 +77,51 @@ export function StorageFileRow({
               <Text className="font-sans text-sm font-medium text-fg">
                 {file.name}
               </Text>
+              <Text className="mt-1 font-sans text-[13px] leading-5 text-muted">
+                {formatFileBytes(file.size)} ·{' '}
+                {new Date(file.created.replace(' ', 'T')).toLocaleDateString(
+                  undefined,
+                  { day: 'numeric', month: 'short', year: 'numeric' },
+                )}
+              </Text>
             </Pressable>
-            <Text className="font-sans text-xs text-muted">
-              {formatFileBytes(file.size)} ·{' '}
-              {new Date(file.created.replace(' ', 'T')).toLocaleDateString(
-                undefined,
-                { day: 'numeric', month: 'short', year: 'numeric' },
-              )}
-            </Text>
             {file.duplicateCount > 1 ? (
-              <Text className="mt-1 font-sans text-xs text-fg">
+              <Text className="mt-1 font-sans text-[13px] text-fg">
                 {file.duplicateCount} identical copies
               </Text>
             ) : null}
             {state ? (
-              <Text className="mt-1 font-sans text-xs text-muted">{state}</Text>
+              <Text className="mt-1 font-sans text-[13px] text-muted">
+                {state}
+              </Text>
             ) : null}
-            <View className="-ml-3 mt-1 flex-row flex-wrap">
-              <StorageAction
-                title="Preview"
-                label={`Preview text for ${file.name}`}
-                icon="eye"
-                expanded={panel === 'preview'}
-                disabled={busy || file.analysis.state === 'uploading'}
-                onPress={() => toggle('preview')}
-              />
-              {file.originalAvailable ? (
-                <StorageAction
-                  label={`Download ${file.name}`}
-                  icon="download"
-                  disabled={busy}
-                  onPress={onDownload}
-                />
-              ) : null}
-              <StorageAction
-                label={`Options for ${file.name}`}
-                icon={panel === 'options' ? 'x' : 'sliders'}
-                expanded={panel === 'options'}
-                disabled={busy}
-                onPress={() => toggle('options')}
-              />
-            </View>
           </View>
+        </View>
+        <View className="-ml-3 mt-2 flex-row flex-wrap">
+          <StorageAction
+            title="Preview"
+            label={`Preview text for ${file.name}`}
+            icon="eye"
+            expanded={panel === 'preview'}
+            disabled={busy || file.analysis.state === 'uploading'}
+            onPress={() => toggle('preview')}
+          />
+          {file.originalAvailable ? (
+            <StorageAction
+              label={`Download ${file.name}`}
+              icon="download"
+              disabled={busy}
+              onPress={onDownload}
+            />
+          ) : null}
+          <StorageAction
+            title="Options"
+            label={`Options for ${file.name}`}
+            icon={panel === 'options' ? 'x' : 'sliders'}
+            expanded={panel === 'options'}
+            disabled={busy}
+            onPress={() => toggle('options')}
+          />
         </View>
       </View>
       {panel ? (
@@ -144,7 +150,7 @@ export function StorageFileRow({
                     onSave={onRetention}
                   />
                   {file.retainUntil ? (
-                    <Text className="mt-2 font-sans text-xs leading-5 text-muted">
+                    <Text className="mt-2 font-sans text-[13px] leading-5 text-muted">
                       Eligible for removal from{' '}
                       {new Date(file.retainUntil).toLocaleDateString()}, after
                       complete analysis.
@@ -157,7 +163,7 @@ export function StorageFileRow({
                           accessibilityRole="alert"
                           className="font-sans text-sm font-semibold text-fg"
                         >
-                          Remove this original?
+                          Remove “{file.name}”?
                         </Text>
                         <Text className="my-2 font-sans text-sm leading-5 text-muted">
                           This cannot be undone. Your saved item, extracted text

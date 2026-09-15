@@ -402,3 +402,21 @@ The generated extension points to loopback API/PB for QA; the canonical plugin
 adds local-network permission only when both hosts are loopback, and Swift allows
 HTTP upload URLs only in DEBUG on loopback. Production URLs still require HTTPS.
 No signing/provisioning/Apple portal changes. No merge or deployment performed.
+
+## Storage design loop — 2026-09-14
+
+Three Impeccable iterations completed in the paired worktrees, reaching a weighted
+self-assessment of 9.26/10 (target 9.2; maximum four iterations). Native file actions
+now show Options, filename targets include accessible size/date, and the layout
+uses less space before the file list. Extracted text has a clear heading, layout
+notice, partial-analysis coverage and inline retry; retry results are announced.
+Failed retention saves preserve the selection and offer another attempt without
+claiming an unconfirmed server result. Header wrapping and secondary text were
+checked with extra-extra-large preferred text size on iPhone 16e, iOS 26.0;
+the simulator was restored to large afterward.
+
+Native TypeScript and final iOS Metro/Hermes export pass. Actual Word body/table
+preview and native accessibility tree were inspected. Full VoiceOver and physical
+device acceptance remain manual. No server contract or native configuration change
+in this refinement; no merge/deployment. See the paired server's
+`docs/storage-design-review.md` and `docs/file-storage-manual-checklist.md`.

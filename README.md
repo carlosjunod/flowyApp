@@ -326,3 +326,10 @@ Requires paired server migration 39/hooks, worker and web routes from
 checklist lives at `../Flowy-document-storage/docs/file-storage-manual-checklist.md`.
 Local development uses web 4003, PB 8093, Redis 6383, S3 9193 and Metro 8083; the
 ShareExtension allows HTTP uploads only to loopback in DEBUG. Release stays HTTPS.
+
+Storage's three-round Impeccable refinement adds visible Options, 44px filename
+controls with grouped metadata, a clearer extracted-text preview with retry and
+accessible retry announcements, and inline save errors that retain the selection.
+The local iPhone 16e review included extra-extra-large text. Native TypeScript and
+iOS Metro/Hermes export pass. The fixed-rubric self-assessment and remaining manual
+checks are in `../Flowy-document-storage/docs/storage-design-review.md`.

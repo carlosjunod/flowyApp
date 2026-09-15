@@ -123,7 +123,7 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
           onSave={(v) => change(() => api.storagePreference(v))}
         />
       ) : null}
-      <View className="mt-5 mb-2 flex-row items-center justify-between">
+      <View className="mt-4 mb-1 flex-row items-center justify-between">
         <Text
           accessibilityRole="header"
           className="font-sans text-base font-semibold text-fg"
@@ -184,7 +184,12 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
         </View>
       ) : null}
       <View className="my-4 min-h-[44px] flex-row items-center rounded-lg border border-border pl-3">
-        <Feather accessible={false} name="search" size={17} color={colors.muted} />
+        <Feather
+          accessible={false}
+          name="search"
+          size={17}
+          color={colors.muted}
+        />
         <TextInput
           accessibilityLabel="Search files"
           placeholder="Search by filename"
@@ -206,7 +211,7 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
         ) : null}
       </View>
       {duplicates ? (
-        <Text className="mb-4 font-sans text-xs leading-5 text-muted">
+        <Text className="mb-4 font-sans text-[13px] leading-5 text-muted">
           {data && data.duplicateBytes > 0
             ? `${formatFileBytes(data.duplicateBytes)} in extra identical copies. `
             : ''}
@@ -314,7 +319,7 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
                 disabled={page <= 1 || loading}
                 onPress={() => setPage((v) => v - 1)}
               />
-              <Text className="font-sans text-xs text-muted">
+              <Text className="font-sans text-[13px] text-muted">
                 Page {page} of {data.totalPages}
               </Text>
               <StorageAction

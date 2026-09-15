@@ -43,9 +43,9 @@ export function StorageUsage() {
       <View
         accessibilityLabel="Storage usage"
         accessibilityState={{ busy: loading }}
-        className="pb-6"
+        className="pb-4"
       >
-        <View className="mb-2 flex-row items-center justify-between">
+        <View className="flex-row items-center justify-between">
           <Text className="font-sans text-sm font-medium text-fg">
             Space used
           </Text>
@@ -65,7 +65,7 @@ export function StorageUsage() {
                   of {formatFileBytes(usage.limitBytes)}
                 </Text>
               </Text>
-              <Text className="font-sans text-xs capitalize text-muted">
+              <Text className="font-sans text-[13px] capitalize text-muted">
                 {usage.plan} plan
               </Text>
             </View>
@@ -107,13 +107,13 @@ export function StorageUsage() {
               {formatFileBytes(usage.availableBytes)} available
             </Text>
             {usage.reservedBytes > 0 ? (
-              <Text className="mt-2 font-sans text-xs leading-5 text-muted">
+              <Text className="mt-2 font-sans text-[13px] leading-5 text-muted">
                 {formatFileBytes(usage.reservedBytes)} reserved for uploads in
                 progress.
               </Text>
             ) : null}
             {usage.pendingDeletionBytes > 0 ? (
-              <Text className="mt-2 font-sans text-xs leading-5 text-muted">
+              <Text className="mt-2 font-sans text-[13px] leading-5 text-muted">
                 {formatFileBytes(usage.pendingDeletionBytes)} awaiting deletion.
                 Space is released after cleanup succeeds.
               </Text>

@@ -14,7 +14,7 @@ export default function StorageScreen() {
     [billingError, setBillingError] = useState(false);
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top', 'bottom']}>
-      <View className="flex-row items-center justify-between px-2">
+      <View className="flex-row flex-wrap items-center justify-between px-2">
         <StorageAction
           title="Settings"
           icon="chevron-left"
@@ -49,7 +49,7 @@ export default function StorageScreen() {
         >
           Storage
         </Text>
-        <Text className="mt-2 mb-5 font-sans text-sm leading-5 text-muted">
+        <Text className="mt-2 mb-3 font-sans text-sm leading-5 text-muted">
           Your original files, and how long you keep them.
         </Text>
         {billingError ? (
