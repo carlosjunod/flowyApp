@@ -1,9 +1,9 @@
 import type { ApiResult, AuthSession } from '@/types';
 import type { GoogleIdentity } from './googleSignIn';
 
-export type GoogleAuthOutcome =
+export type GoogleAuthOutcome<Identity = GoogleIdentity> =
   | { type: 'cancelled' }
-  | { type: 'consent'; identity: GoogleIdentity }
+  | { type: 'consent'; identity: Identity }
   | { type: 'session'; session: AuthSession }
   | { type: 'error'; message: string };
 
@@ -20,6 +20,7 @@ export function googleAuthMessage(error: unknown): string {
       return 'Couldn’t connect. Check your connection and try Google again.';
     case 'EMAIL_IN_USE':
       return 'This email already has an account. Sign in with your password or reset it first.';
+    case 'INVALID_APPLE_TOKEN':
     case 'INVALID_GOOGLE_TOKEN':
     case 'INVALID_TOKEN':
     case 'GOOGLE_TOKEN_MISSING':
@@ -32,11 +33,11 @@ export function googleAuthMessage(error: unknown): string {
 }
 
 /** Only the server decides whether consent is needed; token stays in memory. */
-export async function exchangeGoogleIdentity(
-  identity: GoogleIdentity,
+export async function exchangeGoogleIdentity<Identity extends { idToken: string; email?: string }>(
+  identity: Identity,
   exchange: Exchange,
   consent = false,
-): Promise<GoogleAuthOutcome> {
+): Promise<GoogleAuthOutcome<Identity>> {
   try {
     const result = await exchange(identity.idToken, identity.email, consent);
     if (result.error) {

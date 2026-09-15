@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { GoogleSignIn } from '@/components/auth/GoogleSignIn';
+import { SocialSignIn } from '@/components/auth/SocialSignIn';
 import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -38,6 +38,7 @@ export default function SignupScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [appleBusy, setAppleBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +46,7 @@ export default function SignupScreen() {
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   const onSubmit = async () => {
-    if (loading || googleBusy) return;
+    if (loading || googleBusy || appleBusy) return;
     setError(null);
     if (!email.trim() || !password) {
       setError('Email and password are required');
@@ -132,8 +133,8 @@ export default function SignupScreen() {
             <Pressable
               accessibilityRole="checkbox"
               accessibilityLabel="Accept Terms of Service and Privacy Policy"
-              accessibilityState={{ checked: termsAccepted, disabled: loading || googleBusy }}
-              disabled={loading || googleBusy}
+              accessibilityState={{ checked: termsAccepted, disabled: loading || googleBusy || appleBusy }}
+              disabled={loading || googleBusy || appleBusy}
               onPress={() => setTermsAccepted((value) => !value)}
               className="flex-row items-start gap-3 py-2"
               style={{ minHeight: 44 }}
@@ -150,8 +151,8 @@ export default function SignupScreen() {
             <Pressable
               accessibilityRole="checkbox"
               accessibilityLabel="Accept AI processing"
-              accessibilityState={{ checked: aiConsent, disabled: loading || googleBusy }}
-              disabled={loading || googleBusy}
+              accessibilityState={{ checked: aiConsent, disabled: loading || googleBusy || appleBusy }}
+              disabled={loading || googleBusy || appleBusy}
               onPress={() => setAiConsent((value) => !value)}
               className="flex-row items-start gap-3 py-2"
               style={{ minHeight: 44 }}
@@ -165,11 +166,12 @@ export default function SignupScreen() {
             <Button
               title="Create account"
               loading={loading}
-              disabled={googleBusy || !termsAccepted || !aiConsent}
+              disabled={googleBusy || appleBusy || !termsAccepted || !aiConsent}
               onPress={onSubmit}
               className="mt-2"
             />
-            {Platform.OS === 'ios' || Platform.OS === 'android' ? <GoogleSignIn aiProcessingConsent={termsAccepted && aiConsent} disabled={loading || !termsAccepted || !aiConsent} onBusyChange={setGoogleBusy} /> : null}
+            <SocialSignIn provider="Apple" disabled={loading || googleBusy} onBusyChange={setAppleBusy} />
+            <SocialSignIn provider="Google" disabled={loading || appleBusy} onBusyChange={setGoogleBusy} />
           </View>
 
           <View className="flex-row items-center justify-center mt-6 gap-1">

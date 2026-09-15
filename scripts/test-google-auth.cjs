@@ -148,16 +148,18 @@ const passed = label => { checks++; console.log(`PASS ${label}`); };
     let nativeCalls = 0;
     const load = loader({
       react: runner.react,
+      'expo-apple-authentication': { isAvailableAsync: async () => true, AppleAuthenticationScope: { FULL_NAME: 1, EMAIL: 2 }, AppleAuthenticationButtonType: { CONTINUE: 1 }, AppleAuthenticationButtonStyle: { WHITE: 1, BLACK: 2 }, AppleAuthenticationButton: 'AppleButton', signInAsync: async () => { nativeCalls++; const id = await getIdentity(); return { identityToken: id.idToken, email: id.email, authorizationCode: 'one-time-code' }; } },
+      '@/lib/theme': { useTheme: () => ({ resolved: 'dark' }) },
       'react-native': { Platform: { OS: platform }, Modal: 'Modal', View: 'View', Text: 'Text', Pressable: 'Pressable', ScrollView: 'ScrollView', Linking: { openURL: async () => {} } },
       'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
       'expo-router': { router: { replace: route => routes.push(route) } },
       '@/components/ui/Button': { Button: 'Button' },
-      '@/lib/api': { api: { authGoogle: async (...args) => { exchanges.push(args); return exchange(...args); } } },
+      '@/lib/api': { api: { authGoogle: async (...args) => { exchanges.push(args); return exchange(...args); }, authApple: async (token, email, code, consent) => { assert.equal(code, 'one-time-code'); exchanges.push([token, email, consent]); return exchange(token, email, consent); } } },
       '@/lib/auth': { useAuth: () => ({ signInWithSession: async value => saved.push(value) }) },
       '@/lib/env': { ENV: { API_BASE_URL: 'https://fixture.invalid' } },
       '@/lib/googleSignIn': { requestGoogleIdentity: async () => { nativeCalls++; return getIdentity(); } },
     });
-    const { GoogleSignIn } = load('src/components/auth/GoogleSignIn.tsx');
+    const { SocialSignIn: GoogleSignIn } = load('src/components/auth/SocialSignIn.tsx');
     const onBusyChange = () => {};
     const render = () => runner.render(() => GoogleSignIn({ onBusyChange, ...props }));
     const button = title => find(render(), el => el.props?.title === title);
@@ -186,12 +188,6 @@ const passed = label => { checks++; console.log(`PASS ${label}`); };
     assert.deepEqual(f.saved, [session]);
     assert.equal(f.nativeCalls(), 1);
     passed('new Google user must check disclosure; selected token reused only after acceptance');
-    f = fixture(async () => ({ data: session, error: null }), undefined, { aiProcessingConsent: true });
-    await f.button('Continue with Google').props.onPress();
-    assert.equal(f.exchanges[0][2], true);
-    assert.deepEqual(f.saved, [session]);
-    assert.equal(find(f.render(), e => e.type === 'Modal').props.visible, false);
-    passed('signup forwards explicit consent without a second disclosure');
     f = fixture(async () => ({ data: session, error: null }), undefined, { disabled: true });
     await f.button('Continue with Google').props.onPress();
     assert.equal(f.nativeCalls(), 0);
@@ -238,6 +234,50 @@ const passed = label => { checks++; console.log(`PASS ${label}`); };
     assert.equal(f.button('Create account').props.disabled, true);
     passed('expired consent exchange restores login; retry uses a fresh identity and unchecked consent');
   }
+  platform = 'ios';
+  for (const outcome of ['existing', 'new', 'cancel', 'expired']) {
+    const f = fixture(async (_token, _email, consent) => outcome === 'existing' || (consent && outcome === 'new')
+      ? { data: session, error: null }
+      : consent ? { data: null, error: { code: 'INVALID_APPLE_TOKEN' } } : consentError,
+      undefined, { provider: 'Apple' });
+    f.render();
+    await Promise.resolve();
+    await find(f.render(), e => e.type === 'AppleButton').props.onPress();
+    if (outcome === 'existing') { assert.deepEqual(f.saved, [session]); continue; }
+    assert.equal(find(f.render(), e => e.type === 'Modal').props.visible, true);
+    assert.equal(f.button('Create account').props.disabled, true);
+    if (outcome === 'cancel') {
+      f.button('Cancel').props.onPress();
+      assert.equal(f.exchanges.length, 1);
+      assert.equal(f.saved.length, 0);
+      continue;
+    }
+    find(f.render(), e => e.props?.accessibilityLabel === 'Accept AI processing').props.onPress();
+    await f.button('Create account').props.onPress();
+    assert.equal(f.exchanges.length, 1);
+    find(f.render(), e => e.props?.accessibilityLabel === 'Accept Terms of Service and Privacy Policy').props.onPress();
+    await f.button('Create account').props.onPress();
+    assert.equal(f.nativeCalls(), 1);
+    assert.equal(f.exchanges[1][2], true);
+    assert.equal(f.saved.length, outcome === 'new' ? 1 : 0);
+    if (outcome === 'expired') assert.ok(find(f.render(), e => e.props?.accessibilityRole === 'alert'));
+  }
+  passed('Apple existing/new/cancel/expired flows preserve one-time code and require both acceptances');
+  {
+    const f = fixture(async () => ({ data: session, error: null }), async () => ({ idToken: 'apple-without-email' }), { provider: 'Apple' });
+    f.render(); await Promise.resolve();
+    await find(f.render(), e => e.type === 'AppleButton').props.onPress();
+    assert.deepEqual(f.saved, [session]);
+    assert.equal(f.exchanges[0][1], undefined);
+    passed('Apple subsequent authorization can omit email while the server returns the account');
+    const cancelled = fixture(async () => { throw Error('must not exchange'); }, async () => { throw { code: 'ERR_REQUEST_CANCELED' }; }, { provider: 'Apple' });
+    cancelled.render(); await Promise.resolve();
+    await find(cancelled.render(), e => e.type === 'AppleButton').props.onPress();
+    assert.equal(cancelled.exchanges.length, 0);
+    assert.equal(find(cancelled.render(), e => e.props?.accessibilityRole === 'alert'), null);
+    passed('Apple sheet cancellation remains silent and does not exchange credentials');
+  }
+
   {
     const runner = hooks();
     const requests = [], sessions = [], routes = [], links = [];
@@ -248,7 +288,7 @@ const passed = label => { checks++; console.log(`PASS ${label}`); };
       'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
       'expo-router': { Link: 'Link', router: { push: route => routes.push(route), replace: route => routes.push(route) } },
       'expo-apple-authentication': { isAvailableAsync: async () => false },
-      '@/components/auth/GoogleSignIn': { GoogleSignIn: 'GoogleSignIn' },
+      '@/components/auth/SocialSignIn': { SocialSignIn: 'SocialSignIn' },
       '@/components/ui/Button': { Button: 'Button' },
       '@/lib/api': { api: { registerEmail: async (...args) => { requests.push(args); if (response instanceof Error) throw response; return response; } } },
       '@/lib/auth': { useAuth: () => ({ signInWithSession: async value => sessions.push(value) }) },
@@ -285,7 +325,8 @@ const passed = label => { checks++; console.log(`PASS ${label}`); };
     await find(render(), e => e.props?.accessibilityRole === 'link' && e.props?.children === 'Privacy Policy').props.onPress();
     assert.deepEqual(links, ['https://fixture.invalid/terms', 'https://fixture.invalid/privacy']);
     assert.equal(button().props.disabled, false);
-    assert.equal(find(render(), e => e.type === 'GoogleSignIn').props.aiProcessingConsent, true);
+    assert.equal(find(render(), e => e.type === 'SocialSignIn' && e.props.provider === 'Google').props.disabled, false);
+    assert.ok(find(render(), e => e.type === 'SocialSignIn' && e.props.provider === 'Apple'));
     response = new Error('fixture network failure');
     await button().props.onPress();
     assert.equal(button().props.loading, false);

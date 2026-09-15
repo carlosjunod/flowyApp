@@ -443,3 +443,9 @@ preview and native accessibility tree were inspected. Full VoiceOver and physica
 device acceptance remain manual. No server contract or native configuration change
 in this refinement; no merge/deployment. See the paired server's
 `docs/storage-design-review.md` and `docs/file-storage-manual-checklist.md`.
+
+## Apple/Google consent parity — 2026-09-15
+
+Login and signup share `src/components/auth/SocialSignIn.tsx`: existing accounts enter immediately; new accounts receive separate unchecked terms/privacy and AI-processing acceptances, then explicitly create the account. Apple is now present on iOS signup too. `src/components/auth/GoogleSignIn.tsx` remains a compatibility wrapper. Pending provider credentials remain in memory and clear on cancellation, failure, success or unmount. `src/lib/googleAuth.ts` also supports Apple's optional email and expired-token response. `scripts/test-google-auth.cjs` covers both providers, cancellation, one-time-code preservation, absent Apple email and duplicate/late requests.
+
+The paired server `/api/auth/apple` now defers one-time-code exchange until the new-account consent check passes. Deploy that change before native distribution. No API shape, audience, entitlement, environment variable or dependency changed. Native TypeScript and iOS export pass; local component adapters cover 27 regression groups. No fresh physical-device Apple/Google authorization or TestFlight publication is claimed.

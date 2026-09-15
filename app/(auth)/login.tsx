@@ -1,6 +1,5 @@
-import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -12,35 +11,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { GoogleSignIn } from '@/components/auth/GoogleSignIn';
+import { SocialSignIn } from '@/components/auth/SocialSignIn';
 import { Button } from '@/components/ui/Button';
-import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { useResolvedColors, useTheme } from '@/lib/theme';
+import { useResolvedColors } from '@/lib/theme';
 
 export default function LoginScreen() {
-  const { signIn, signInWithSession } = useAuth();
+  const { signIn } = useAuth();
   const colors = useResolvedColors();
-  const { resolved } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [appleAvailable, setAppleAvailable] = useState(false);
-
-  useEffect(() => {
-    if (Platform.OS !== 'ios') return;
-    try {
-      AppleAuthentication.isAvailableAsync()
-        .then(setAppleAvailable)
-        .catch(() => setAppleAvailable(false));
-    } catch {
-      setAppleAvailable(false);
-    }
-  }, []);
-
   const onSubmit = async () => {
     if (loading || appleLoading || googleBusy) return;
     if (!email || !password) {
@@ -56,44 +40,6 @@ export default function LoginScreen() {
       return;
     }
     router.replace('/inbox');
-  };
-
-  const onApple = async () => {
-    if (loading || appleLoading || googleBusy) return;
-    setError(null);
-    setAppleLoading(true);
-    try {
-      const credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-      });
-      if (!credential.identityToken) {
-        setError('Apple sign-in failed: no identity token');
-        return;
-      }
-      // Forward the one-time code too: the server trades it for a refresh
-      // token so account deletion can revoke Flowy's access to the Apple
-      // Account, which Apple requires of apps offering both.
-      const res = await api.authApple(
-        credential.identityToken,
-        credential.email ?? undefined,
-        credential.authorizationCode ?? undefined,
-      );
-      if (res.error) {
-        setError(res.error.message);
-        return;
-      }
-      await signInWithSession(res.data);
-      router.replace('/inbox');
-    } catch (err) {
-      const code = (err as { code?: string }).code;
-      if (code === 'ERR_REQUEST_CANCELED' || code === 'ERR_CANCELED') return;
-      setError(err instanceof Error ? err.message : 'Apple sign-in failed');
-    } finally {
-      setAppleLoading(false);
-    }
   };
 
   return (
@@ -159,21 +105,9 @@ export default function LoginScreen() {
                   <Text className="text-xs text-muted">or</Text>
                   <View className="flex-1 h-px bg-border" />
                 </View>
-                {appleAvailable ? (
-                  <AppleAuthentication.AppleAuthenticationButton
-                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-                    buttonStyle={
-                      resolved === 'dark'
-                        ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                        : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-                    }
-                    cornerRadius={12}
-                    style={{ height: 44, width: '100%', opacity: appleLoading ? 0.6 : 1 }}
-                    onPress={onApple}
-                  />
-                ) : null}
+                <SocialSignIn provider="Apple" disabled={loading || googleBusy} onBusyChange={setAppleLoading} />
                 {Platform.OS === 'ios' || Platform.OS === 'android' ? (
-                  <GoogleSignIn disabled={loading || appleLoading} onBusyChange={setGoogleBusy} />
+                  <SocialSignIn disabled={loading || appleLoading} onBusyChange={setGoogleBusy} />
                 ) : (
                   <Pressable onPress={() => setError('Google sign-in is being set up — use email for now.')} accessibilityRole="button" className="h-11 rounded-xl border border-border bg-card items-center justify-center">
                     <Text className="text-fg text-sm font-medium">Continue with Google</Text>
