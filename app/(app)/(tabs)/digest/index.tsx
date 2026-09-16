@@ -10,7 +10,9 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { relativeDate } from "@/lib/relativeDate";
 import { nextDigestCadence } from "@/lib/digestSettings";
-import type { Digest, DigestCadence } from "@/types";
+import { EditorialImage } from "@/components/digest/EditorialImage";
+import { readEdition } from "@/lib/digestEditorial";
+import type { Digest, DigestCadence, DigestPresentation } from "@/types";
 
 export default function DigestListScreen() {
   const { user } = useAuth();
@@ -94,14 +96,14 @@ export default function DigestListScreen() {
         </View>
       ) : (
         <FlatList
-          data={query.data?.pages.flatMap((page) => page.items) ?? []}
-          keyExtractor={(d) => d.id}
+          data={query.data?.pages.flatMap((page) => page.items.map((digest) => ({ digest, presentation: page.presentation }))) ?? []}
+          keyExtractor={(row) => row.digest.id}
           contentContainerStyle={{
             paddingHorizontal: 16,
             paddingBottom: 32,
             gap: 8,
           }}
-          renderItem={({ item }) => <DigestRow digest={item} />}
+          renderItem={({ item }) => <DigestRow digest={item.digest} presentation={item.presentation} />}
           ListEmptyComponent={
             <View className="items-center justify-center px-6 pt-16">
               <View className="mb-3"><AppIcon name="file-text" size={40} /></View>
@@ -134,24 +136,38 @@ export default function DigestListScreen() {
   );
 }
 
-const DigestRow: React.FC<{ digest: Digest }> = ({ digest }) => (
-  <Link href={`/digest/${digest.id}`} asChild>
-    <Pressable
-      style={({ pressed }) => [pressed && { opacity: 0.85 }]}
-      className="rounded-xl border border-border bg-card p-4"
-    >
-      <Text className="text-xs uppercase text-muted">
-        {digest.cadence || "daily"} · {relativeDate(digest.generated_at)} ·{" "}
-        {digest.first_opened_at ? "Read" : "New"}
-      </Text>
-      <Text
-        className="text-lg text-fg mt-1"
-        style={{ fontFamily: "InstrumentSerif_400Regular" }}
+const DigestRow: React.FC<{ digest: Digest; presentation: DigestPresentation }> = ({ digest, presentation }) => {
+  const locale = digest.content.locale === "es" ? "es" : "en";
+  const cover = digest.status === "source_removed" ? null : readEdition(digest.content, presentation, __DEV__)?.cover;
+  return (
+    <Link href={`/digest/${digest.id}`} asChild>
+      <Pressable
+        accessibilityRole="link"
+        style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+        className="flex-row items-start gap-3 rounded-xl border border-border bg-card p-4"
       >
-        {digest.content.title || "Your digest"} · {digest.categories_count}{" "}
-        {digest.categories_count === 1 ? "category" : "categories"} ·{" "}
-        {digest.items_count} {digest.items_count === 1 ? "item" : "items"}
-      </Text>
-    </Pressable>
-  </Link>
-);
+        <View className="flex-1">
+          <Text className="text-xs uppercase text-muted">
+            {digest.cadence || "daily"} · {relativeDate(digest.generated_at)} ·{" "}
+            {digest.first_opened_at ? "Read" : "New"}
+          </Text>
+          <Text
+            className="text-lg text-fg mt-1"
+            style={{ fontFamily: "InstrumentSerif_400Regular" }}
+          >
+            {digest.content.title || "Your digest"}
+          </Text>
+          <Text className="text-sm text-muted mt-1" numberOfLines={2}>
+            {digest.items_count} {digest.items_count === 1 ? "item" : "items"}
+            {digest.content.tldr?.bullets[0] ? ` · ${digest.content.tldr.bullets[0].text}` : ""}
+          </Text>
+        </View>
+        {cover ? (
+          <View style={{ width: 96 }}>
+            <EditorialImage image={cover.image} locale={locale} width={96} caption={false} radius={6} />
+          </View>
+        ) : null}
+      </Pressable>
+    </Link>
+  );
+};

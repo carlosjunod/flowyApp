@@ -18,6 +18,7 @@ import type {
   DigestCadence,
   DigestSettings,
   DigestPreferences,
+  DigestPresentation,
   IngestPayload,
   IngestResponse,
   Item,
@@ -83,6 +84,10 @@ const parseError = async (res: Response, historyRequest = false): Promise<ApiErr
   });
   return { code, message, status: res.status };
 };
+
+function digestPresentation(value: Partial<DigestPresentation> | undefined): DigestPresentation {
+  return { editorial: value?.editorial === true, pdf: value?.pdf === true };
+}
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResult<T>> {
   const url = `${ENV.API_BASE_URL}${path}`;
@@ -280,11 +285,24 @@ export const api = {
   readDigest: (id: string) => request<Record<string, never>>(`/api/digest/${id}/read`, {method:'POST'}),
 
   listDigests: () => request<Digest[]>('/api/digest'),
-  listDigestPage: async (cursor:string|null, filters:{cadence?:DigestCadence;read?:'read'|'new'}={}):Promise<{items:Digest[];nextCursor:string|null}> => {
+  listDigestPage: async (cursor:string|null, filters:{cadence?:DigestCadence;read?:'read'|'new'}={}):Promise<{items:Digest[];nextCursor:string|null;presentation:DigestPresentation}> => {
     const params=new URLSearchParams(filters);if(cursor)params.set('cursor',cursor);
     const response=await fetch(ENV.API_BASE_URL+'/api/digest?'+params.toString(),{headers:jsonHeaders()});
     if(!response.ok)throw new Error('Could not load reports. Check your connection and retry.');
-    const body=await response.json() as {data:Digest[];nextCursor:string|null};return {items:body.data,nextCursor:body.nextCursor};
+    const body=await response.json() as {data:Digest[];nextCursor:string|null;presentation?:Partial<DigestPresentation>};
+    return {items:body.data,nextCursor:body.nextCursor,presentation:digestPresentation(body.presentation)};
+  },
+  /** Detail plus server presentation switches; older servers omit them (editions off). */
+  getDigestDetail: async (id:string):Promise<ApiResult<{digest:Digest;presentation:DigestPresentation}>> => {
+    try {
+      const response=await fetch(`${ENV.API_BASE_URL}/api/digest/${encodeURIComponent(id)}`,{headers:jsonHeaders()});
+      if(!response.ok)return {data:null,error:await parseError(response,false)};
+      const body=await response.json() as {data?:Digest;presentation?:Partial<DigestPresentation>};
+      if(!body.data)return {data:null,error:{code:'INVALID_BODY',message:'DIGEST_NOT_FOUND'}};
+      return {data:{digest:body.data,presentation:digestPresentation(body.presentation)},error:null};
+    } catch (err) {
+      return {data:null,error:{code:'NETWORK_ERROR',message:err instanceof Error?err.message:'Network error'}};
+    }
   },
   digestFeedback: (id:string,target:string,value:'useful'|'not_useful'|'not_interested'|null)=>request(`/api/digest/${id}/feedback`,{method:'POST',body:JSON.stringify({target,value})}),
   digestItemOpened: (id:string,target:string)=>request(`/api/digest/${id}/events`,{method:'POST',body:JSON.stringify({name:'digest_item_opened',target})}),

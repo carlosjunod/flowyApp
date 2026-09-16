@@ -305,7 +305,41 @@ export type DigestContent = {
   sections: DigestSection[];
   window_start: string;
   window_end: string;
+  locale?: 'en' | 'es';
+  source_item_ids?: string[];
+  /** Optional editorial edition fixed at publication (server D-039). Validate before use. */
+  editorial?: DigestEditorial;
 };
+
+export type DigestEditorialVariant = { w: number; h: number; key: string; url: string };
+export type DigestEditorialImage = {
+  id: string;
+  category: string;
+  kind: 'ai_editorial_illustration';
+  width: number;
+  height: number;
+  focal_point: { x: number; y: number };
+  alt: { es: string; en: string };
+  variants: { webp: DigestEditorialVariant[]; jpeg: DigestEditorialVariant[] };
+};
+export type DigestEditorialSection = 'ideas' | 'themes' | 'highlights' | 'connections';
+export type DigestEditorialPlacement = {
+  slot: 'cover' | 'interior';
+  section: 'cover' | DigestEditorialSection;
+  block_id: string | null;
+  topic: string;
+  image: DigestEditorialImage;
+};
+export type DigestEditorial = {
+  version: 1;
+  catalog_version: string;
+  selector_version: string;
+  mode: 'illustrated' | 'typographic';
+  cover: DigestEditorialPlacement | null;
+  interior: DigestEditorialPlacement[];
+};
+/** Server presentation switches returned beside `data` on digest list/detail responses. */
+export type DigestPresentation = { editorial: boolean; pdf: boolean };
 
 export type Digest = {
   cadence?: DigestCadence; first_opened_at?: string; status?: string;

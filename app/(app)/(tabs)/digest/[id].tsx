@@ -13,6 +13,16 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useWindowDimensions } from "react-native";
+
+import { EditorialImage } from "@/components/digest/EditorialImage";
+import {
+  CADENCE_LABEL,
+  SECTION_LABEL,
+  periodLabel,
+  placementFor,
+  readEdition,
+} from "@/lib/digestEditorial";
 
 import { Button } from "@/components/ui/Button";
 import { AppIcon } from "@/components/ui/AppIcon";
@@ -22,18 +32,20 @@ import { useAuth } from "@/lib/auth";
 import { relativeDate } from "@/lib/relativeDate";
 import { hostOf } from "@/lib/thumbnails";
 import { useResolvedColors } from "@/lib/theme";
-import type { Digest, DigestSection } from "@/types";
+import type { Digest, DigestPresentation, DigestSection } from "@/types";
 
 export default function DigestDetailScreen() {
   const { user } = useAuth();
   const chat = useChat();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const query = useQuery<Digest, Error>({
+  const { width: windowWidth } = useWindowDimensions();
+  const [coverFailed, setCoverFailed] = useState(false);
+  const query = useQuery<{ digest: Digest; presentation: DigestPresentation }, Error>({
     queryKey: ["digest", user?.id, id],
     enabled: !!id && !!user,
     queryFn: async () => {
       if (!id) throw new Error("No digest id");
-      const res = await api.getDigest(id);
+      const res = await api.getDigestDetail(id);
       if (res.error) throw new Error(res.error.message);
       return res.data;
     },
@@ -45,7 +57,7 @@ export default function DigestDetailScreen() {
       const mark = () => {
         if (
           query.data &&
-          query.data.status !== "source_removed" &&
+          query.data.digest.status !== "source_removed" &&
           id &&
           AppState.currentState === "active"
         )
@@ -106,7 +118,13 @@ export default function DigestDetailScreen() {
     );
   }
 
-  const digest = query.data;
+  const { digest, presentation } = query.data;
+  const locale = digest.content.locale === "es" ? "es" : "en";
+  const removed = digest.status === "source_removed";
+  const edition = removed ? null : readEdition(digest.content, presentation, __DEV__);
+  const cover = coverFailed ? null : edition?.cover ?? null;
+  const contentWidth = Math.min(windowWidth, 720) - 32;
+  const period = periodLabel(digest.content.window_start, digest.content.window_end, digest.content.timezone, locale);
   const highlightAction = (blockId: string, sourceIds: string[], selectedText: string) => (
     <View className="flex-row items-center gap-2">
       <Pressable
@@ -155,9 +173,8 @@ export default function DigestDetailScreen() {
         contentContainerStyle={{ padding: 16, gap: 20, paddingBottom: 48 }}
       >
         <View className="gap-1">
-          <Text className="text-xs uppercase text-muted">
-            {digest.cadence || "digest"} · {relativeDate(digest.generated_at)}
-            {digest.content.timezone ? ` · ${digest.content.timezone}` : ""}
+          <Text className="text-xs uppercase text-accent" style={{ letterSpacing: 0.8 }}>
+            Flowy · {digest.cadence ? CADENCE_LABEL[locale][digest.cadence] : "digest"} · {relativeDate(digest.generated_at)}
           </Text>
           <Text
             className="text-3xl text-fg"
@@ -170,19 +187,7 @@ export default function DigestDetailScreen() {
               ? "Report unavailable"
               : digest.content.title || "Your digest"}
           </Text>
-          {digest.content.window_start && (
-            <Text className="text-sm text-muted">
-              {new Date(digest.content.window_start).toLocaleDateString(
-                undefined,
-                { timeZone: digest.content.timezone },
-              )}{" "}
-              —{" "}
-              {new Date(digest.content.window_end).toLocaleDateString(
-                undefined,
-                { timeZone: digest.content.timezone },
-              )}
-            </Text>
-          )}
+          {period ? <Text className="text-sm text-muted">{period}</Text> : null}
           <Text className="text-sm text-muted">
             {digest.items_count} {digest.items_count === 1 ? "item" : "items"}{" "}
             in the period
@@ -208,6 +213,9 @@ export default function DigestDetailScreen() {
             ))}
           </View>
         )}
+        {cover ? (
+          <EditorialImage image={cover.image} locale={locale} width={contentWidth} onUnavailable={() => setCoverFailed(true)} />
+        ) : null}
         {digest.status === "source_removed" ? (
           <Text className="text-fg">
             Report no longer available after a source was removed.
@@ -224,7 +232,7 @@ export default function DigestDetailScreen() {
                     className="text-2xl capitalize text-fg"
                     style={{ fontFamily: "InstrumentSerif_400Regular" }}
                   >
-                    {section}
+                    {SECTION_LABEL[locale][section]}
                   </Text>
                   {blocks.map((block) => {
                     const hidden = digest.feedback?.some(
@@ -242,9 +250,13 @@ export default function DigestDetailScreen() {
                       />
                     ) : (
                       <View key={block.id} className="gap-2">
+                        {(() => {
+                          const placement = placementFor(edition, section, block.id);
+                          return placement ? <EditorialImage image={placement.image} locale={locale} width={contentWidth} /> : null;
+                        })()}
                         <SectionCard
                           section={{
-                            category: section,
+                            category: SECTION_LABEL[locale][section],
                             summary: block.text,
                             image_urls: [],
                             item_ids: block.source_item_ids,
