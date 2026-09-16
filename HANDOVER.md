@@ -471,3 +471,8 @@ number column. Explicit `useResolvedColors` styles retain the native palette
 and implement pressed, disabled, selected and expanded states. Unknown yields
 retain the same control height. TypeScript and real-component tests with DOM
 platform adapters pass; actual iPhone layout/VoiceOver remain unverified.
+
+
+## 2026-09-16 — Instagram and approved iOS icon release
+
+The user authorized a combined production iOS build and TestFlight submission. This release includes the native Instagram connection flow from `5a2f3ae` and the approved orange icon with the charcoal italic f and white dot. `icons/icon-1024.png` is the opaque 1024px iOS master; `assets/icon.png` mirrors it. Unrelated local changes are excluded. Typecheck, all six Instagram scenario groups, and clean iOS prebuild passed. Build, submission, and Apple availability must be recorded separately.
