@@ -111,6 +111,19 @@ export default function SettingsScreen() {
           <PushNotificationSettings />
         </Section>
 
+        <Section title="Instagram">
+          <Link href="/instagram" asChild>
+            <Pressable accessibilityRole="link" className="rounded-xl border border-border bg-card px-4 py-3 flex-row items-center gap-3" style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+              <Feather name="instagram" size={20} color={colors.muted} />
+              <View className="flex-1">
+                <Text className="text-base text-fg">Save from Instagram</Text>
+                <Text className="text-xs text-muted mt-1">Connect your account to save post links by DM.</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={colors.muted} />
+            </Pressable>
+          </Link>
+        </Section>
+
         <Section title="Inbox">
           <Link href="/inbox-alias" asChild>
             <Pressable

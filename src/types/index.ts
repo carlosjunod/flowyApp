@@ -169,6 +169,10 @@ export type ChatMessage = {
 };
 
 export type ApiErrorCode =
+  | 'AI_CONSENT_REQUIRED'
+  | 'ALREADY_LINKED'
+  | 'INSTAGRAM_UNAVAILABLE'
+  | 'BEARER_REQUIRED'
   | 'ORIGINAL_REQUIRED'
   | 'INVALID_RETENTION'
 
@@ -361,3 +365,5 @@ export * from './personalization';
 
 export type ItemEngagementAction = 'open' | 'mark_read' | 'mark_unread';
 export type ItemEngagement = { id: string; first_opened_at: string; read_at: string };
+
+export * from './instagram';

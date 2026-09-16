@@ -336,3 +336,10 @@ checks are in `../Flowy-document-storage/docs/storage-design-review.md`.
 
 
 Floating inbox chat: [behavior, validation and distribution](docs/FLOATING-CHAT.md).
+
+## Instagram connection — 2026-09-16
+
+Settings now includes Instagram connection through a private app link, status
+refresh when returning from Instagram, and a manual-code fallback. Requires the
+paired server referral rollout. Validation and native release limits:
+[docs/INSTAGRAM_CONNECTION.md](docs/INSTAGRAM_CONNECTION.md).

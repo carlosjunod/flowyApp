@@ -70,6 +70,7 @@ export function AppNavigator() {
       <Stack.Screen name="personalization" />
       <Stack.Screen name="digest-settings" />
       <Stack.Screen name="inbox-alias" />
+      <Stack.Screen name="instagram" />
       <Stack.Screen name="storage" />
     </Stack>
   );
