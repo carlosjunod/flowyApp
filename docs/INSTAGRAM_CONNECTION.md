@@ -82,5 +82,5 @@ account remains hidden until its Meta connection and credentials are ready.
 iOS 1.0.0 build 30: `5cbfda16-7881-419a-a710-82555a5f28ed`.
 Automatic App Store Connect submission: `097c2743-3b17-4d2b-a5f0-a687088e2904`.
 Build 30 completed successfully at 2026-09-17 02:41:21 UTC; automatic submission
-is in progress. TestFlight availability and physical Instagram handoff remain
-separate acceptance steps.
+finished successfully. Apple processing, TestFlight availability and physical
+Instagram handoff remain separate acceptance steps.
