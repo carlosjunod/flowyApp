@@ -42,3 +42,32 @@ Relevant files:
 
 The backend's ordinary post-URL DM save is verified with a ready production item.
 Native shared reels without a public permalink remain a separate server limitation.
+
+
+## Bilingual recipient preparation (2026-09-16)
+
+Branch `codex/instagram-bilingual-accounts` matches the server branch of the same
+name. Connection API responses now optionally include `account`, `handle`,
+`language` and `accounts` (public id/handle/language/connected/linkedAt). The
+server configures which accounts are available; the native client does not ship
+future accounts as active. No new Expo environment variable is required.
+
+With two configured accounts, the screen selects English/Spanish destinations.
+GET/POST/DELETE send `?account=<recipient ID>`; disconnect affects only that
+recipient. Each connects separately to the same library. Links and instructions
+use the server handle. Legacy server responses fall back to `tryflowy` until
+rollout; malformed handles cannot turn a link into an arbitrary URL. Private
+codes and query keys are scoped to both Flowy session and destination, and
+in-flight responses cannot open the old destination after switching.
+
+The intended account names are `save.to.flowy` and `guardalo.en.flowy`; operators
+may change either in server configuration. DM reply language is selected by the
+server's destination configuration. This does not translate the entire settings
+screen or change the rest of the app language.
+
+Validation: `npm run typecheck` and `node scripts/test-instagram-connection.cjs`
+(7 scenario groups) passed. The change adds no native dependencies/capabilities.
+No new native binary, TestFlight submission or physical Instagram handoff has
+been performed. Existing beta builds still contain the old hardcoded handle and
+must be updated before the rename. Full activation runbook is in the server's
+`docs/instagram-account-rollout.md`; deploy its migration 44 before the API/worker.

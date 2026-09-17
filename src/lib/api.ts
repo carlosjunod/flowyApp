@@ -130,12 +130,12 @@ async function personalizationRequest(
 }
 
 /** Connection codes are scoped to the original user and token, never another login. */
-async function instagramRequest(accountId: string, init: RequestInit = {}): Promise<ApiResult<InstagramConnection>> {
+async function instagramRequest(accountId: string, init: RequestInit = {}, destination?: string): Promise<ApiResult<InstagramConnection>> {
   const token = pb.authStore.token;
   const sameSession = () => !!token && pb.authStore.model?.id === accountId && pb.authStore.token === token;
   const denied: ApiResult<InstagramConnection> = { data: null, error: { code: 'UNAUTHORIZED', message: 'Your session changed. Reopen Instagram settings.' } };
   if (!sameSession()) return denied;
-  const result = await request<InstagramConnection>('/api/integrations/instagram', {
+  const result = await request<InstagramConnection>(`/api/integrations/instagram${destination ? `?account=${encodeURIComponent(destination)}` : ''}`, {
     ...init, cache: 'no-store', credentials: 'omit', headers: { ...init.headers, Authorization: `Bearer ${token}` },
   });
   return sameSession() ? result : denied;
@@ -170,9 +170,9 @@ async function ingestWithOriginals(payload: IngestPayload): Promise<ApiResult<In
 }
 
 export const api = {
-  getInstagramConnection: (accountId: string, signal?: AbortSignal) => instagramRequest(accountId, { signal }),
-  createInstagramConnection: (accountId: string) => instagramRequest(accountId, { method: 'POST' }),
-  disconnectInstagram: (accountId: string) => instagramRequest(accountId, { method: 'DELETE' }),
+  getInstagramConnection: (accountId: string, signal?: AbortSignal, destination?: string) => instagramRequest(accountId, { signal }, destination),
+  createInstagramConnection: (accountId: string, destination?: string) => instagramRequest(accountId, { method: 'POST' }, destination),
+  disconnectInstagram: (accountId: string, destination?: string) => instagramRequest(accountId, { method: 'DELETE' }, destination),
   getAiProcessingConsent: () => request<{ accepted: boolean; version: string }>('/api/account/ai-consent'),
   acceptAiProcessingConsent: () => request<{ accepted: boolean; version: string }>('/api/account/ai-consent', { method: 'POST' }),
   getPersonalization: (accountId: string, signal?: AbortSignal) =>

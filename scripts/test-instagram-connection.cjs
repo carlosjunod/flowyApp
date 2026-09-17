@@ -75,6 +75,10 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   }
   assert.deepEqual(requests.map(r=>r.init.method||'GET'),['GET','POST','DELETE']);
   requests.forEach(r=>{assert.equal(r.url,'https://fixture.invalid/api/integrations/instagram');assert.equal(r.init.headers.Authorization,'Bearer token-a');assert.equal(r.init.credentials,'omit');});
+  await api.getInstagramConnection('alice', undefined, '789');
+  await api.createInstagramConnection('alice', '789');
+  await api.disconnectInstagram('alice', '789');
+  assert.ok(requests.slice(-3).every(r => r.url.endsWith('?account=789')));
   let finish;
   global.fetch=()=>new Promise(resolve=>{finish=resolve;});
   const late=api.createInstagramConnection('alice');
@@ -84,13 +88,16 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   global.fetch=originalFetch;
   passed('REST methods are authenticated and reject cross-account initial and late responses');
 
-  const {instagramConnectionUrl}=loader()('src/lib/instagramConnection.ts');
+  const {instagramConnectionUrl,instagramChatUrl}=loader()('src/lib/instagramConnection.ts');
   assert.equal(instagramConnectionUrl(connection),'https://ig.me/m/tryflowy?ref='+code);
   for(const override of [{enabled:false},{referralEnabled:false},{connected:true},{expiresAt:1},{code:'https://malicious.invalid'},{code:code+'&token=secret'}]) assert.equal(instagramConnectionUrl({...connection,...override}),null);
+  assert.equal(instagramConnectionUrl({...connection,handle:'save.to.flowy'}),'https://ig.me/m/save.to.flowy?ref='+code);
+  assert.equal(instagramChatUrl({handle:'guardalo.en.flowy'}),'https://ig.me/m/guardalo.en.flowy');
+  assert.equal(instagramChatUrl({handle:'evil.invalid/?steal='}),'https://ig.me/m/tryflowy');
   passed('Only valid, current, rollout-enabled private codes can open referral links');
 
   authStore.model={id:'alice'};authStore.token='token-a';
-  let accountId='alice',queryData={enabled:true,referralEnabled:true,connected:false};
+  let accountId='alice',destination,queryData={enabled:true,referralEnabled:true,connected:false};
   let foreground,createResult=async()=>({data:connection,error:null}),openFails=false;
   const opened=[],copied=[],refreshes=[],cached=[];
   const timers=new Map();let timerId=0;
@@ -108,7 +115,7 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
     '@/lib/pb':{pb:{authStore}},
     '@/lib/api':{api:{createInstagramConnection:()=>createResult(),disconnectInstagram:async()=>({data:{enabled:true,referralEnabled:true,connected:false},error:null})}},
   })('src/hooks/useInstagramConnection.ts').useInstagramConnection;
-  const render=()=>harness.render(()=>useInstagramConnection(accountId));
+  const render=()=>harness.render(()=>useInstagramConnection(accountId,destination));
   let state=render();await state.connect();state=render();
   assert.equal(opened[0],'https://ig.me/m/tryflowy?ref='+code);
   assert.equal(state.connection.code,code);
@@ -130,6 +137,15 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   resolveCode({data:connection,error:null});await pending;state=render();
   assert.equal(state.connection,null);assert.equal(opened.length,openCount);
   passed('An account change during code creation never opens or displays the prior account code');
+  let finishDestination;
+  createResult=()=>new Promise(resolve=>{finishDestination=resolve;});
+  const oldDestination=state.connect();await tick();
+  destination='789';queryData={enabled:true,referralEnabled:true,connected:false,handle:'guardalo.en.flowy',account:'789'};state=render();
+  const beforeOpen=opened.length;
+  finishDestination({data:{...connection,handle:'save.to.flowy',account:'123'},error:null});await oldDestination;state=render();
+  assert.equal(state.connection,null);assert.equal(opened.length,beforeOpen);
+  await state.openChat();assert.equal(opened.at(-1),'https://ig.me/m/guardalo.en.flowy');
+  passed('Destination switching isolates in-flight codes and opens the selected account');
   harness.close();assert.equal(timers.size,0);assert.equal(foreground,null);
   global.setInterval=originalInterval;global.clearInterval=originalClear;
   console.log('PASS: '+scenarios.length+' Instagram native scenario groups\n- '+scenarios.join('\n- '));
