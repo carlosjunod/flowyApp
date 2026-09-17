@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
-import { FlatList, ScrollView, Pressable, Text, View } from 'react-native';
+import { FlatList, Platform, ScrollView, Pressable, Text, View } from 'react-native';
 
 import { useResolvedColors } from '@/lib/theme';
 import type { ChatMessage as ChatMessageType } from '@/types';
@@ -38,7 +38,7 @@ export const ChatWindow: React.FC<Props> = ({ messages, onPromptTap, ready, onRe
   useEffect(() => { following.current = true; setShowLatest(false); }, [latestUserId]);
   const follow = () => { if (following.current) ref.current?.scrollToEnd({ animated: false }); else setShowLatest(true); };
   if (!ready) return <View className="flex-1 items-center justify-center"><Spinner /><Text className="text-muted pt-3">Loading conversations…</Text></View>;
-  if (messages.length === 0) return compact ? <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 20, gap: 16 }}>
+  if (messages.length === 0) return compact ? <ScrollView style={{ flex: 1 }} keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'} keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 20, gap: 16 }}>
     <Text style={{ color: colors.fg, fontSize: 22, fontFamily: 'Inter_600SemiBold' }}>Find a thought you saved.</Text>
     <Text style={{ color: colors.muted, fontSize: 14, lineHeight: 21 }}>Ask about your saved content. Follow the sources to see where each answer comes from.</Text>
     {EXAMPLE_PROMPTS.slice(0, 2).map(prompt => <Pressable key={prompt} accessibilityRole="button" disabled={!onPromptTap || retryDisabled} onPress={() => onPromptTap?.(prompt)} style={{ minHeight: 44, paddingVertical: 10, borderBottomWidth: 1, borderColor: colors.border }}><Text style={{ color: colors.fg, fontSize: 14 }}>{prompt}</Text></Pressable>)}
@@ -47,7 +47,7 @@ export const ChatWindow: React.FC<Props> = ({ messages, onPromptTap, ready, onRe
     <View className="flex-1">
       <FlatList ref={ref} data={messages} keyExtractor={m => m.id}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         onLayout={follow}
         onScrollBeginDrag={() => { following.current = false; }}
         onScroll={event => {
@@ -75,7 +75,9 @@ export const ChatWindow: React.FC<Props> = ({ messages, onPromptTap, ready, onRe
 const WelcomeState: React.FC<{ onPromptTap?: (text: string) => void }> = ({ onPromptTap }) => {
   const colors = useResolvedColors();
   return (
-    <View className="flex-1 items-center justify-center px-6 gap-5">
+    <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled"
+      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+      contentContainerStyle={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 16, gap: 20 }}>
       <View
         style={{
           width: 64,
@@ -150,6 +152,6 @@ const WelcomeState: React.FC<{ onPromptTap?: (text: string) => void }> = ({ onPr
           </Pressable>
         ))}
       </View>
-    </View>
+    </ScrollView>
   );
 };
