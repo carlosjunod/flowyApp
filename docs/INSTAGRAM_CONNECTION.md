@@ -5,7 +5,7 @@ GET/POST/DELETE `/api/integrations/instagram` contract and the server-owned
 `INSTAGRAM_SAVING_ENABLED` / `INSTAGRAM_REFERRAL_LINKS_ENABLED` rollout flags.
 
 A user tap requests the private ten-minute code and opens
-`https://ig.me/m/tryflowy?ref=FLOWY-...` using React Native Linking. Existing
+`https://ig.me/m/<configured-handle>?ref=FLOWY-...` using React Native Linking. Existing
 Instagram threads can connect on opening; new threads may require the welcome
 button or a first message. Returning to Flowy refreshes status through AppState;
 while waiting, polling runs only in the foreground. A manual code/clipboard
@@ -67,7 +67,20 @@ screen or change the rest of the app language.
 
 Validation: `npm run typecheck` and `node scripts/test-instagram-connection.cjs`
 (7 scenario groups) passed. The change adds no native dependencies/capabilities.
-No new native binary, TestFlight submission or physical Instagram handoff has
-been performed. Existing beta builds still contain the old hardcoded handle and
-must be updated before the rename. Full activation runbook is in the server's
+The preparation checks did not include a signed binary or physical Instagram
+handoff. Existing beta builds contain the old hardcoded handle and must be
+updated to build 30 or later for the renamed receiver. Full activation runbook is in the server's
 `docs/instagram-account-rollout.md`; deploy its migration 44 before the API/worker.
+
+
+## Rename release (2026-09-17 UTC)
+
+Native commit `ce60a65` is merged to `main`. Server metadata is configured for
+`@save.to.flowy`, verified against the original Instagram account ID. The Spanish
+account remains hidden until its Meta connection and credentials are ready.
+
+iOS 1.0.0 build 30: `5cbfda16-7881-419a-a710-82555a5f28ed`.
+Automatic App Store Connect submission: `097c2743-3b17-4d2b-a5f0-a687088e2904`.
+Build 30 completed successfully at 2026-09-17 02:41:21 UTC; automatic submission
+is in progress. TestFlight availability and physical Instagram handoff remain
+separate acceptance steps.
