@@ -124,8 +124,8 @@ export type Item = {
   /** R2 URLs of the original uploaded media (e.g. the receipt photo). */
   original_media_urls?: string[];
   /**
-   * Result of the exploration/enrichment pass. Items now arrive auto-enriched at
-   * ingest with `primary_link` + `candidates`; the deep-dive pass populates
+   * Result of manual exploration (or opt-in automatic enrichment).
+   * Identifies `primary_link` + `candidates`; the deep-dive pass populates
    * `deep_analysis` with synthesis + key findings + link excerpts.
    */
   exploration?: ItemExploration;

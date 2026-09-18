@@ -27,7 +27,7 @@ not been independently confirmed. Unrelated local edits remain uncommitted.
 
 > **Item reading state — 2026-09-12:** Shared phone/landscape ItemReader records first opening automatically, independently of the reversible **Mark as read / Mark as unread** action. Inbox cards/rows show a discreet dot/check; **Unread** filters the full server library. Older saves show no read mark recorded, not a claim that they were never read. Requires the coordinated Flowy engagement migration and API before shipping. Realtime remains active for ready items and foreground/30-second reconciliation covers missed events. Requests, detail caches and late responses are account-bound. See `docs/ITEM-READING.md` for rollout and validation.
 
-> **Google iOS — 2026-09-11:** Login/signup now use the native Google SDK and existing `/api/auth/google` plus shared PocketBase session. New-account consent is explicit, cancellable and server-gated. Public iOS/web OAuth IDs and a new binary are required; Android Google remains deferred. Details and release checks: `docs/GOOGLE_SIGN_IN_IOS.md`.
+> **Google iOS + Android — 2026-09-11:** Login/signup now use the native Google SDK and existing `/api/auth/google` plus shared PocketBase session. New-account consent is explicit, cancellable and server-gated. Public iOS/web OAuth IDs and a new binary are required; Android now shares this flow through its Play Services adapter; see `docs/GOOGLE_SIGN_IN_ANDROID.md` for signing and validation. Details and release checks: `docs/GOOGLE_SIGN_IN_IOS.md`.
 
 > **Android share menu — 2026-09-11:** Android now appears in the system share menu for text/URLs, images, videos, PDFs and files, including multi-select image/file shares. `expo-share-intent` is configured only for Android so it cannot alter the existing custom iOS extension. `src/lib/shareIntent.ts` applies iOS-equivalent priority and classification (video → URL → PDF → images → file), converts Android cache files to the server's base64 ingest contract, and waits for PocketBase session hydration before posting. A clean Android prebuild verified the generated `ACTION_SEND` and `ACTION_SEND_MULTIPLE` filters. TypeScript passes; device-level share, file-provider and large-media validation remain required before release.
 
@@ -302,6 +302,33 @@ Actual iOS Simulator navigation confirms related-save → Back → Inbox. Automa
 physical drag delivery cannot be asserted: the tool sends down/up without
 movement. No debug instrumentation remains. See `docs/reader-ui-parity.md`.
 
+## Native signup consent — 2026-09-11
+
+`app/(auth)/login.tsx` pushes `/(auth)/signup` explicitly from Create one. `app/(auth)/signup.tsx` shows email/password/confirmation followed by two unchecked, required acceptances: Terms of Service/Privacy Policy and third-party AI processing (Anthropic, OpenAI, Voyage AI, matching the web disclosure). Policy links are separate from the checkbox hit targets. Email and Google signup remain disabled until both are accepted. `src/components/auth/GoogleSignIn.tsx` forwards signup consent to the existing API without repeating the modal; new Google accounts initiated from login must accept both in the modal. The existing server version/timestamp records AI consent; terms acceptance is a client gate, with no new server field.
+
+Validation: native typecheck and 26 simulated auth regression scenarios pass, including explicit signup navigation, both acceptance gates, mismatched passwords, policy URLs, network recovery and Google consent/session outcomes. The previously installed simulator build opens signup from Create one; the reported return to login was not reproduced there. The revised UI still needs device/build acceptance; no TestFlight update was published.
+
+
+## Repository discovery and reading parity — 2026-09-13 (local)
+
+Reels/YouTube and generic audio/video/TikTok transcripts now start collapsed,
+using the existing accessible `CollapsibleSection`. Found sources start expanded;
+candidates show “Possible match” and their reason. `ItemExploration.deep` mirrors
+the optional existing server field so the CTA distinguishes research/exploration.
+The shared server now researches named repositories without an owner and deepens
+resolved semantic resource links. A sole resolved resource populates the existing
+primary link; multiple resources remain independent semantic entries.
+
+`npm run typecheck` passes. The server suite
+`tests/unit/native-inbox-reading.test.tsx` renders the real native components with
+platform adapters: three transcript expand/collapse scenarios and exact primary
+URL opening/candidate uncertainty pass. This is not device validation.
+`npm run test:ui-models` fails in its existing loader at `src/lib/chatSync.ts` with
+`SyntaxError: Unexpected token ';'`; no chat implementation was changed here.
+No deployment or binary/OTA distribution was performed. Server audit and limits:
+`../Flowy/docs/repository-discovery.md`.
+
+
 ## 2026-09-14 — Deep Dive, enumeraciones generales y fondo de imágenes
 
 Cambios locales coordinados con `../Flowy`: `src/types/reader.ts` unifica el CTA en
@@ -443,6 +470,7 @@ preview and native accessibility tree were inspected. Full VoiceOver and physica
 device acceptance remain manual. No server contract or native configuration change
 in this refinement; no merge/deployment. See the paired server's
 `docs/storage-design-review.md` and `docs/file-storage-manual-checklist.md`.
+
 
 ## Apple/Google consent parity — 2026-09-15
 

@@ -243,7 +243,7 @@ are distinct from confirmed deletions; connecting is cancellable and bounded to
 
 Settings and Digest Settings share explicit device-notification registration. iOS and Android registration, provider receipts and visible arrival passed on owned devices; notification tap routing remains a release gate. Firebase configuration is supplied by EAS and is never committed to the app.
 
-## Google Sign-In on iOS — 2026-09-11
+## Google Sign-In on iOS and Android — 2026-09-11
 
 Native Google login/signup now uses the existing Flowy server and shared session. New accounts require explicit AI-processing consent before creation. See [iOS Google setup and validation](docs/GOOGLE_SIGN_IN_IOS.md) for the two public OAuth IDs, EAS environments, rebuild requirement and device checks. Run `npm run test:google-auth` and `npm run typecheck`. Android Google implementation uses the same server contract; see [Android configuration](docs/GOOGLE_SIGN_IN_ANDROID.md).
 

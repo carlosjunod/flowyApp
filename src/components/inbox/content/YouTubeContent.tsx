@@ -53,7 +53,7 @@ export const YouTubeContent: React.FC<{ item: Item }> = ({ item }) => {
         title={item.title}
       />
       <ChannelBar item={item} url={url} />
-      {item.content ? <CollapsibleSection label={hasSegments ? 'Chapters and transcript' : 'Transcript'} defaultOpen={false}><ChaptersTranscript
+      {item.content?.trim() ? <CollapsibleSection label={hasSegments ? 'Chapters and transcript' : 'Transcript'} defaultOpen={false}><ChaptersTranscript
         segments={segments}
         hasSegments={hasSegments}
         content={item.content ?? ''}

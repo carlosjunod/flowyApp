@@ -154,7 +154,7 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onRetry, r
     <View className={`px-4 py-3 ${isUser ? 'items-end' : 'items-start'}`}>
       {!isUser ? <View className="mb-3 flex-row flex-wrap items-center gap-2.5">
         <View accessible={false} style={{ width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}>
-          <Text accessible={false} style={{ fontFamily: 'InstrumentSerif_400Regular', fontSize: 26, lineHeight: 30, color: colors.accent }}>f.</Text>
+          <Text accessible={false} style={{ fontFamily: 'InstrumentSerif_400Regular_Italic', fontSize: 26, lineHeight: 30, color: colors.accent }}>f.</Text>
         </View>
         <Text className="text-fg text-sm font-medium">Flowy <Text className="text-muted text-xs">· AI</Text></Text>
         {message.streaming ? <Text accessibilityLiveRegion="polite" className="text-muted text-xs">{content ? 'Writing…' : 'Preparing response…'}</Text> : null}
