@@ -6,6 +6,7 @@ import React, { useMemo, useState } from 'react';
 import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
 import { extractYoutubeId } from '@/lib/thumbnails';
 import {
@@ -32,6 +33,7 @@ type Tab = 'chapters' | 'transcript';
  * Mirrors apps/web/components/inbox/content/YouTubeContent.tsx.
  */
 export const YouTubeContent: React.FC<{ item: Item }> = ({ item }) => {
+  const { t } = useI18n();
   const url = item.source_url ?? item.raw_url ?? '';
   const videoId = url ? extractYoutubeId(url) : null;
   const [embedded, setEmbedded] = useState(false);
@@ -53,7 +55,7 @@ export const YouTubeContent: React.FC<{ item: Item }> = ({ item }) => {
         title={item.title}
       />
       <ChannelBar item={item} url={url} />
-      {item.content ? <CollapsibleSection label={hasSegments ? 'Chapters and transcript' : 'Transcript'} defaultOpen={false}><ChaptersTranscript
+      {item.content?.trim() ? <CollapsibleSection label={hasSegments ? t('inbox.content.chaptersSection') : t('inbox.content.transcriptSection')} defaultOpen={false}><ChaptersTranscript
         segments={segments}
         hasSegments={hasSegments}
         content={item.content ?? ''}
@@ -75,6 +77,7 @@ const VideoArea: React.FC<{
   ogImage?: string;
   title?: string;
 }> = ({ videoId, url, embedded, onPlay, ogImage, title }) => {
+  const { t } = useI18n();
   // `hqdefault` is always available; `maxresdefault` sometimes 404s.
   const thumb = videoId
     ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
@@ -132,7 +135,7 @@ const VideoArea: React.FC<{
   return (
     <Pressable
       onPress={handlePress}
-      accessibilityLabel="Play video"
+      accessibilityLabel={t('inbox.content.playVideo')}
       accessibilityRole="button"
       className="mb-3 overflow-hidden rounded-xl border border-border bg-black"
       style={[
@@ -148,7 +151,7 @@ const VideoArea: React.FC<{
           source={{ uri: thumb }}
           style={{ width: '100%', height: '100%' }}
           contentFit="cover"
-          accessibilityLabel={title ?? 'YouTube thumbnail'}
+          accessibilityLabel={title ?? t('inbox.content.youtubeThumbnail')}
         />
       ) : (
         <View className="flex-1 items-center justify-center">
@@ -206,7 +209,9 @@ const VideoArea: React.FC<{
 // ─────────────────────────────────────────────────────────────
 
 const ChannelBar: React.FC<{ item: Item; url: string }> = ({ item, url }) => {
+  const { t } = useI18n();
   const colors = useResolvedColors();
+  // The channel name is source data; "YouTube" is a brand name either way.
   const channelName =
     item.site_name || 'YouTube';
   const initial = channelName.charAt(0).toUpperCase();
@@ -246,7 +251,7 @@ const ChannelBar: React.FC<{ item: Item; url: string }> = ({ item, url }) => {
           numberOfLines={1}
           style={{ fontFamily: 'Inter_400Regular', fontSize: 11 }}
         >
-          on YouTube
+          {t('inbox.content.onYoutube')}
         </Text>
       </View>
       {url ? (
@@ -254,7 +259,7 @@ const ChannelBar: React.FC<{ item: Item; url: string }> = ({ item, url }) => {
           onPress={() => Linking.openURL(url)}
           hitSlop={6}
           accessibilityRole="link"
-          accessibilityLabel="Watch on YouTube"
+          accessibilityLabel={t('inbox.content.watchYoutube')}
           style={[
             { flexDirection: 'row', alignItems: 'center', gap: 4,  },
           ]}
@@ -266,7 +271,7 @@ const ChannelBar: React.FC<{ item: Item; url: string }> = ({ item, url }) => {
               color: colors.accent,
             }}
           >
-            Watch on YouTube
+            {t('inbox.content.watchYoutube')}
           </Text>
           <Feather name="arrow-up-right" size={11} color={colors.accent} />
         </Pressable>
@@ -285,14 +290,15 @@ const ChaptersTranscript: React.FC<{
   content: string;
   url: string;
 }> = ({ segments, hasSegments, content, url }) => {
+  const { t } = useI18n();
   const [tab, setTab] = useState<Tab>(hasSegments ? 'chapters' : 'transcript');
 
   return (
     <View>
       <ContentTabs
         tabs={[
-          { id: 'chapters', label: 'Chapters' },
-          { id: 'transcript', label: 'Transcript' },
+          { id: 'chapters', label: t('inbox.content.tabChapters') },
+          { id: 'transcript', label: t('inbox.content.tabTranscript') },
         ]}
         active={tab}
         onChange={setTab}
@@ -310,6 +316,7 @@ const ChapterList: React.FC<{
   segments: TimestampedSegment[] | null;
   url: string;
 }> = ({ segments, url }) => {
+  const { t } = useI18n();
   const colors = useResolvedColors();
   if (!segments || segments.length < 2) {
     return (
@@ -326,7 +333,7 @@ const ChapterList: React.FC<{
             opacity: 0.75,
           }}
         >
-          No chapters extracted for this video.
+          {t('inbox.content.noChapters')}
         </Text>
       </View>
     );
@@ -400,6 +407,7 @@ const TranscriptView: React.FC<{
   content: string;
   url: string;
 }> = ({ segments, content, url }) => {
+  const { t } = useI18n();
   const colors = useResolvedColors();
 
   if (segments && segments.length >= 2) {
@@ -455,7 +463,7 @@ const TranscriptView: React.FC<{
       className="rounded-xl border border-border bg-surface"
       style={{ padding: 14 }}
     >
-      <SourceText text={content || 'No transcript captured yet.'} />
+      <SourceText text={content || t('inbox.content.noTranscriptCaptured')} />
     </View>
   );
 };

@@ -18,6 +18,7 @@ processing, and production service configuration.
 | Expo Router screens | `app/` | Auth, inbox, chat, item detail, digests, settings |
 | Components | `src/components/` | Inbox, chat, settings, and shared UI |
 | Data and platform boundaries | `src/lib/` | PocketBase, REST API, auth, env, secure store, themes |
+| Interface language | `src/lib/i18n/` | Locale negotiation, dictionaries, translator, formatters |
 | Server state / behavior | `src/hooks/` | Queries, item actions, chat, bulk import, push registration |
 | Domain types | `src/types/` | Item, API, ingest, receipt, and chat contracts |
 | Native project generation | `plugins/` | Expo config plugins and share-extension Swift template |
@@ -49,6 +50,7 @@ npm run ios
 npm run android
 npm run web
 npm run typecheck
+npm run test:i18n
 npm run prebuild
 ```
 
@@ -74,6 +76,18 @@ not validate entitlements, Xcode targets, or Info.plist output.
 - When expanding item support, update the canonical `ItemType` and the
   appropriate type-specific renderer, thumbnail/source helpers, ingest types,
   and server contract together.
+- Never hardcode user-facing text. Add the key to
+  `src/lib/i18n/dictionaries/en/` first (it is the schema), then to `es/`, then
+  render it with `t()` — or `tKey()` for a computed key. `npm run typecheck`
+  fails on a missing Spanish key. Translate interface copy only: item titles,
+  notes, tags, categories, AI output, API error *codes* and `item.type` values
+  are content or contract. Read `docs/I18N.md` before touching
+  `src/lib/i18n/`, the dictionaries, or any module that returns a key.
+- `src/types/inbox-presentation.ts`, `src/types/reader.ts`, the "Localisable
+  variants" block of `src/types/semantic.ts` and `chatErrorKey` in
+  `src/hooks/useChatEngine.ts` are mirrored **byte-for-byte** with the web
+  client — comments included. Change them in both repositories in the same
+  workstream, or not at all.
 
 ## Authentication, Apple, and native sharing
 

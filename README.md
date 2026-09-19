@@ -13,6 +13,7 @@ Users save URLs, screenshots, short videos, PDFs and files from the iOS/macOS sh
 - **Chat** — streaming responses with inline `[[itemId]]` citations and expandable sources, account-scoped on-device conversation history and drafts, new/open/delete conversation, stop/retry/copy, and reader-controlled scrolling. A provider above the tabs retains work while navigating inside the app.
 - **Item detail** — title-first hierarchy, compact expandable media, original-source access, readable receipt rows/totals, secondary analysis/tags disclosure, contextual actions and keyboard-safe editing
 - **Native sharing** — iOS + Mac Catalyst uses a native share extension; Android receives `ACTION_SEND` / `ACTION_SEND_MULTIPLE`. Both accept links, images, videos, PDFs and files and send authenticated payloads to `/api/ingest`.
+- **English and Spanish** — the whole interface, including alerts and accessibility labels. The language follows the device by default (any Spanish variant resolves to one neutral Spanish) and can be set explicitly from the login/signup screens or Settings. Saved content, notes and AI answers keep the language they were written in, and the digest report language stays a separate setting. See [docs/I18N.md](docs/I18N.md).
 - Auth via PocketBase email/password, token persisted to shared Keychain so the extension can read it
 
 ## Responsive layout
@@ -102,6 +103,7 @@ server's chat-history routes and PocketBase migration.
 │   │   ├── chat/   ChatWindow  ChatMessage  ChatInput  Citation
 │   │   └── ui/     Button  Spinner  Badge  Thumbnail
 │   ├── lib/        pb.ts  api.ts  auth.ts  env.ts  secureStore.ts  thumbnails.ts  relativeDate.ts  viewMode.ts
+│   │   └── i18n/   locale  dictionary  translate  format  device  storage  LocaleProvider  dictionaries/{en,es}
 │   ├── hooks/      useItems.ts  useItemStatus.ts  useChat.ts
 │   └── types/      index.ts
 ├── plugins/
@@ -161,10 +163,14 @@ Verified: clean and incremental Expo prebuild, generated-template equality, unsi
 ```
 npm run start        # expo start (dev server)
 npm run ios          # expo run:ios
-npm run typecheck    # tsc --noEmit
+npm run typecheck    # tsc --noEmit — also the EN/ES dictionary parity gate
 npm run test:ui-models # Node regression scenarios using the real TS models
+npm run test:i18n    # locale core + dictionary parity + provider/screen scenarios
 npm run prebuild     # re-apply config plugins to ios/
 ```
+
+`test:i18n` is the aggregate; the three parts can be run on their own as
+`test:i18n-core`, `test:i18n-parity` and `test:i18n-screens`.
 
 ## Test plan
 
@@ -243,7 +249,7 @@ are distinct from confirmed deletions; connecting is cancellable and bounded to
 
 Settings and Digest Settings share explicit device-notification registration. iOS and Android registration, provider receipts and visible arrival passed on owned devices; notification tap routing remains a release gate. Firebase configuration is supplied by EAS and is never committed to the app.
 
-## Google Sign-In on iOS — 2026-09-11
+## Google Sign-In on iOS and Android — 2026-09-11
 
 Native Google login/signup now uses the existing Flowy server and shared session. New accounts require explicit AI-processing consent before creation. See [iOS Google setup and validation](docs/GOOGLE_SIGN_IN_IOS.md) for the two public OAuth IDs, EAS environments, rebuild requirement and device checks. Run `npm run test:google-auth` and `npm run typecheck`. Android Google implementation uses the same server contract; see [Android configuration](docs/GOOGLE_SIGN_IN_ANDROID.md).
 
@@ -272,16 +278,6 @@ Validated with TypeScript, `node scripts/test-labels.cjs`, `npm run test:item-en
 ### Local main and simulator — 2026-09-14
 
 The tags/categories and shared reader are now merged into local `main` (`0929149`), paired with the server integration `46db015`. Existing local changes were reconciled and their original snapshots retained in Git stashes. The installed development build launches in the iPhone 16e iOS 26.0 simulator using this checkout's Metro server at `http://127.0.0.1:8081`; the current launch reached login without authentication. Restart with `npx expo start --dev-client --localhost --port 8081`, then press `i`. No new native binary, main push or backend deployment was performed.
-
-
-### Tags release validation — 2026-09-14
-
-The UI-model request regression now exercises normalized tags with global search,
-category pagination and separate query-cache keys, including clearing a tag.
-Native TypeScript, label API/order tests, ten reader navigation scenarios and
-26 Google authentication scenarios pass on the integrated main source. The
-broader UI-model harness reaches its previously documented TypeScript generic
-transpilation failure in `chatSync.ts`; this is not a passing full UI-model suite.
 
 ### Inbox states and card sizes — 2026-09-14
 
@@ -336,3 +332,45 @@ checks are in `../Flowy-document-storage/docs/storage-design-review.md`.
 
 
 Floating inbox chat: [behavior, validation and distribution](docs/FLOATING-CHAT.md).
+
+### Spanish interface — 2026-09-17
+
+The whole native interface is now available in Spanish alongside English:
+auth, tabs, inbox (filters, labels, cards, bulk actions, states), the reader and
+its semantic/receipt/media renderers, chat and its history, digests and digest
+settings, personalization, storage, the inbox email alias, and every alert and
+accessibility label.
+
+What is *not* translated is as deliberate as what is: item titles, notes, tags
+and categories stay in the user's own words; summaries, transcripts, digest
+bullets and chat answers stay in the language the AI wrote them in; API error
+codes, `item.type` values and URLs are contracts. Two literals stay English
+because a server compares them byte-for-byte — the `delete my account`
+confirmation phrase and the `New conversation` sentinel title, whose *display*
+is localized while the stored value is not.
+
+The language follows the device (any Spanish variant → one neutral Spanish,
+otherwise English) until it is set explicitly, from the login/signup screens or
+Settings → Language. Choosing **Automatic** deletes the stored choice, so the
+next launch detects again. The digest *report* language remains a separate
+server-side preference and is never changed by the interface language (D-041).
+
+No dependency, entitlement or native configuration changed: detection reads the
+platform's existing locale modules and `Intl` rather than adding
+`expo-localization`.
+
+Validated with `npm run typecheck`, `npm run test:i18n`,
+`npm run test:reader-navigation`, `npm run test:digest-monthly`, an iOS
+Metro/Hermes export, and a Spanish/English switch in the installed development
+client on an iPhone 16e. `npm run test:ui-models` still stops at its
+pre-existing `chatSync.ts` transpilation failure — unrelated to this work and
+not addressed here. Full details in [docs/I18N.md](docs/I18N.md).
+
+### Tags release validation — 2026-09-14
+
+The UI-model request regression now exercises normalized tags with global search,
+category pagination and separate query-cache keys, including clearing a tag.
+Native TypeScript, label API/order tests, ten reader navigation scenarios and
+26 Google authentication scenarios pass on the integrated main source. The
+broader UI-model harness reaches its previously documented TypeScript generic
+transpilation failure in `chatSync.ts`; this is not a passing full UI-model suite.

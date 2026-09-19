@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { CollapsibleSection } from '../CollapsibleSection';
 import { Pressable, Text, View } from 'react-native';
 
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
 import type { Item } from '@/types';
 
@@ -20,6 +21,7 @@ type Tab = 'visual' | 'transcript';
  */
 export const GenericContent: React.FC<{ item: Item }> = ({ item }) => {
   const [tab, setTab] = useState<Tab>('transcript');
+  const { t } = useI18n();
   const colors = useResolvedColors();
 
   const visualParts: string[] = [];
@@ -41,15 +43,15 @@ export const GenericContent: React.FC<{ item: Item }> = ({ item }) => {
   const active = tab === 'visual' ? visualText : transcriptText;
   const emptyLabel =
     tab === 'visual'
-      ? 'No visual summary available for this item.'
-      : 'No transcript or extracted text yet.';
+      ? t('inbox.content.noVisual')
+      : t('inbox.content.noTranscript');
 
   const body = (
     <View>
       {visualText ? <ContentTabs
         tabs={[
-          { id: 'transcript', label: 'Full text' },
-          { id: 'visual', label: 'Image notes' },
+          { id: 'transcript', label: t('inbox.content.tabFullText') },
+          { id: 'visual', label: t('inbox.content.tabImageNotes') },
         ]}
         active={tab}
         onChange={setTab}
@@ -66,7 +68,7 @@ export const GenericContent: React.FC<{ item: Item }> = ({ item }) => {
     </View>
   );
   return ['audio', 'video', 'screen_recording', 'tiktok'].includes(item.type)
-    ? <CollapsibleSection label="Transcript and image notes" defaultOpen={false}>{body}</CollapsibleSection> : body;
+    ? <CollapsibleSection label={t('inbox.content.transcriptAndNotes')} defaultOpen={false}>{body}</CollapsibleSection> : body;
 };
 
 // ─────────────────────────────────────────────────────────────

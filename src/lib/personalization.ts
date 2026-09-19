@@ -25,10 +25,11 @@ export function shouldInvitePersonalization(profile: PersonalizationProfile): bo
   return !profile.onboardingDismissed && !hasPersonalization(profile);
 }
 
-export function personalizationError(error: Pick<ApiError, 'code' | 'status'>): string {
-  if (error.code === 'PERSONALIZATION_CONFLICT' || error.status === 409) return 'Your profile changed on another device. Your edits are still here. Reload the saved profile before making more changes.';
-  if (error.code === 'UNAUTHORIZED') return 'Your session expired or changed. Sign in again to continue.';
-  if (error.code === 'NETWORK_ERROR') return 'Could not connect. Your edits are still here. Check your connection and try again.';
-  if (['INVALID_INPUT', 'INVALID_PERSONALIZATION', 'BODY_TOO_LARGE', 'INVALID_BODY'].includes(error.code)) return 'Check your answers and try again. Keep them within the character limits.';
-  return 'Could not update personalization. Your edits are still here. Please try again.';
+/** Maps a server error *code* to a translation key under `settings.personalization.errors.*`. */
+export function personalizationErrorKey(error: Pick<ApiError, 'code' | 'status'>): string {
+  if (error.code === 'PERSONALIZATION_CONFLICT' || error.status === 409) return 'settings.personalization.errors.conflict';
+  if (error.code === 'UNAUTHORIZED') return 'settings.personalization.errors.session';
+  if (error.code === 'NETWORK_ERROR') return 'settings.personalization.errors.network';
+  if (['INVALID_INPUT', 'INVALID_PERSONALIZATION', 'BODY_TOO_LARGE', 'INVALID_BODY'].includes(error.code)) return 'settings.personalization.errors.invalid';
+  return 'settings.personalization.errors.unknown';
 }

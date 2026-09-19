@@ -1,5 +1,74 @@
 # FlowyApp — Parity Red-Priority Handover
 
+## Spanish interface — 2026-09-17 (branch `codex/i18n-es`, not merged)
+
+The native client now ships English and Spanish. Operating guide, glossary and
+the full "what is and is not translated" policy live in `docs/I18N.md`; this
+entry records rollout state and what a reviewer still owes the release.
+
+**Capability.** Every native screen, alert and accessibility label is
+translated: auth, tabs, inbox (filters, labels, cards, item actions, bulk
+selection, empty/error states), the reader and its semantic/recipe/receipt/
+carousel/YouTube/Reel renderers, original files and text previews, chat and its
+history drawer, digests and digest settings, personalization, storage, and the
+inbox email alias. Dates, numbers, byte sizes and relative times are formatted
+through the active locale.
+
+**Not translated, on purpose.** Item titles, notes, tags and categories (the
+user's words); summaries, transcripts, digest bullets and chat answers (AI
+output, in the language it was generated in); API error *codes*, `item.type`
+values and URLs (contracts). `ApiError.message` is the server's code, so alerts
+now render it through `src/lib/apiErrors.ts` instead of showing the raw value.
+
+**Two literals stay English because a server compares them byte-for-byte:**
+the `delete my account` confirmation phrase, and `DEFAULT_CONVERSATION_TITLE`
+(`New conversation`), which is persisted and synced — its *display* is localized
+via `chat.history.newConversation`, the stored value is not.
+
+**Locale policy.** Explicit choice (persisted under `flowy.locale` in the
+device-local secure store) → device language (any Spanish variant resolves to
+one neutral Spanish) → English. Detection is never persisted. Choosing
+**Automatic** deletes the stored row, so the next launch detects again. A
+keychain that cannot be read degrades to the detected language and never blocks
+startup. The selector is reachable from login, signup and Settings — someone
+whose phone put them in a language they cannot read needs a way out *before*
+signing in.
+
+**D-041 holds:** `DigestPreferences.locale` (the language Flowy *writes reports
+in*) remains an independent server-side setting. The interface language never
+changes it; `test:i18n-parity` asserts both directions.
+
+**Cross-platform contracts.** `src/types/inbox-presentation.ts`,
+`src/types/reader.ts`, the "Localisable variants" block in
+`src/types/semantic.ts`, and `chatErrorKey` in `src/hooks/useChatEngine.ts` are
+mirrored byte-for-byte with the web client and now return translation *keys*.
+Renaming a key on either side breaks the other; `test:i18n-parity` renders every
+key those contracts can emit, in both locales, with no English fallback.
+`semanticCoverageMessage` / `semanticEvidenceLabel` are untouched — the worker
+uses them to write `exploration.notes`, which is stored content.
+
+**No native change.** No dependency, entitlement, capability or native project
+configuration was added; `expo-localization` is deliberately absent. Detection
+reads the platform's existing locale modules (through `getConstants()` *and* the
+legacy own-property, because React Native 0.81 moved both behind TurboModule
+getters) and falls back to `Intl`. This ships as a JavaScript change; no new
+binary is required for the i18n work itself.
+
+**Validation performed.** `npm run typecheck` (also the EN/ES parity gate),
+`npm run test:i18n`, `npm run test:reader-navigation` (10 scenarios),
+`npm run test:digest-monthly`, an iOS Metro/Hermes export, and a Spanish/English
+switch confirmed in the installed development client on an iPhone 16e.
+`npm run test:ui-models` still stops at its **pre-existing** `chatSync.ts`
+transpilation failure in the custom loader; that is unrelated to this work and
+was deliberately not touched.
+
+**Still owed before release.** Native VoiceOver in Spanish; Dynamic Type at the
+largest sizes with the longer Spanish strings (Spanish runs ~15–25% longer than
+English and several toolbars are tight); a Spanish-language device cold start
+(as opposed to switching in-app); Android verification — every device-detection
+path is covered by tests against the real module shapes, but only iOS has been
+exercised on hardware. Translation review by a native speaker has not happened.
+
 ## Storage publication — 2026-09-15
 
 Native Storage P0–P3 and UI refinements are integrated into main at `6c28839`,
@@ -27,7 +96,7 @@ not been independently confirmed. Unrelated local edits remain uncommitted.
 
 > **Item reading state — 2026-09-12:** Shared phone/landscape ItemReader records first opening automatically, independently of the reversible **Mark as read / Mark as unread** action. Inbox cards/rows show a discreet dot/check; **Unread** filters the full server library. Older saves show no read mark recorded, not a claim that they were never read. Requires the coordinated Flowy engagement migration and API before shipping. Realtime remains active for ready items and foreground/30-second reconciliation covers missed events. Requests, detail caches and late responses are account-bound. See `docs/ITEM-READING.md` for rollout and validation.
 
-> **Google iOS — 2026-09-11:** Login/signup now use the native Google SDK and existing `/api/auth/google` plus shared PocketBase session. New-account consent is explicit, cancellable and server-gated. Public iOS/web OAuth IDs and a new binary are required; Android Google remains deferred. Details and release checks: `docs/GOOGLE_SIGN_IN_IOS.md`.
+> **Google iOS + Android — 2026-09-11:** Login/signup now use the native Google SDK and existing `/api/auth/google` plus shared PocketBase session. New-account consent is explicit, cancellable and server-gated. Public iOS/web OAuth IDs and a new binary are required; Android now shares this flow through its Play Services adapter; see `docs/GOOGLE_SIGN_IN_ANDROID.md` for signing and validation. Details and release checks: `docs/GOOGLE_SIGN_IN_IOS.md`.
 
 > **Android share menu — 2026-09-11:** Android now appears in the system share menu for text/URLs, images, videos, PDFs and files, including multi-select image/file shares. `expo-share-intent` is configured only for Android so it cannot alter the existing custom iOS extension. `src/lib/shareIntent.ts` applies iOS-equivalent priority and classification (video → URL → PDF → images → file), converts Android cache files to the server's base64 ingest contract, and waits for PocketBase session hydration before posting. A clean Android prebuild verified the generated `ACTION_SEND` and `ACTION_SEND_MULTIPLE` filters. TypeScript passes; device-level share, file-provider and large-media validation remain required before release.
 
@@ -302,6 +371,33 @@ Actual iOS Simulator navigation confirms related-save → Back → Inbox. Automa
 physical drag delivery cannot be asserted: the tool sends down/up without
 movement. No debug instrumentation remains. See `docs/reader-ui-parity.md`.
 
+## Native signup consent — 2026-09-11
+
+`app/(auth)/login.tsx` pushes `/(auth)/signup` explicitly from Create one. `app/(auth)/signup.tsx` shows email/password/confirmation followed by two unchecked, required acceptances: Terms of Service/Privacy Policy and third-party AI processing (Anthropic, OpenAI, Voyage AI, matching the web disclosure). Policy links are separate from the checkbox hit targets. Email and Google signup remain disabled until both are accepted. `src/components/auth/GoogleSignIn.tsx` forwards signup consent to the existing API without repeating the modal; new Google accounts initiated from login must accept both in the modal. The existing server version/timestamp records AI consent; terms acceptance is a client gate, with no new server field.
+
+Validation: native typecheck and 26 simulated auth regression scenarios pass, including explicit signup navigation, both acceptance gates, mismatched passwords, policy URLs, network recovery and Google consent/session outcomes. The previously installed simulator build opens signup from Create one; the reported return to login was not reproduced there. The revised UI still needs device/build acceptance; no TestFlight update was published.
+
+
+## Repository discovery and reading parity — 2026-09-13 (local)
+
+Reels/YouTube and generic audio/video/TikTok transcripts now start collapsed,
+using the existing accessible `CollapsibleSection`. Found sources start expanded;
+candidates show “Possible match” and their reason. `ItemExploration.deep` mirrors
+the optional existing server field so the CTA distinguishes research/exploration.
+The shared server now researches named repositories without an owner and deepens
+resolved semantic resource links. A sole resolved resource populates the existing
+primary link; multiple resources remain independent semantic entries.
+
+`npm run typecheck` passes. The server suite
+`tests/unit/native-inbox-reading.test.tsx` renders the real native components with
+platform adapters: three transcript expand/collapse scenarios and exact primary
+URL opening/candidate uncertainty pass. This is not device validation.
+`npm run test:ui-models` fails in its existing loader at `src/lib/chatSync.ts` with
+`SyntaxError: Unexpected token ';'`; no chat implementation was changed here.
+No deployment or binary/OTA distribution was performed. Server audit and limits:
+`../Flowy/docs/repository-discovery.md`.
+
+
 ## 2026-09-14 — Deep Dive, enumeraciones generales y fondo de imágenes
 
 Cambios locales coordinados con `../Flowy`: `src/types/reader.ts` unifica el CTA en
@@ -443,6 +539,7 @@ preview and native accessibility tree were inspected. Full VoiceOver and physica
 device acceptance remain manual. No server contract or native configuration change
 in this refinement; no merge/deployment. See the paired server's
 `docs/storage-design-review.md` and `docs/file-storage-manual-checklist.md`.
+
 
 ## Apple/Google consent parity — 2026-09-15
 

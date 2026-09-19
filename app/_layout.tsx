@@ -21,6 +21,7 @@ import { usePushRegistration } from '@/hooks/usePushRegistration';
 import { useNotificationIntent } from '@/hooks/useNotificationIntent';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
+import { LocaleProvider, useI18n } from '@/lib/i18n';
 import { payloadFromShareIntent, readSharedFileBase64 } from '@/lib/shareIntent';
 import { ThemeProvider, useResolvedVars, useTheme } from '@/lib/theme';
 
@@ -41,6 +42,7 @@ function AppShell() {
   const { resolved } = useTheme();
   const themeVars = useResolvedVars();
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const { user, ready } = useAuth();
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent({
     // iOS already owns its native extension. Keeping the Android intent until
@@ -61,26 +63,26 @@ function AppShell() {
       try {
         const payload = await payloadFromShareIntent(shareIntent, readSharedFileBase64);
         if (!payload) {
-          Alert.alert('Can’t save this item', 'Share a link, photo, video, PDF, or file to Flowy.');
+          Alert.alert(t('app.share.unsupportedTitle'), t('app.share.unsupportedBody'));
           return;
         }
         const result = await api.ingest(payload);
         if (result.error) {
-          Alert.alert('Couldn’t save item', result.error.code === 'UNAUTHORIZED'
-            ? 'Your session has ended. Sign in to save shared items.'
-            : 'Check your connection and try sharing again.');
+          Alert.alert(t('app.share.failedTitle'), result.error.code === 'UNAUTHORIZED'
+            ? t('app.share.failedUnauthorized')
+            : t('app.share.failedNetwork'));
           return;
         }
         void queryClient.invalidateQueries({ queryKey: ['items'] });
         router.replace('/inbox');
       } catch {
-        Alert.alert('Couldn’t read this item', 'Check that the shared file is still available, then try again.');
+        Alert.alert(t('app.share.unreadableTitle'), t('app.share.unreadableBody'));
       } finally {
         resetShareIntent();
         savingShare.current = false;
       }
     })();
-  }, [hasShareIntent, ready, resetShareIntent, shareIntent, user]);
+  }, [hasShareIntent, ready, resetShareIntent, shareIntent, user, queryClient, t]);
 
   return (
     <View style={[{ flex: 1 }, themeVars]}>
@@ -122,11 +124,16 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
-          <ThemeProvider>
-            <AuthProvider>
-              <AppShell />
-            </AuthProvider>
-          </ThemeProvider>
+          {/* Outside ThemeProvider and AuthProvider: the language must be
+              resolved before anything renders user-visible copy, including the
+              share-intent alerts AppShell raises before any screen mounts. */}
+          <LocaleProvider>
+            <ThemeProvider>
+              <AuthProvider>
+                <AppShell />
+              </AuthProvider>
+            </ThemeProvider>
+          </LocaleProvider>
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

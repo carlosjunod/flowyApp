@@ -6,24 +6,26 @@ import { StorageUsage } from '@/components/settings/StorageUsage';
 import { StorageAction } from '@/components/settings/StorageAction';
 import { useAuth } from '@/lib/auth';
 import { ENV } from '@/lib/env';
+import { useI18n } from '@/lib/i18n';
 
 export default function StorageScreen() {
   const router = useRouter(),
     { user } = useAuth();
+  const { t } = useI18n();
   const [limits, setLimits] = useState(false),
     [billingError, setBillingError] = useState(false);
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top', 'bottom']}>
       <View className="flex-row flex-wrap items-center justify-between px-2">
         <StorageAction
-          title="Settings"
+          title={t('settings.storage.back')}
           icon="chevron-left"
           onPress={() =>
             router.canGoBack() ? router.back() : router.replace('/settings')
           }
         />
         <StorageAction
-          title="Plan & billing"
+          title={t('settings.storage.billing')}
           icon="arrow-up-right"
           tone="action"
           onPress={() =>
@@ -47,24 +49,24 @@ export default function StorageScreen() {
           className="text-4xl text-fg"
           style={{ fontFamily: 'InstrumentSerif_400Regular' }}
         >
-          Storage
+          {t('settings.storage.title')}
         </Text>
         <Text className="mt-2 mb-3 font-sans text-sm leading-5 text-muted">
-          Your original files, and how long you keep them.
+          {t('settings.storage.intro')}
         </Text>
         {billingError ? (
           <Text
             accessibilityRole="alert"
             className="mb-3 font-sans text-sm text-muted"
           >
-            Could not open billing. Please try again.
+            {t('settings.storage.billingFailed')}
           </Text>
         ) : null}
         <StorageUsage key={user?.id} />
         <View className="mt-6 border-t border-border pt-3">
           <View className="-ml-3 items-start">
             <StorageAction
-              title="Upload limits"
+              title={t('settings.storage.uploadLimits')}
               icon={limits ? 'chevron-up' : 'chevron-down'}
               expanded={limits}
               onPress={() => setLimits((v) => !v)}
@@ -72,9 +74,7 @@ export default function StorageScreen() {
           </View>
           {limits ? (
             <Text className="mt-1 font-sans text-sm leading-6 text-muted">
-              PDF up to 25 MB · images 5 MB · other files 50 MB. Up to 10 files
-              and 100 MB per upload. Original files and saved media count toward
-              your storage.
+              {t('settings.storage.uploadLimitsBody')}
             </Text>
           ) : null}
         </View>

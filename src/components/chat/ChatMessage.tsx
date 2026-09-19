@@ -7,6 +7,7 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Markdown, { renderRules, type ASTNode } from 'react-native-markdown-display';
 
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
 import type { ChatMessage as ChatMessageType, CitedItem } from '@/types';
 
@@ -14,9 +15,14 @@ import { CitedItemsRail, InlineItemChip } from './ItemChip';
 
 type Props = { message: ChatMessageType; onRetry?: () => void; retryDisabled?: boolean; onShowSources?: (ids: string[]) => void };
 
+type CopyState = 'idle' | 'copied' | 'failed';
+
 export const ChatMessage = React.memo(function ChatMessage({ message, onRetry, retryDisabled, onShowSources }: Props) {
   const [sourcesOpen, setSourcesOpen] = useState(false);
-  const [copyLabel, setCopyLabel] = useState('Copy');
+  // State, not a rendered label: a language switch must relabel the button
+  // even while it is showing "Copied".
+  const [copyState, setCopyState] = useState<CopyState>('idle');
+  const { t, tKey } = useI18n();
   const colors = useResolvedColors();
   const sources = useMemo(() => answerSources(message), [message]);
   const isUser = message.role === 'user';
@@ -41,7 +47,13 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onRetry, r
   // Web parity: if no citations were emitted, surface up to 3 of the items the
   // LLM had context on as a "might be related" rail.
   const railItems = citedItems.length > 0 ? citedItems : items.slice(0, 3);
-  const railLabel = citedItems.length > 0 ? 'Sources' : 'Related saves';
+  const railLabel = citedItems.length > 0 ? t('chat.message.sources') : t('chat.message.relatedSaves');
+  const copyLabel =
+    copyState === 'copied'
+      ? t('chat.message.copied')
+      : copyState === 'failed'
+        ? t('chat.message.copyFailed')
+        : t('chat.message.copy');
 
   const userText = colors.fg;
   const markdownStyle = useMemo(
@@ -154,44 +166,44 @@ export const ChatMessage = React.memo(function ChatMessage({ message, onRetry, r
     <View className={`px-4 py-3 ${isUser ? 'items-end' : 'items-start'}`}>
       {!isUser ? <View className="mb-3 flex-row flex-wrap items-center gap-2.5">
         <View accessible={false} style={{ width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}>
-          <Text accessible={false} style={{ fontFamily: 'InstrumentSerif_400Regular', fontSize: 26, lineHeight: 30, color: colors.accent }}>f.</Text>
+          <Text accessible={false} style={{ fontFamily: 'InstrumentSerif_400Regular_Italic', fontSize: 26, lineHeight: 30, color: colors.accent }}>f.</Text>
         </View>
-        <Text className="text-fg text-sm font-medium">Flowy <Text className="text-muted text-xs">· AI</Text></Text>
-        {message.streaming ? <Text accessibilityLiveRegion="polite" className="text-muted text-xs">{content ? 'Writing…' : 'Preparing response…'}</Text> : null}
+        <Text className="text-fg text-sm font-medium">{t('chat.message.assistant')} <Text className="text-muted text-xs">{t('chat.message.assistantTag')}</Text></Text>
+        {message.streaming ? <Text accessibilityLiveRegion="polite" className="text-muted text-xs">{content ? t('chat.message.writing') : t('chat.message.preparing')}</Text> : null}
       </View> : null}
       <View className={isUser ? 'max-w-[88%] rounded-2xl rounded-br-md bg-surface px-4 py-3' : 'w-full'}>
         <Markdown style={markdownStyle} rules={rules} onLinkPress={onLinkPress}>
           {content}
         </Markdown>
       </View>
-      {!isUser && (message.error || message.interrupted) ? <Text accessibilityRole="alert" className="text-danger text-sm py-2">{message.error ?? 'Response stopped. You can retry when ready.'}</Text> : null}
+      {!isUser && (message.errorKey || message.interrupted) ? <Text accessibilityRole="alert" className="text-danger text-sm py-2">{message.errorKey ? tKey(message.errorKey) : t('chat.message.stopped')}</Text> : null}
       {!isUser && !message.streaming ? (
         <View className="w-full" style={{ paddingTop: 4 }}>
           <View className="flex-row flex-wrap items-center gap-2">
             {message.content ? (
               <Pressable accessibilityRole="button" accessibilityLabel={copyLabel} className="min-h-[44px] flex-row items-center gap-2 px-2 rounded-lg active:bg-surface"
-                onPress={() => { void Clipboard.setStringAsync(copyWithCitations(message.content, items)).then(() => setCopyLabel('Copied')).catch(() => setCopyLabel('Copy failed, retry')); }}>
-                <Feather name={copyLabel === 'Copied' ? 'check' : 'copy'} size={14} color={colors.muted} accessible={false} />
+                onPress={() => { void Clipboard.setStringAsync(copyWithCitations(message.content, items)).then(() => setCopyState('copied')).catch(() => setCopyState('failed')); }}>
+                <Feather name={copyState === 'copied' ? 'check' : 'copy'} size={14} color={colors.muted} accessible={false} />
                 <Text className="text-muted text-xs" accessibilityLiveRegion="polite">{copyLabel}</Text>
               </Pressable>
             ) : null}
             {onRetry ? (
-              <Pressable disabled={retryDisabled} accessibilityRole="button" accessibilityLabel="Retry response" accessibilityState={{ disabled: retryDisabled }} className="min-h-[44px] flex-row items-center gap-2 px-2 rounded-lg active:bg-surface" style={{ opacity: retryDisabled ? 0.4 : 1 }} onPress={onRetry}>
+              <Pressable disabled={retryDisabled} accessibilityRole="button" accessibilityLabel={t('chat.message.retryResponse')} accessibilityState={{ disabled: retryDisabled }} className="min-h-[44px] flex-row items-center gap-2 px-2 rounded-lg active:bg-surface" style={{ opacity: retryDisabled ? 0.4 : 1 }} onPress={onRetry}>
                 <Feather name="rotate-cw" size={14} color={colors.muted} accessible={false} />
-                <Text className="text-muted text-xs">Retry</Text>
+                <Text className="text-muted text-xs">{t('chat.message.retry')}</Text>
               </Pressable>
             ) : null}
           </View>
           {onShowSources && sources.items.length > 0 ? <Pressable accessibilityRole="button" onPress={() => onShowSources(sources.items.map(item => item.id))}
             style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 12, marginTop: 4 }}>
-            <Text style={{ color: colors.fg, fontSize: 14, fontFamily: 'Inter_500Medium' }}>View {sources.items.length} {sources.cited ? (sources.items.length === 1 ? 'source' : 'sources') : (sources.items.length === 1 ? 'related save' : 'related saves')} in inbox ↗</Text>
+            <Text style={{ color: colors.fg, fontSize: 14, fontFamily: 'Inter_500Medium' }}>{sources.cited ? t('chat.message.viewSources', { count: sources.items.length }) : t('chat.message.viewRelated', { count: sources.items.length })}</Text>
           </Pressable> : null}
           {railItems.length ? (
             <View style={{ paddingTop: 4 }}>
-              <Pressable accessibilityRole="button" accessibilityLabel={`${railLabel}, ${railItems.length}`} accessibilityState={{ expanded: sourcesOpen }}
+              <Pressable accessibilityRole="button" accessibilityLabel={t('chat.message.railLabel', { label: railLabel, count: railItems.length })} accessibilityState={{ expanded: sourcesOpen }}
                 className="self-start min-h-[44px] flex-row items-center gap-2 px-2 rounded-lg active:bg-surface" onPress={() => setSourcesOpen(value => !value)}>
                 <Feather name={sourcesOpen ? 'chevron-down' : 'chevron-right'} size={16} color={colors.muted} accessible={false} />
-                <Text className="text-muted text-sm">{railLabel} · {railItems.length}</Text>
+                <Text className="text-muted text-sm">{t('chat.message.railSummary', { label: railLabel, count: railItems.length })}</Text>
               </Pressable>
               {sourcesOpen ? <CitedItemsRail items={railItems} indexById={indexById} /> : null}
             </View>

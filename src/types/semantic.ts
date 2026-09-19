@@ -155,6 +155,69 @@ export function semanticEvidenceLabel(origin?: SemanticSourceKind): string {
   return origin === 'caption' ? 'Original caption' : origin === 'ocr' ? 'Text read from image' : origin === 'transcript' ? 'Audio transcript' : origin === 'comment' ? 'Reader comment' : 'Saved text';
 }
 
+/* ------------------------------------------------------------------ *
+ * Localisable variants
+ *
+ * The English functions above stay untouched: the worker calls
+ * `semanticCoverageMessage` to write `exploration.notes`, which is STORED
+ * CONTENT and must not change shape or language. The functions below return
+ * translation keys for the UI instead, and are mirrored into the worker copy
+ * (unused there) purely to keep the three files identical.
+ * ------------------------------------------------------------------ */
+
+export interface SemanticText {
+  key: string;
+  vars?: Record<string, string | number>;
+  /** Plural key whose rendering fills the `unit` variable of `key`. */
+  unitKey?: string;
+  /** Append `inbox.semantic.listPartialSuffix` after rendering. */
+  partial?: boolean;
+}
+
+const kindKeys: Record<SemanticKind, string> = {
+  repository: 'inbox.semantic.kinds.repository',
+  movie: 'inbox.semantic.kinds.movie',
+  book: 'inbox.semantic.kinds.book',
+  product: 'inbox.semantic.kinds.product',
+  place: 'inbox.semantic.kinds.place',
+  paper: 'inbox.semantic.kinds.paper',
+  other: 'inbox.semantic.kinds.other',
+};
+
+export function semanticLabelParts(content: SemanticContentV1): SemanticText {
+  const partial = content.coverage === 'partial';
+  if (content.recipe) return { key: 'inbox.semantic.recipe', partial };
+  if (content.layout === 'list') {
+    const kind = content.entries[0]?.kind ?? 'other';
+    const uniform = content.entries.every(e => e.kind === kind);
+    return {
+      key: 'inbox.semantic.listOf',
+      vars: { count: content.entries.length },
+      unitKey: content.entries.length === 1 || uniform ? kindKeys[kind] : kindKeys.other,
+      partial,
+    };
+  }
+  return { key: content.layout === 'entity' ? 'inbox.semantic.resource' : content.layout === 'narrative' ? 'inbox.semantic.story' : 'inbox.semantic.savedContent' };
+}
+
+export function semanticCoverageKey(content: SemanticContentV1): SemanticText | undefined {
+  const state = content.extraction;
+  if (state?.sourceStatus === 'insufficient') return { key: 'inbox.semantic.coverageInsufficient' };
+  if (canResumeSemantic(content)) return { key: 'inbox.semantic.coverageResume' };
+  if (state?.issues.includes('announced_count_mismatch') && state.announced)
+    return { key: 'inbox.semantic.coverageMismatch', vars: { announced: state.announced.count, count: content.entries.length } };
+  if (content.coverage === 'partial') return { key: 'inbox.semantic.coveragePartial' };
+  return undefined;
+}
+
+export function semanticEvidenceKey(origin?: SemanticSourceKind): string {
+  return origin === 'caption' ? 'inbox.semantic.evidence.caption'
+    : origin === 'ocr' ? 'inbox.semantic.evidence.ocr'
+    : origin === 'transcript' ? 'inbox.semantic.evidence.transcript'
+    : origin === 'comment' ? 'inbox.semantic.evidence.comment'
+    : 'inbox.semantic.evidence.savedText';
+}
+
 /** Parse only explicit numeric amounts. Written quantities remain in source text. */
 export function parseRecipeAmount(raw: string): number[] | undefined {
   const fractions: Record<string, string> = { '¼': '1/4', '½': '1/2', '¾': '3/4', '⅓': '1/3', '⅔': '2/3', '⅛': '1/8', '⅜': '3/8', '⅝': '5/8', '⅞': '7/8' };

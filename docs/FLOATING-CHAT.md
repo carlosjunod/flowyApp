@@ -49,3 +49,23 @@ scenarios pass. `npm run typecheck` passes. `expo export --platform ios` produce
 an iOS Hermes bundle successfully. Export is not a signed build or TestFlight
 submission. No new binary, OTA update or TestFlight distribution was requested
 as part of preparing this native change.
+
+## Native keyboard correction — 2026-09-16
+
+`ChatPanel.tsx` measures the keyboard-avoiding view's parent in window coordinates
+and supplies that origin as `keyboardVerticalOffset`. This accounts for safe
+areas and nested/floating panels without hardcoded header heights. It remeasures
+on layout, focus and history closure. The message area can shrink while the
+composer remains above the keyboard. Unhandled background taps dismiss it;
+message actions and Send remain independently tappable. `ChatWindow.tsx` uses
+scrollable welcome content and interactive iOS / on-drag Android dismissal.
+
+Validation: native TypeScript, 10 existing source-selection checks and iOS Hermes
+export pass. An isolated Expo Go harness using the actual ChatPanel, ChatWindow,
+ChatInput and user-message components was exercised on iPhone 16e / iOS 26.0.
+Verified sending with the software keyboard visible, background-tap dismissal in
+the message list and both welcome states, and repeated opening/closing with a
+compact panel at a different vertical origin. The harness mocks chat state and
+history and does not contact production. It does not validate authenticated
+streaming, the complete inbox overlay, Android or a physical iPhone. No signed
+build, OTA update or TestFlight distribution was performed.

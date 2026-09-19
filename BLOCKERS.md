@@ -36,3 +36,16 @@ For macOS (Mac Catalyst): in Xcode, target → Supported Destinations → add "M
 - **BLOCKER: the remaining physical notification scenarios are unverified.** iOS build `b1c7a091-070b-4ab2-9c4f-db6cb8c68fbf` and Android build `a2ee45bd-d9da-4337-bf24-cdfd2fb581de` were installed on owned phones. Registration, provider `ok` receipts and visible arrival passed on both on September 11; Android also displayed a real worker-generated `Ready to read` notification. Still verify foreground/background/terminated item/report taps, broader visual/accessibility behavior, denied-permission settings recovery, offline retry and account switching.
 - Android Firebase project `flowy-494202` now has app `app.tryflowy.client`; EAS stores its `GOOGLE_SERVICES_JSON` file variable for development, preview and production plus the matching FCM V1 service-account credential. Neither credential is tracked by Git or embedded in the client.
 - Server rollout is coordinated through `Flowy/docs/push-notifications-rollout.md`. `DIGEST_PUSH_ENABLED=1` is deployed on web/worker while the worker remains restricted to `DIGEST_DELIVERY_ENV=staging` and its explicit recipient allowlist. This task leaves isolated commits for later merge.
+
+## Android Google sign-in — 2026-09-11
+
+- OAuth Android client creation resolved: `Flowy Android EAS` is registered in
+  `flowy-494202` for `app.tryflowy.client` and the verified EAS SHA-1.
+  Client ID and build validation are recorded in `docs/GOOGLE_SIGN_IN_ANDROID.md`.
+- Live Android Google sign-in remains unverified: no Android device is connected.
+  Follow `docs/GOOGLE_SIGN_IN_ANDROID.md` with an EAS-signed build; Play-distributed
+  builds also need their actual Play app-signing certificate registered.
+
+## Icon visual validation — 2026-09-16
+
+BLOCKER: New icon passes Xcode asset-catalog compilation and PNG format checks, but installation of a separate local icon-preview app and `simctl listapps` stalled on the running iOS 26 simulator. Commands were stopped; the simulator was not reset. Verify the new icon on SpringBoard when simulator service responds or during the next authorized native build. TestFlight build/submission is explicitly on hold until the user's additional feature is included.

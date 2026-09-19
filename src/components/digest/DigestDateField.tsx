@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Platform, Pressable, View, Text } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
 import { useDigestColors } from "@/lib/digestAppearance";
 import {
@@ -29,6 +30,7 @@ export function DigestDateField({
   disabled,
 }: DigestDateFieldProps) {
   const [open, setOpen] = useState(false);
+  const { locale } = useI18n();
   const colors = useDigestColors();
   const { resolved } = useTheme();
   const date = mode === "time" ? timePickerDate(value) : datePickerDate(value);
@@ -78,8 +80,8 @@ export function DigestDateField({
         />
         <Text className="font-sans text-base text-fg">
           {mode === "time"
-            ? displayTime(value)
-            : date.toLocaleDateString(undefined, {
+            ? displayTime(value, locale)
+            : date.toLocaleDateString(locale, {
                 timeZone: "UTC",
                 dateStyle: "medium",
               })}

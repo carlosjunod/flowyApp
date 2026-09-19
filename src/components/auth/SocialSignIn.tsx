@@ -9,8 +9,9 @@ import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { ENV } from '@/lib/env';
-import { exchangeGoogleIdentity, googleAuthMessage, type GoogleAuthOutcome } from '@/lib/googleAuth';
+import { exchangeGoogleIdentity, socialAuthErrorKey, type GoogleAuthOutcome } from '@/lib/googleAuth';
 import { requestGoogleIdentity } from '@/lib/googleSignIn';
+import { useI18n } from '@/lib/i18n';
 
 interface SocialIdentity {
   idToken: string;
@@ -34,11 +35,15 @@ export function SocialSignIn({ disabled, onBusyChange, provider = 'Google' }: Pr
     return () => { active = false; };
   }, [provider]);
   const { signInWithSession } = useAuth();
+  const { t, tKey } = useI18n();
   const [busy, setBusy] = useState(false);
   const [consentVisible, setConsentVisible] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // A translation key, not a sentence: the provider name is interpolated at
+  // render time, which replaced a `replaceAll('Google', provider)` rewrite of
+  // already-rendered English.
+  const [errorKey, setErrorKey] = useState<string | null>(null);
   const identity = useRef<SocialIdentity | null>(null);
   const running = useRef(false);
   const mounted = useRef(true);
@@ -65,14 +70,14 @@ export function SocialSignIn({ disabled, onBusyChange, provider = 'Google' }: Pr
     } else if (result.type === 'error') {
       identity.current = null;
       setConsentVisible(false);
-      setError(provider === 'Apple' ? result.message.replaceAll('Google', 'Apple') : result.message);
+      setErrorKey(result.messageKey);
     }
   };
   const run = async (consent: boolean) => {
     if (running.current || disabled || (consent && (!accepted || !termsAccepted))) return;
     running.current = true;
     setBusy(true);
-    setError(null);
+    setErrorKey(null);
     try {
       const credential = consent ? identity.current : provider === 'Google' ? await requestGoogleIdentity() : await (async () => {
         const apple = await AppleAuthentication.signInAsync({ requestedScopes: [AppleAuthentication.AppleAuthenticationScope.FULL_NAME, AppleAuthentication.AppleAuthenticationScope.EMAIL] });
@@ -89,7 +94,7 @@ export function SocialSignIn({ disabled, onBusyChange, provider = 'Google' }: Pr
       identity.current = null;
       if (mounted.current) {
         setConsentVisible(false);
-        setError(googleAuthMessage(err).replaceAll('Google', provider));
+        setErrorKey(socialAuthErrorKey(err));
       }
     } finally {
       running.current = false;
@@ -102,39 +107,39 @@ export function SocialSignIn({ disabled, onBusyChange, provider = 'Google' }: Pr
     setAccepted(false);
     setTermsAccepted(false);
     setConsentVisible(false);
-    setError(null);
+    setErrorKey(null);
   };
 
   if (Platform.OS !== 'ios' && Platform.OS !== 'android') return null;
   if (provider === 'Apple' && !appleAvailable) return null;
   return (
     <>
-      {provider === 'Google' ? <Button title="Continue with Google" variant="secondary" disabled={disabled || consentVisible} loading={busy} onPress={() => run(false)} /> : (
+      {provider === 'Google' ? <Button title={t('auth.social.continueGoogle')} variant="secondary" disabled={disabled || consentVisible} loading={busy} onPress={() => run(false)} /> : (
         <View pointerEvents={disabled || consentVisible || busy ? 'none' : 'auto'} accessibilityState={{ disabled: disabled || consentVisible || busy }}>
           <AppleAuthentication.AppleAuthenticationButton buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE} buttonStyle={resolved === 'dark' ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK} cornerRadius={12} style={{ height: 44, width: '100%', opacity: disabled || busy ? 0.6 : 1 }} onPress={() => run(false)} />
         </View>
       )}
-      {error ? <Text accessibilityRole="alert" className="text-danger text-sm">{error}</Text> : null}
+      {errorKey ? <Text accessibilityRole="alert" className="text-danger text-sm">{tKey(errorKey, { provider })}</Text> : null}
       <Modal visible={consentVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={cancel}>
         <SafeAreaView className="flex-1 bg-bg">
           <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
             <View accessibilityViewIsModal className="gap-5">
-              <Text accessibilityRole="header" className="text-3xl text-fg" style={{ fontFamily: 'InstrumentSerif_400Regular' }}>Create your Flowy account</Text>
-              <Text className="text-muted">One more step before creating your account with {provider}.</Text>
-              <Pressable accessibilityRole="checkbox" accessibilityLabel="Accept Terms of Service and Privacy Policy" accessibilityState={{ checked: termsAccepted, disabled: busy }} disabled={busy} onPress={() => setTermsAccepted(!termsAccepted)} className="flex-row items-start gap-3 py-2" style={{ minHeight: 44 }}>
+              <Text accessibilityRole="header" className="text-3xl text-fg" style={{ fontFamily: 'InstrumentSerif_400Regular' }}>{t('auth.consent.modalTitle')}</Text>
+              <Text className="text-muted">{t('auth.consent.modalBody', { provider })}</Text>
+              <Pressable accessibilityRole="checkbox" accessibilityLabel={t('auth.consent.termsLabel')} accessibilityState={{ checked: termsAccepted, disabled: busy }} disabled={busy} onPress={() => setTermsAccepted(!termsAccepted)} className="flex-row items-start gap-3 py-2" style={{ minHeight: 44 }}>
                 <View className="h-6 w-6 rounded border border-border items-center justify-center"><Text className="text-fg">{termsAccepted ? '✓' : ''}</Text></View>
-                <Text className="flex-1 text-fg leading-6">I agree to the Terms of Service and Privacy Policy.</Text>
+                <Text className="flex-1 text-fg leading-6">{t('auth.consent.terms')}</Text>
               </Pressable>
               <View className="flex-row gap-5">
-                <Text accessibilityRole="link" onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/privacy`)} className="text-accent underline">Privacy Policy</Text>
-                <Text accessibilityRole="link" onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/terms`)} className="text-accent underline">Terms of Service</Text>
+                <Text accessibilityRole="link" onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/privacy`)} className="text-accent underline">{t('auth.consent.privacyLink')}</Text>
+                <Text accessibilityRole="link" onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/terms`)} className="text-accent underline">{t('auth.consent.termsLink')}</Text>
               </View>
-              <Pressable accessibilityRole="checkbox" accessibilityLabel="Accept AI processing" accessibilityState={{ checked: accepted, disabled: busy }} disabled={busy} onPress={() => setAccepted(!accepted)} className="flex-row items-start gap-3 py-2" style={{ minHeight: 44 }}>
+              <Pressable accessibilityRole="checkbox" accessibilityLabel={t('auth.consent.aiLabel')} accessibilityState={{ checked: accepted, disabled: busy }} disabled={busy} onPress={() => setAccepted(!accepted)} className="flex-row items-start gap-3 py-2" style={{ minHeight: 44 }}>
                 <View className="h-6 w-6 rounded border border-border items-center justify-center"><Text className="text-fg">{accepted ? '✓' : ''}</Text></View>
-                <Text className="flex-1 text-fg leading-6">I agree that Flowy may send my saved content and chat requests to Anthropic, OpenAI, and Voyage AI to summarize, transcribe, search, and answer questions.</Text>
+                <Text className="flex-1 text-fg leading-6">{t('auth.consent.modalAi')}</Text>
               </Pressable>
-              <Button title="Create account" disabled={!accepted || !termsAccepted} loading={busy} onPress={() => run(true)} />
-              <Button title="Cancel" variant="ghost" disabled={busy} onPress={cancel} />
+              <Button title={t('auth.consent.accept')} disabled={!accepted || !termsAccepted} loading={busy} onPress={() => run(true)} />
+              <Button title={t('auth.consent.cancel')} variant="ghost" disabled={busy} onPress={cancel} />
             </View>
           </ScrollView>
         </SafeAreaView>

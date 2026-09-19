@@ -50,9 +50,33 @@ export type ChatAdapters = {
 };
 export const newChatId = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+
+/**
+ * Sentinel title for a conversation the user has not named by asking anything.
+ *
+ * Deliberately stored in English: it is persisted and synced across devices, so
+ * translating it at creation time would write the creating device's language
+ * into shared data. The UI compares against this constant and renders
+ * `chat.history.newConversation` instead — see `ChatPanel`.
+ */
+export const DEFAULT_CONVERSATION_TITLE = 'New conversation';
+
+/** Title + prefilled drafts for a digest-scoped conversation. */
+export interface DigestSeedCopy {
+  title: string;
+  sourceDraft: string;
+  digestDraft: string;
+}
+
+export const DEFAULT_DIGEST_SEED: DigestSeedCopy = {
+  title: 'About your digest',
+  sourceDraft: 'Help me understand this source.',
+  digestDraft: 'What should I remember from this digest?',
+};
+
 export const freshConversation = (): LocalConversation => ({
   id: newChatId(),
-  title: 'New conversation',
+  title: DEFAULT_CONVERSATION_TITLE,
   updatedAt: Date.now(),
   draft: '',
   messages: [],
@@ -61,27 +85,26 @@ export function freshHistory(): LocalHistory {
   const c = freshConversation();
   return { activeId: c.id, conversations: [c] };
 }
-export function chatError(error: unknown): string {
+/**
+ * Maps a thrown error's *code* to a translation key.
+ *
+ * The engine is shared with the web client, which has its own dictionary, so it
+ * returns keys rather than sentences. Every key below exists under
+ * `chat.errors.*` in both dictionaries.
+ */
+export function chatErrorKey(error: unknown): string {
   const code = error instanceof Error ? error.message : '';
-  if (code === 'CHAT_BUSY')
-    return 'A response is already being prepared on another device. Refresh to see it.';
-  if (code === 'REVISION_CONFLICT')
-    return 'This conversation changed on another device. Review the latest messages and send again.';
-  if (code === 'REQUEST_EXISTS')
-    return 'This question was already received. Refresh to see its saved response.';
-  if (code === 'CHAT_DELETED')
-    return 'This conversation was deleted. Start a new chat to continue.';
-  if (code === 'NOT_FOUND')
-    return 'This conversation could not be found. Your local copy is preserved. Refresh and try again.';
-  if (code === 'CHAT_HISTORY_UNAVAILABLE')
-    return 'Chat sync is not available on this server yet. Your local chats are preserved.';
-  if (code === 'CHAT_TIMEOUT')
-    return 'Connecting took too long. Your draft is preserved. Please try again.';
-  if (code === 'UNAUTHORIZED')
-    return 'Your session expired. Sign in again to sync your chats.';
+  if (code === 'CHAT_BUSY') return 'chat.errors.CHAT_BUSY';
+  if (code === 'REVISION_CONFLICT') return 'chat.errors.REVISION_CONFLICT';
+  if (code === 'REQUEST_EXISTS') return 'chat.errors.REQUEST_EXISTS';
+  if (code === 'CHAT_DELETED') return 'chat.errors.CHAT_DELETED';
+  if (code === 'NOT_FOUND') return 'chat.errors.NOT_FOUND';
+  if (code === 'CHAT_HISTORY_UNAVAILABLE') return 'chat.errors.CHAT_HISTORY_UNAVAILABLE';
+  if (code === 'CHAT_TIMEOUT') return 'chat.errors.CHAT_TIMEOUT';
+  if (code === 'UNAUTHORIZED') return 'chat.errors.UNAUTHORIZED';
   if (code === 'BODY_TOO_LARGE' || code === 'VALIDATION_FAILED')
-    return 'This local chat could not be imported because it exceeds the supported format or size. Your local copy is preserved.';
-  return 'Chat sync could not finish. Your local copy is available; reconnect and retry.';
+    return 'chat.errors.BODY_TOO_LARGE';
+  return 'chat.errors.DEFAULT';
 }
 export function useChatEngine(
   accountId: string | null,
@@ -140,10 +163,7 @@ export function useChatEngine(
       await latest.current.write(s.user, cache);
       if (valid(s)) setStorageError(null);
     } catch {
-      if (valid(s))
-        setStorageError(
-          'This device could not save its local chat copy. Keep the app open and retry.',
-        );
+      if (valid(s)) setStorageError('chat.errors.storageWrite');
     }
   };
   const request = <T>(
@@ -310,7 +330,7 @@ export function useChatEngine(
             } catch (error) {
               // One unsupported legacy chat must not hide the rest of the account.
               failedImports.add(c.id);
-              importError = chatError(error);
+              importError = chatErrorKey(error);
             }
           }
         }
@@ -394,7 +414,7 @@ export function useChatEngine(
           setSyncError(
             s.unavailable && latest.current.streamLocal
               ? null
-              : chatError(error),
+              : chatErrorKey(error),
           );
           setSynced(false);
         }
@@ -439,10 +459,7 @@ export function useChatEngine(
         void refreshRef.current();
       })
       .catch(() => {
-        if (valid(s))
-          setStorageError(
-            'Saved chats could not be loaded. Retry to protect your existing conversations.',
-          );
+        if (valid(s)) setStorageError('chat.errors.storageRead');
       });
     return () => {
       if (s.writable)
@@ -522,7 +539,7 @@ export function useChatEngine(
     )
       return;
     if (question.length > 16000) {
-      setSyncError('Please keep your question under 16,000 characters.');
+      setSyncError('chat.errors.tooLong');
       return;
     }
     setActionError(null);
@@ -655,7 +672,7 @@ export function useChatEngine(
         );
     } catch (error) {
       if (valid(s) && run.current === r) {
-        setActionError(chatError(error));
+        setActionError(chatErrorKey(error));
         setSynced(false);
         if (before)
           change((h) => ({
@@ -744,8 +761,10 @@ export function useChatEngine(
     history,
     active,
     ready,
-    storageError,
-    syncError: actionError || syncError,
+    // Both carry *translation keys*, not sentences: the view renders them with
+    // its own dictionary so a locale switch updates a visible error.
+    storageErrorKey: storageError,
+    syncErrorKey: actionError || syncError,
     syncing,
     synced,
     localOnly,
@@ -773,16 +792,24 @@ export function useChatEngine(
           ? { ...h, activeId: id }
           : h,
       ),
-    startNew: (digestContext?: LocalConversation['digestContext']) => {
+    /**
+     * `seed` supplies the digest conversation's title and prefilled draft. The
+     * caller passes translated copy; the English default keeps the engine
+     * usable (and testable) without a translator. The draft is *editable text
+     * the user reviews before sending*, so localizing it is intended: it is not
+     * a silent rewrite of a stored message.
+     */
+    startNew: (
+      digestContext?: LocalConversation['digestContext'],
+      seed: DigestSeedCopy = DEFAULT_DIGEST_SEED,
+    ) => {
       if (!ready) return;
       stop();
       const c = freshConversation();
       if (digestContext) {
         c.digestContext = digestContext;
-        c.title = 'About your digest';
-        c.draft = digestContext.itemIds
-          ? 'Help me understand this source.'
-          : 'What should I remember from this digest?';
+        c.title = seed.title;
+        c.draft = digestContext.itemIds ? seed.sourceDraft : seed.digestDraft;
       }
       change((h) => ({
         activeId: c.id,
@@ -817,7 +844,7 @@ export function useChatEngine(
       try {
         await load(s, c.id, c.before);
       } catch (error) {
-        if (valid(s)) setSyncError(chatError(error));
+        if (valid(s)) setSyncError(chatErrorKey(error));
       }
     },
     deleteConversation: remove,

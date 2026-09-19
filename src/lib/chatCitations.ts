@@ -1,5 +1,5 @@
 import type { CitedItem } from '@/types';
-import { itemTypeLabel } from './itemIcons';
+import { itemTypeLabelKey } from './itemIcons';
 
 export const CITATION_RE = /\[\[([A-Za-z0-9_-]+)\]\]/g;
 export const ITEM_PROTOCOL = 'item://';
@@ -14,13 +14,20 @@ export function prepareCitations(text: string) {
   return { content, indexById };
 }
 
-export function domainLabelForRef(item: CitedItem): string {
-  if (item.site_name?.trim()) return item.site_name.trim();
+/**
+ * The domain caption under a cited item.
+ *
+ * Returns *source-provided* text (site name or hostname) when there is any, and
+ * only falls back to a translation key — hence the `key` discriminator, which
+ * tells the caller whether to render the value or translate it.
+ */
+export function domainLabelForRef(item: CitedItem): { text: string } | { key: string } {
+  if (item.site_name?.trim()) return { text: item.site_name.trim() };
   for (const url of [item.source_url, item.raw_url]) {
     if (!url) continue;
-    try { return new URL(url).hostname.replace(/^www\./, ''); } catch { /* Try the alternate URL. */ }
+    try { return { text: new URL(url).hostname.replace(/^www\./, '') }; } catch { /* Try the alternate URL. */ }
   }
-  return itemTypeLabel[item.type] || 'Saved source';
+  return { key: itemTypeLabelKey[item.type] || 'chat.message.savedSource' };
 }
 
 export function copyWithCitations(text: string, items: CitedItem[]): string {

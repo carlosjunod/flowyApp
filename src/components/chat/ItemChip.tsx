@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-na
 
 import { ENV } from '@/lib/env';
 import { domainLabelForRef } from '@/lib/chatCitations';
+import { useI18n } from '@/lib/i18n';
 import { itemTypeIcon } from '@/lib/itemIcons';
 import { useResolvedColors } from '@/lib/theme';
 import { extractYoutubeId, hostOf } from '@/lib/thumbnails';
@@ -27,11 +28,15 @@ export function thumbnailUrlForRef(item: CitedItem): string | null {
 /** Native Text spans keep citations on the paragraph baseline; no inline View/image. */
 export function InlineItemChip({ item, id, index }: { item?: CitedItem; id: string; index?: number }) {
   const colors = useResolvedColors();
+  const { t } = useI18n();
   return (
     <Text
       onPress={() => router.push(`/item/${id}`)}
       accessibilityRole="link"
-      accessibilityLabel={`Open source ${index ?? ''}: ${item?.title?.trim() || 'Saved source'}`}
+      accessibilityLabel={t('chat.message.openSource', {
+        index: index ?? '',
+        title: item?.title?.trim() || t('chat.message.savedSource'),
+      })}
       suppressHighlighting={false}
       style={{ fontFamily: 'Inter_600SemiBold', fontSize: 12, color: colors.accent, backgroundColor: colors.surface }}
     >
@@ -57,17 +62,23 @@ export function CitedItemsRail({ items, indexById }: { items: CitedItem[]; index
 
 function SourceCard({ item, index, width }: { item: CitedItem; index?: number; width?: number }) {
   const colors = useResolvedColors();
+  const { t, tKey } = useI18n();
   const [pressed, setPressed] = useState(false);
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const thumb = thumbnailUrlForRef(item);
-  const title = item.title?.trim() || 'Untitled save';
+  const title = item.title?.trim() || t('chat.message.untitled');
+  // The caption is either source-provided text or a key — see `domainLabelForRef`.
+  const label = domainLabelForRef(item);
+  const domain = 'text' in label ? label.text : tKey(label.key);
   return (
     <Pressable
       onPress={() => router.push(`/item/${item.id}`)}
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
       accessibilityRole="link"
-      accessibilityLabel={`Open ${index ? `source ${index}` : 'saved item'}: ${title}, ${domainLabelForRef(item)}`}
+      accessibilityLabel={index
+        ? t('chat.message.openSourceIndexed', { index, title, domain })
+        : t('chat.message.openSavedItemDomain', { title, domain })}
       style={[styles.card, {
         width: width ?? '100%', borderColor: pressed ? colors.accent : colors.border,
         backgroundColor: pressed ? colors.surface : colors.card,
@@ -84,7 +95,7 @@ function SourceCard({ item, index, width }: { item: CitedItem; index?: number; w
         </Text>
         <View style={styles.source}>
           <Feather name="link" size={12} color={colors.muted} accessible={false} />
-          <Text numberOfLines={1} style={[styles.domain, { color: colors.muted }]}>{domainLabelForRef(item)}</Text>
+          <Text numberOfLines={1} style={[styles.domain, { color: colors.muted }]}>{domain}</Text>
         </View>
       </View>
     </Pressable>

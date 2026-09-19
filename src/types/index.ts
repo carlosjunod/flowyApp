@@ -124,8 +124,8 @@ export type Item = {
   /** R2 URLs of the original uploaded media (e.g. the receipt photo). */
   original_media_urls?: string[];
   /**
-   * Result of the exploration/enrichment pass. Items now arrive auto-enriched at
-   * ingest with `primary_link` + `candidates`; the deep-dive pass populates
+   * Result of manual exploration (or opt-in automatic enrichment).
+   * Identifies `primary_link` + `candidates`; the deep-dive pass populates
    * `deep_analysis` with synthesis + key findings + link excerpts.
    */
   exploration?: ItemExploration;
@@ -165,7 +165,14 @@ export type ChatMessage = {
   citations?: CitedItem[];
   streaming?: boolean;
   interrupted?: boolean;
-  error?: string;
+  /**
+   * Translation key for a failed turn, never a sentence.
+   *
+   * Messages are persisted locally and restored on the next launch, so storing
+   * the rendered English would pin a message to the language of the device that
+   * happened to receive the failure.
+   */
+  errorKey?: string;
 };
 
 export type ApiErrorCode =

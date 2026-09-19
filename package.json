@@ -14,7 +14,11 @@
     "test:ui-models": "node scripts/test-ui-models.cjs",
     "test:push-contract": "node scripts/test-push-contract.cjs",
     "test:google-auth": "node scripts/test-google-auth.cjs",
-    "test:reader-navigation": "node scripts/test-reader-navigation.cjs"
+    "test:reader-navigation": "node scripts/test-reader-navigation.cjs",
+    "test:i18n-core": "node scripts/test-i18n-core.cjs",
+    "test:i18n-parity": "node scripts/test-i18n-parity.cjs",
+    "test:i18n-screens": "node scripts/test-i18n-screens.cjs",
+    "test:i18n": "npm run test:i18n-core && npm run test:i18n-parity && npm run test:i18n-screens"
   },
   "dependencies": {
     "@expo-google-fonts/instrument-serif": "^0.4.1",
