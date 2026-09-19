@@ -338,7 +338,7 @@ Floating inbox chat: [behavior, validation and distribution](docs/FLOATING-CHAT.
 The whole native interface is now available in Spanish alongside English:
 auth, tabs, inbox (filters, labels, cards, bulk actions, states), the reader and
 its semantic/receipt/media renderers, chat and its history, digests and digest
-settings, personalization, storage, the inbox email alias, and every alert and
+settings, personalization, storage, the inbox email alias, the Instagram connection screen, and every alert and
 accessibility label.
 
 What is *not* translated is as deliberate as what is: item titles, notes, tags

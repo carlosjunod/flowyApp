@@ -124,7 +124,7 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   appState.currentState='background';[...timers.values()].forEach(fn=>fn());assert.equal(refreshes.length,0);
   appState.currentState='active';foreground('active');assert.equal(refreshes.length,1);
   passed('Native handoff opens the private link, keeps codes out of cache, and refreshes on foreground only');
-  openFails=true;await state.connect();state=render();assert.match(state.error,/Could not open Instagram/);assert.equal(state.connection.code,code);openFails=false;
+  openFails=true;await state.connect();state=render();assert.equal(state.errorKey,'settings.instagram.errors.openFailed');assert.equal(state.connection.code,code);openFails=false;
   passed('A failed app handoff preserves the manual connection code');
   queryData={...queryData,connected:true};state=render();assert.equal(state.connection,null);
   await state.disconnect();state=render();assert.equal(state.data.connected,false);

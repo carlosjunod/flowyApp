@@ -17,10 +17,11 @@ export function instagramConnectionUrl(connection: InstagramConnection, now = Da
   return `${instagramChatUrl(connection)}?ref=${encodeURIComponent(connection.code!)}`;
 }
 
-export function instagramConnectionError(code?: string): string {
-  if (code === 'UNAUTHORIZED') return 'Your session changed. Reopen this screen or sign in again.';
-  if (code === 'AI_CONSENT_REQUIRED') return 'Accept AI processing in Flowy before connecting Instagram.';
-  if (code === 'ALREADY_LINKED') return 'This account is already connected. Refresh its status.';
-  if (code === 'NETWORK_ERROR') return 'Could not reach Flowy. Check your connection and try again.';
-  return 'Could not update Instagram. Please try again.';
+/** Translation key for a connection failure; the server code stays the contract. */
+export function instagramConnectionErrorKey(code?: string): string {
+  if (code === 'UNAUTHORIZED') return 'settings.instagram.errors.sessionChanged';
+  if (code === 'AI_CONSENT_REQUIRED') return 'settings.instagram.errors.consentRequired';
+  if (code === 'ALREADY_LINKED') return 'settings.instagram.errors.alreadyLinked';
+  if (code === 'NETWORK_ERROR') return 'settings.instagram.errors.network';
+  return 'settings.instagram.errors.updateFailed';
 }
