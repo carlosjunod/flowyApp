@@ -23,11 +23,20 @@ export function getDefaultCurrencySymbol(): CurrencySymbol {
   return HARDCODED_DEFAULT;
 }
 
+/**
+ * `locale` controls grouping only ("$156,915" vs "$156.915"); the symbol is the
+ * account's, not the locale's, so it is never inferred from the language.
+ */
 export function formatCurrency(
   amount: number,
+  locale = 'en',
   symbol: CurrencySymbol = getDefaultCurrencySymbol(),
 ): string {
   if (!Number.isFinite(amount)) return '';
   const safe = Math.round(amount);
-  return `${symbol}${safe.toLocaleString('en-US')}`;
+  try {
+    return `${symbol}${new Intl.NumberFormat(locale).format(safe)}`;
+  } catch {
+    return `${symbol}${safe.toLocaleString('en-US')}`;
+  }
 }

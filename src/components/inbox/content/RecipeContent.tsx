@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Pressable, Text, View, type TextStyle, type ViewStyle } from 'react-native';
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
 import { recipeIngredientLabel, type SemanticContentV1 } from '@/types/semantic';
 
 export function RecipeContent({ content }: { content: SemanticContentV1 }) {
   const [factor, setFactor] = useState(1);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const { t, formatNumber } = useI18n();
   const colors = useResolvedColors();
   const servings = content.recipe?.servings;
   const ingredients = content.entries.filter(e => e.recipe?.role === 'ingredient');
@@ -18,11 +20,11 @@ export function RecipeContent({ content }: { content: SemanticContentV1 }) {
   return <View style={styles.root}>
     <View style={{ ...styles.portions, borderColor: colors.border }}>
       <View style={styles.portionsHeading}>
-        <View><Text style={label}>Recipe size</Text><Text style={hint}>{servings ? `Original: ${servings} servings` : 'Original servings not specified'}</Text></View>
+        <View><Text style={label}>{t('inbox.recipe.size')}</Text><Text style={hint}>{servings ? t('inbox.recipe.originalServings', { count: servings }) : t('inbox.recipe.noServings')}</Text></View>
         <View style={{ ...styles.stepper, borderColor: colors.border }}>
-          {servings ? stepControl('Fewer servings', '−', () => setFactor(Math.max(1, servings * factor - 1) / servings), servings * factor <= 1) : null}
-          <Text accessibilityLiveRegion="polite" style={{ ...styles.yield, color: colors.fg }}>{servings ? `${Number((servings * factor).toFixed(2))} servings` : `${factor}× recipe`}</Text>
-          {servings ? stepControl('More servings', '+', () => setFactor(Math.min(100, factor + 1 / servings)), factor >= 100) : null}
+          {servings ? stepControl(t('inbox.recipe.fewer'), '−', () => setFactor(Math.max(1, servings * factor - 1) / servings), servings * factor <= 1) : null}
+          <Text accessibilityLiveRegion="polite" style={{ ...styles.yield, color: colors.fg }}>{servings ? t('inbox.recipe.servings', { count: Number((servings * factor).toFixed(2)) }) : t('inbox.recipe.multiplier', { count: factor })}</Text>
+          {servings ? stepControl(t('inbox.recipe.more'), '+', () => setFactor(Math.min(100, factor + 1 / servings)), factor >= 100) : null}
         </View>
       </View>
       <View style={{ ...styles.presets, backgroundColor: colors.surface }}>
@@ -31,29 +33,29 @@ export function RecipeContent({ content }: { content: SemanticContentV1 }) {
           <Text style={{ fontSize: 14, fontWeight: factor === n ? '600' : '500', color: factor === n ? colors.accent : colors.fg }}>{n === 0.5 ? '½' : n}×</Text>
         </Pressable>)}
       </View>
-      <Text style={hint}>{servings ? 'Amounts update for your servings.' : 'Use a multiplier to adjust the whole recipe.'} Times and temperatures stay as written.</Text>
+      <Text style={hint}>{servings ? t('inbox.recipe.scaledHint') : t('inbox.recipe.multiplierHint')}{t('inbox.recipe.unchangedHint')}</Text>
     </View>
 
     <View>
-      <View style={styles.sectionHeading}><Text accessibilityRole="header" style={heading}>Ingredients</Text>{ingredients.length ? <Text style={hint}>{ingredients.length}</Text> : null}</View>
-      {!ingredients.length ? <Text style={hint}>No ingredients could be extracted. Check the saved source below.</Text> : <>
+      <View style={styles.sectionHeading}><Text accessibilityRole="header" style={heading}>{t('inbox.recipe.ingredients')}</Text>{ingredients.length ? <Text style={hint}>{formatNumber(ingredients.length)}</Text> : null}</View>
+      {!ingredients.length ? <Text style={hint}>{t('inbox.recipe.noIngredients')}</Text> : <>
         {ingredients.map((entry, index) => {
           const quantity = recipeIngredientLabel(entry, factor).slice(0, -entry.name.length).trim();
           return <View key={entry.id} style={{ ...styles.ingredient, paddingTop: index === 0 ? 0 : 14, borderColor: colors.border }}>
-            <View style={{ flex: 1, minWidth: 0 }}><Text selectable style={{ ...styles.body, color: colors.fg }}>{entry.name}</Text>{!entry.recipe?.amount ? <Text selectable style={hint}>{entry.description || 'Quantity not specified'}</Text> : null}</View>
+            <View style={{ flex: 1, minWidth: 0 }}><Text selectable style={{ ...styles.body, color: colors.fg }}>{entry.name}</Text>{!entry.recipe?.amount ? <Text selectable style={hint}>{entry.description || t('inbox.recipe.noQuantity')}</Text> : null}</View>
             {quantity ? <Text selectable style={{ ...styles.quantity, color: colors.fg }}>{quantity}</Text> : null}
           </View>;
         })}
-        <Pressable accessibilityRole="button" accessibilityLabel="Original quantities" accessibilityState={{ expanded: evidenceOpen }} onPress={() => setEvidenceOpen(v => !v)} style={({ pressed }) => ({ ...styles.evidenceToggle, backgroundColor: pressed ? colors.surface : 'transparent' })}>
-          <Text style={hint}>Original quantities</Text><Text accessibilityElementsHidden importantForAccessibility="no" style={{ color: colors.muted, fontSize: 18 }}>{evidenceOpen ? '⌃' : '⌄'}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('inbox.recipe.originalQuantities')} accessibilityState={{ expanded: evidenceOpen }} onPress={() => setEvidenceOpen(v => !v)} style={({ pressed }) => ({ ...styles.evidenceToggle, backgroundColor: pressed ? colors.surface : 'transparent' })}>
+          <Text style={hint}>{t('inbox.recipe.originalQuantities')}</Text><Text accessibilityElementsHidden importantForAccessibility="no" style={{ color: colors.muted, fontSize: 18 }}>{evidenceOpen ? '⌃' : '⌄'}</Text>
         </Pressable>
-        {evidenceOpen ? <View><Text style={hint}>As saved in the source. Unspecified amounts remain unchanged.</Text>{ingredients.map(entry => <View key={entry.id} style={{ paddingVertical: 12 }}><Text style={label}>{entry.name}</Text>{entry.evidence.map((proof, i) => <Text selectable key={i} style={{ ...hint, marginTop: 4 }}>{proof.quote}</Text>)}</View>)}</View> : null}
+        {evidenceOpen ? <View><Text style={hint}>{t('inbox.recipe.originalQuantitiesHint')}</Text>{ingredients.map(entry => <View key={entry.id} style={{ paddingVertical: 12 }}><Text style={label}>{entry.name}</Text>{entry.evidence.map((proof, i) => <Text selectable key={i} style={{ ...hint, marginTop: 4 }}>{proof.quote}</Text>)}</View>)}</View> : null}
       </>}
     </View>
 
     <View>
-      <View style={styles.sectionHeading}><Text accessibilityRole="header" style={heading}>Preparation</Text>{steps.length ? <Text style={hint}>{steps.length} steps</Text> : null}</View>
-      {!steps.length ? <Text style={hint}>Preparation steps were not present in the extracted source.</Text> : <View style={{ gap: 28 }}>{steps.map((entry, i) => <View key={entry.id} style={styles.step}>
+      <View style={styles.sectionHeading}><Text accessibilityRole="header" style={heading}>{t('inbox.recipe.preparation')}</Text>{steps.length ? <Text style={hint}>{t('inbox.recipe.stepCount', { count: steps.length })}</Text> : null}</View>
+      {!steps.length ? <Text style={hint}>{t('inbox.recipe.noSteps')}</Text> : <View style={{ gap: 28 }}>{steps.map((entry, i) => <View key={entry.id} style={styles.step}>
         <Text style={{ ...styles.stepNumber, color: colors.muted }}>{String(i + 1).padStart(2, '0')}</Text>
         <View style={{ flex: 1, minWidth: 0 }}><Text selectable style={{ ...styles.body, fontWeight: '600', marginBottom: 6, color: colors.fg }}>{entry.name}</Text><Text selectable style={{ ...styles.body, color: colors.fg }}>{entry.description || entry.evidence[0]?.quote}</Text></View>
       </View>)}</View>}

@@ -2,19 +2,21 @@ import React, { useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { safeSemanticUrl } from '@/types/semantic';
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
 
 export function ResourceLink({ url, title, provenance, primary = false }: {
   url: string; title: string; provenance?: string; primary?: boolean;
 }) {
   const [error, setError] = useState(false);
+  const { t } = useI18n();
   const colors = useResolvedColors();
   const safe = safeSemanticUrl(url);
   if (!safe) return null;
   const domain = new URL(safe).hostname.replace(/^www\./, '');
   return <View style={{ minWidth: 0, maxWidth: '100%' }}>
     <Pressable accessibilityRole="link" accessibilityLabel={`${title}, ${domain}${provenance ? `, ${provenance}` : ''}`}
-      accessibilityHint="Opens in your browser" onPress={() => { setError(false); void Linking.openURL(safe).catch(() => setError(true)); }}
+      accessibilityHint={t('common.a11y.externalLink')} onPress={() => { setError(false); void Linking.openURL(safe).catch(() => setError(true)); }}
       style={({ pressed }) => ({ minHeight: 64, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12,
         padding: 12, borderRadius: 8, backgroundColor: pressed ? colors.accent + '1F' : primary ? colors.accent + '14' : 'transparent' })}>
       {primary ? <Feather name="link" size={18} color={colors.accent} /> : null}
@@ -27,6 +29,6 @@ export function ResourceLink({ url, title, provenance, primary = false }: {
       </View>
       <Feather name="arrow-up-right" size={16} color={colors.muted} />
     </Pressable>
-    {error ? <Text accessibilityRole="alert" style={{ color: colors.muted, fontSize: 12, paddingHorizontal: 12 }}>Could not open this link. Try again.</Text> : null}
+    {error ? <Text accessibilityRole="alert" style={{ color: colors.muted, fontSize: 12, paddingHorizontal: 12 }}>{t('inbox.semanticBody.openFailed')}</Text> : null}
   </View>;
 }

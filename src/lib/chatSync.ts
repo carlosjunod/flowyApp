@@ -22,7 +22,7 @@ export function toHistory(snapshot: ChatSnapshot): LocalHistory {
         status:
           m.streaming || m.interrupted
             ? 'interrupted'
-            : m.historyStatus || (m.error ? 'error' : 'complete'),
+            : m.historyStatus || (m.errorKey ? 'error' : 'complete'),
         items: (m.citations || []).map((i) => ({
           ...i,
           source_url: i.source_url || null,
@@ -40,10 +40,7 @@ export function nativeMessage(m: HistoryMessage): ChatMessage {
     historyStatus: m.status,
     streaming: m.status === 'preparing' || m.status === 'streaming',
     interrupted: m.status === 'interrupted' || m.status === 'stopped',
-    error:
-      m.status === 'error'
-        ? 'This response could not be completed. Please try again.'
-        : undefined,
+    errorKey: m.status === 'error' ? 'chat.message.failed' : undefined,
     citations: (m.items || []).map((i) => ({
       id: i.id,
       type: i.type as CitedItem['type'],

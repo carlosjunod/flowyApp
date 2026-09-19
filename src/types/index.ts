@@ -165,7 +165,14 @@ export type ChatMessage = {
   citations?: CitedItem[];
   streaming?: boolean;
   interrupted?: boolean;
-  error?: string;
+  /**
+   * Translation key for a failed turn, never a sentence.
+   *
+   * Messages are persisted locally and restored on the next launch, so storing
+   * the rendered English would pin a message to the language of the device that
+   * happened to receive the failure.
+   */
+  errorKey?: string;
 };
 
 export type ApiErrorCode =

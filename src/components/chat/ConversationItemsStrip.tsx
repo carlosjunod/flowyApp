@@ -1,4 +1,5 @@
-import { itemTypeLabel } from '@/lib/itemIcons';
+import { itemTypeLabelKey } from '@/lib/itemIcons';
+import { useI18n } from '@/lib/i18n';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -43,6 +44,7 @@ const citedToItem = (c: CitedItem): Item => ({
 });
 
 export const ConversationItemsStrip: React.FC<Props> = ({ messages }) => {
+  const { t } = useI18n();
   const items = useMemo(() => collectCited(messages), [messages]);
   if (items.length === 0) return null;
 
@@ -52,7 +54,7 @@ export const ConversationItemsStrip: React.FC<Props> = ({ messages }) => {
         className="text-muted px-4 mb-2"
         style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11, letterSpacing: 1 }}
       >
-        ITEMS IN THIS CONVERSATION
+        {t('inbox.strip.heading')}
       </Text>
       <ScrollView
         horizontal
@@ -68,6 +70,7 @@ export const ConversationItemsStrip: React.FC<Props> = ({ messages }) => {
 };
 
 const MiniImageLedCard: React.FC<{ cited: CitedItem }> = ({ cited }) => {
+  const { t, tKey } = useI18n();
   const item = citedToItem(cited);
   const thumb = thumbnailFor(item);
   const url = cited.source_url;
@@ -82,7 +85,7 @@ const MiniImageLedCard: React.FC<{ cited: CitedItem }> = ({ cited }) => {
       onPress={() => router.push(`/item/${cited.id}`)}
       style={({ pressed }) => [pressed && { opacity: 0.9 }]}
       className="rounded-2xl overflow-hidden bg-card border border-border"
-      accessibilityLabel={cited.title ?? 'Cited item'}
+      accessibilityLabel={cited.title ?? t('inbox.strip.citedItem')}
     >
       <View style={{ width: 140 }}>
         <View style={{ height: 96 }} className="relative bg-surface">
@@ -129,7 +132,7 @@ const MiniImageLedCard: React.FC<{ cited: CitedItem }> = ({ cited }) => {
             style={{ fontFamily: 'Inter_600SemiBold', fontSize: 12, lineHeight: 15 }}
             numberOfLines={2}
           >
-            {cited.title ?? itemTypeLabel[cited.type]}
+            {cited.title ?? tKey(itemTypeLabelKey[cited.type])}
           </Text>
           {cited.category ? (
             <Text

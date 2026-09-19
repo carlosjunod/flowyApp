@@ -3,6 +3,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Pressable, Text, View } from 'react-native';
 
 import { useItemActions } from '@/hooks/useItemActions';
+import { apiErrorKey } from '@/lib/apiErrors';
+import { useI18n } from '@/lib/i18n';
 import { useSelection } from '@/lib/selection';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useResolvedColors } from '@/lib/theme';
@@ -10,6 +12,7 @@ import { useResolvedColors } from '@/lib/theme';
 export const SelectionActionBar: React.FC = () => {
   const selection = useSelection();
   const actions = useItemActions();
+  const { t, tKey } = useI18n();
   const colors = useResolvedColors();
   const reducedMotion = useReducedMotion();
   const slide = useRef(new Animated.Value(0)).current;
@@ -48,15 +51,18 @@ export const SelectionActionBar: React.FC = () => {
     setBusy(null);
     selection.clear();
     if (!res.ok && 'error' in res) {
-      Alert.alert('Reload failed', res.error.message);
+      Alert.alert(t('inbox.selection.reloadFailedTitle'), tKey(apiErrorKey(res.error)));
       return;
     }
     if (res.ok) {
       const { succeeded, failed } = res.data;
       if (failed.length > 0) {
         Alert.alert(
-          'Reload partially complete',
-          `${succeeded.length} reloaded · ${failed.length} skipped`,
+          t('inbox.selection.reloadPartialTitle'),
+          t('inbox.selection.reloadPartialBody', {
+            succeeded: succeeded.length,
+            failed: failed.length,
+          }),
         );
       }
     }
@@ -70,13 +76,16 @@ export const SelectionActionBar: React.FC = () => {
     if (!res.ok && 'cancelled' in res) return;
     selection.exit();
     if (!res.ok && 'error' in res) {
-      Alert.alert('Delete failed', res.error.message);
+      Alert.alert(t('inbox.selection.deleteFailedTitle'), tKey(apiErrorKey(res.error)));
       return;
     }
     if (res.ok && res.data.failed.length > 0) {
       Alert.alert(
-        'Delete partially complete',
-        `${res.data.succeeded.length} deleted · ${res.data.failed.length} failed`,
+        t('inbox.selection.deletePartialTitle'),
+        t('inbox.selection.deletePartialBody', {
+          succeeded: res.data.succeeded.length,
+          failed: res.data.failed.length,
+        }),
       );
     }
   };
@@ -101,23 +110,23 @@ export const SelectionActionBar: React.FC = () => {
     >
       <View
         accessibilityRole="toolbar"
-        accessibilityLabel="Bulk actions"
+        accessibilityLabel={t('inbox.selection.toolbar')}
         className="flex-row flex-wrap items-center justify-center gap-1 rounded-2xl border border-border bg-card px-3 py-2 shadow-card"
         style={{ shadowColor: colors.fg, maxWidth: '95%' }}
       >
         <Text className="text-sm font-semibold text-fg px-2">
-          {count} selected
+          {t('inbox.selection.countSelected', { count })}
         </Text>
 
         <BarButton
-          label="Reprocess"
+          label={t('inbox.selection.reprocess')}
           icon="refresh-cw"
           onPress={onReload}
           disabled={empty || busy !== null}
           loading={busy === 'reload'}
         />
         <BarButton
-          label="Delete"
+          label={t('inbox.selection.delete')}
           icon="trash-2"
           tone="danger"
           onPress={onDelete}
@@ -127,11 +136,11 @@ export const SelectionActionBar: React.FC = () => {
         <Pressable
           onPress={() => selection.exit()}
           hitSlop={8}
-          accessibilityLabel="Exit selection"
+          accessibilityLabel={t('inbox.selection.exit')}
           style={({ pressed }) => [pressed && { opacity: 0.6 }]}
           className="px-3 min-h-[44px] justify-center"
         >
-          <Text className="text-sm text-muted">Cancel</Text>
+          <Text className="text-sm text-muted">{t('inbox.selection.cancel')}</Text>
         </Pressable>
       </View>
     </Animated.View>

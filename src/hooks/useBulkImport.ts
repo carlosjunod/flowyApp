@@ -2,14 +2,21 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '@/lib/api';
-import type { ApiError, ImportBatch } from '@/types';
+import type { ImportBatch } from '@/types';
 
 type Phase = 'idle' | 'submitting' | 'polling' | 'done' | 'error';
+
+/**
+ * `error` is a translation key plus its variables, not a sentence: the sheet
+ * renders it, and a language switch while an import is in flight must relabel
+ * the message rather than leave the previous language on screen.
+ */
+type BulkImportError = { key: string; vars?: Record<string, number> };
 
 type State = {
   phase: Phase;
   batch: ImportBatch | null;
-  error: ApiError | null;
+  error: BulkImportError | null;
   failedUrls: string[];
 };
 
@@ -56,7 +63,7 @@ export const useBulkImport = () => {
           phase: 'error',
           failedUrls: [],
           batch: null,
-          error: { code: 'INVALID_INPUT', message: 'No valid URLs to import' },
+          error: { key: 'inbox.addLinks.errors.noUrls' },
         });
         return;
       }
@@ -66,7 +73,7 @@ export const useBulkImport = () => {
           phase: 'error',
           failedUrls: [],
           batch: null,
-          error: { code: 'INVALID_INPUT', message: `Max ${MAX_URLS} URLs per batch` },
+          error: { key: 'inbox.addLinks.errors.tooMany', vars: { max: MAX_URLS } },
         });
         return;
       }
