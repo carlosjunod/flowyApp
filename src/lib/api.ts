@@ -1,3 +1,4 @@
+import type { InstagramConnection } from '@/types/instagram';
 import type { ReadingFilter } from '@/types/inbox-presentation';
 import type { StorageFiles, FileRetention, FilePreview } from '@/types/files';
 import type { OriginalFile, StorageUsage, UploadSession } from '@/types/files';
@@ -128,14 +129,33 @@ async function personalizationRequest(
   return sameSession() ? result : sessionError;
 }
 
+/** Connection codes are scoped to the original user and token, never another login. */
+async function instagramRequest(accountId: string, init: RequestInit = {}, destination?: string): Promise<ApiResult<InstagramConnection>> {
+  const token = pb.authStore.token;
+  const sameSession = () => !!token && pb.authStore.model?.id === accountId && pb.authStore.token === token;
+  const denied: ApiResult<InstagramConnection> = { data: null, error: { code: 'UNAUTHORIZED', message: 'Your session changed. Reopen Instagram settings.' } };
+  if (!sameSession()) return denied;
+  const result = await request<InstagramConnection>(`/api/integrations/instagram${destination ? `?account=${encodeURIComponent(destination)}` : ''}`, {
+    ...init, cache: 'no-store', credentials: 'omit', headers: { ...init.headers, Authorization: `Bearer ${token}` },
+  });
+  return sameSession() ? result : denied;
+}
+
 export type ItemsResponse = { items: Item[]; page: number; perPage: number; totalItems: number; totalPages: number; categories: string[] };
+
+// Which client the server records on items.ingest_client (Flowy D-042), so the
+// item_saved analytics event can say WHERE a save came from. This file is the
+// RN app itself — the iOS/macOS share sheet is a separate target and declares
+// 'ios_share' from plugins/shareExtensionTemplate/ShareViewController.swift.
+// Attribution only; the server re-validates and never trusts it for access.
+const INGEST_CLIENT = 'mobile';
 
 const fileUploadRequests = new WeakMap<IngestPayload, { token: string; id: string }>();
 async function ingestWithOriginals(payload: IngestPayload): Promise<ApiResult<IngestResponse>> {
   const files = [...(payload.raw_pdfs ?? (payload.raw_pdf ? [payload.raw_pdf] : [])), ...(payload.raw_files ?? (payload.raw_file ? [payload.raw_file] : [])),
     ...(payload.raw_images ?? (payload.raw_image ? [payload.raw_image] : [])).map((data, index) => ({ name: `image-${index + 1}.jpg`, mime: 'image/jpeg', data })),
     ...(payload.raw_video ? [{ name: 'recording.mp4', mime: payload.video_mime || 'video/mp4', data: payload.raw_video }] : [])];
-  if (!files.length) return request<IngestResponse>('/api/ingest', { method: 'POST', body: JSON.stringify(payload) });
+  if (!files.length) return request<IngestResponse>('/api/ingest', { method: 'POST', body: JSON.stringify({ ...payload, client: INGEST_CLIENT }) });
   const token = pb.authStore.token;
   const previousRequest = fileUploadRequests.get(payload);
   const requestId = previousRequest?.token === token ? previousRequest.id : `upload-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
@@ -144,7 +164,7 @@ async function ingestWithOriginals(payload: IngestPayload): Promise<ApiResult<In
     const bytes = files.map(f => Uint8Array.from(atob(f.data.replace(/^data:[^,]*;base64,/, '')), c => c.charCodeAt(0)));
     const descriptors = files.map((f, index) => ({ name: f.name, mime: f.mime, size: bytes[index]!.length }));
     validateFiles(descriptors);
-    const created = await request<UploadSession>('/api/files/uploads', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ type: payload.type, files: descriptors, requestId }) });
+    const created = await request<UploadSession>('/api/files/uploads', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ type: payload.type, files: descriptors, requestId, client: INGEST_CLIENT }) });
     if (created.error || !created.data) return { data: null, error: created.error! };
     for (const upload of created.data.uploads) {
       if (pb.authStore.token !== token) throw new Error('UNAUTHORIZED');
@@ -157,6 +177,9 @@ async function ingestWithOriginals(payload: IngestPayload): Promise<ApiResult<In
 }
 
 export const api = {
+  getInstagramConnection: (accountId: string, signal?: AbortSignal, destination?: string) => instagramRequest(accountId, { signal }, destination),
+  createInstagramConnection: (accountId: string, destination?: string) => instagramRequest(accountId, { method: 'POST' }, destination),
+  disconnectInstagram: (accountId: string, destination?: string) => instagramRequest(accountId, { method: 'DELETE' }, destination),
   getAiProcessingConsent: () => request<{ accepted: boolean; version: string }>('/api/account/ai-consent'),
   acceptAiProcessingConsent: () => request<{ accepted: boolean; version: string }>('/api/account/ai-consent', { method: 'POST' }),
   getPersonalization: (accountId: string, signal?: AbortSignal) =>

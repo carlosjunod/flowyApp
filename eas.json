@@ -6,10 +6,12 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://tryflowy.app",
         "EXPO_PUBLIC_PB_URL": "https://pb.tryflowy.app",
@@ -18,6 +20,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "channel": "production",
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://tryflowy.app",
         "EXPO_PUBLIC_PB_URL": "https://pb.tryflowy.app",

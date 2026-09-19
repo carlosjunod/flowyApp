@@ -10,6 +10,8 @@ export const settings: Dictionary['settings'] = {
     sectionLanguage: 'Idioma',
     sectionNotifications: 'Notificaciones',
     sectionInbox: 'Bandeja',
+    instagramTitle: 'Guardar desde Instagram',
+    instagramBody: 'Conecta tu cuenta para guardar enlaces de publicaciones por mensaje directo.',
     sectionDigest: 'Resumen diario',
     sectionAbout: 'Acerca de',
     signedInAs: 'Sesión iniciada como',

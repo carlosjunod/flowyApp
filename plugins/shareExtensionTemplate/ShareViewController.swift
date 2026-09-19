@@ -51,7 +51,15 @@ private struct ShareFile: Codable {
   private enum CodingKeys: String, CodingKey { case name, mime, data }
 }
 
-private struct IngestPayload: Codable {
+// Encodable, not Codable: this is only ever a request body, and declaring it
+// encode-only is what lets `client` carry a default without the "immutable
+// property will not be decoded" warning or touching all four call sites.
+private struct IngestPayload: Encodable {
+  // Which client the server records on items.ingest_client (Flowy D-042), so the
+  // item_saved analytics event can say WHERE a save came from. This target is
+  // the iOS/macOS share sheet; the RN app declares 'mobile' from src/lib/api.ts.
+  // Attribution only; the server re-validates and never trusts it for access.
+  let client: String = "ios_share"
   let type: String
   let raw_url: String?
   let raw_image: String?
@@ -512,7 +520,7 @@ final class ShareViewController: UIViewController {
     struct Session: Decodable { struct Value: Decodable { let itemId: String; let uploads: [Ticket] }; let data: Value }
     var reserve = URLRequest(url: URL(string: "\(API_BASE_URL)/api/files/uploads")!, timeoutInterval: 60)
     reserve.httpMethod = "POST"; reserve.setValue("application/json", forHTTPHeaderField: "Content-Type"); reserve.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-    reserve.httpBody = try JSONSerialization.data(withJSONObject: ["type": payload.type, "files": descriptors, "requestId": uploadRequestID])
+    reserve.httpBody = try JSONSerialization.data(withJSONObject: ["type": payload.type, "files": descriptors, "requestId": uploadRequestID, "client": payload.client])
     let (body, response) = try await URLSession.shared.data(for: reserve)
     try ShareRequestError.validate(response)
     let session = try JSONDecoder().decode(Session.self, from: body).data

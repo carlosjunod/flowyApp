@@ -22,6 +22,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   icon: './icons/icon-1024.png',
   userInterfaceStyle: 'automatic',
   newArchEnabled: true,
+  runtimeVersion: {
+    policy: 'appVersion',
+  },
+  updates: {
+    url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
+  },
   splash: {
     image: './assets/splash-icon.png',
     resizeMode: 'contain',
@@ -50,7 +56,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     googleServicesFile: process.env.GOOGLE_SERVICES_JSON,
     adaptiveIcon: {
       foregroundImage: './icons/adaptive-icon-1024.png',
-      backgroundColor: '#ffffff',
+      backgroundColor: '#F2764C',
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,

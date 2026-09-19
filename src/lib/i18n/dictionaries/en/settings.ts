@@ -12,6 +12,8 @@ export const settings = {
     sectionLanguage: 'Language',
     sectionNotifications: 'Notifications',
     sectionInbox: 'Inbox',
+    instagramTitle: 'Save from Instagram',
+    instagramBody: 'Connect your account to save post links by DM.',
     sectionDigest: 'Daily digest',
     sectionAbout: 'About',
     signedInAs: 'Signed in as',
