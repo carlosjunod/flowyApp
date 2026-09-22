@@ -4,7 +4,17 @@ import type { Item, ItemType } from '@/types';
 
 export type SourceChip = {
   icon: ItemIconName;
-  label: string;
+  /** Translation key under `inbox.sourceChip.*`. */
+  labelKey: string;
+  /** Interpolation payload for `labelKey` (e.g. the carousel slide count). */
+  labelVars?: Record<string, string | number>;
+  /**
+   * Source-provided text that replaces the translated label when present.
+   *
+   * Only `site_name` populates this today: a publisher's own name is content,
+   * not interface copy, so it is shown verbatim in every language.
+   */
+  labelText?: string;
   variant?: 'default' | 'dark' | 'green';
 };
 
@@ -19,59 +29,62 @@ export type SourceChip = {
  */
 export function sourceChip(item: Item, contentType: ContentType): SourceChip {
   if (contentType === 'carousel') {
-    const n = item.media?.length ?? 0;
-    return { icon: 'instagram', label: `Instagram Carousel · ${n} slide${n === 1 ? '' : 's'}` };
+    return {
+      icon: 'instagram',
+      labelKey: 'inbox.sourceChip.carousel',
+      labelVars: { count: item.media?.length ?? 0 },
+    };
   }
   if (contentType === 'youtube') {
-    return { icon: 'youtube', label: 'YouTube Video', variant: 'dark' };
+    return { icon: 'youtube', labelKey: 'inbox.sourceChip.youtubeVideo', variant: 'dark' };
   }
   if (contentType === 'reel') {
-    return { icon: 'instagram', label: 'Instagram Reel' };
+    return { icon: 'instagram', labelKey: 'inbox.sourceChip.reel' };
   }
   if (contentType === 'receipt') {
-    return { icon: 'file-text', label: 'Receipt', variant: 'green' };
+    return { icon: 'file-text', labelKey: 'inbox.sourceChip.receipt', variant: 'green' };
   }
 
   switch (item.type as ItemType) {
     case 'instagram':
-      return { icon: 'instagram', label: 'Instagram Post' };
+      return { icon: 'instagram', labelKey: 'inbox.sourceChip.instagramPost' };
     case 'youtube':
-      return { icon: 'youtube', label: 'YouTube', variant: 'dark' };
+      return { icon: 'youtube', labelKey: 'inbox.sourceChip.youtube', variant: 'dark' };
     case 'url':
-      return { icon: 'file-text', label: item.site_name || 'Article' };
+      return { icon: 'file-text', labelKey: 'inbox.sourceChip.article', labelText: item.site_name };
     case 'screenshot':
-      return { icon: 'image', label: 'Screenshot' };
+      return { icon: 'image', labelKey: 'inbox.sourceChip.screenshot' };
     case 'video':
-      return { icon: 'film', label: 'Video' };
+      return { icon: 'film', labelKey: 'inbox.sourceChip.video' };
     case 'pdf':
-      return { icon: 'file-text', label: 'PDF' };
+      return { icon: 'file-text', labelKey: 'inbox.sourceChip.pdf' };
     case 'receipt':
-      return { icon: 'file-text', label: 'Receipt', variant: 'green' };
+      return { icon: 'file-text', labelKey: 'inbox.sourceChip.receipt', variant: 'green' };
     case 'audio':
-      return { icon: 'headphones', label: 'Audio' };
+      return { icon: 'headphones', labelKey: 'inbox.sourceChip.audio' };
     case 'screen_recording':
-      return { icon: 'video', label: 'Recording' };
+      return { icon: 'video', labelKey: 'inbox.sourceChip.recording' };
     case 'tiktok':
-      return { icon: 'music', label: 'TikTok' };
+      return { icon: 'music', labelKey: 'inbox.sourceChip.tiktok' };
     case 'facebook':
-      return { icon: 'facebook', label: 'Facebook' };
+      return { icon: 'facebook', labelKey: 'inbox.sourceChip.facebook' };
     case 'reddit':
-      return { icon: 'message-circle', label: 'Reddit' };
+      return { icon: 'message-circle', labelKey: 'inbox.sourceChip.reddit' };
     case 'pinterest':
-      return { icon: 'bookmark', label: 'Pinterest' };
+      return { icon: 'bookmark', labelKey: 'inbox.sourceChip.pinterest' };
     case 'twitter':
-      return { icon: 'twitter', label: 'Tweet' };
+      return { icon: 'twitter', labelKey: 'inbox.sourceChip.tweet' };
     case 'linkedin':
-      return { icon: 'linkedin', label: 'LinkedIn' };
+      return { icon: 'linkedin', labelKey: 'inbox.sourceChip.linkedin' };
     case 'dribbble':
-      return { icon: 'dribbble', label: 'Dribbble' };
+      return { icon: 'dribbble', labelKey: 'inbox.sourceChip.dribbble' };
     case 'drive':
-      return { icon: 'folder', label: 'Drive' };
+      return { icon: 'folder', labelKey: 'inbox.sourceChip.drive' };
     case 'file':
-      return { icon: 'paperclip', label: 'File' };
+      return { icon: 'paperclip', labelKey: 'inbox.sourceChip.file' };
     case 'email':
-      return { icon: 'mail', label: 'Email' };
+      return { icon: 'mail', labelKey: 'inbox.sourceChip.email' };
     default:
-      return { icon: 'paperclip', label: 'Item' };
+      return { icon: 'paperclip', labelKey: 'inbox.sourceChip.item' };
   }
 }

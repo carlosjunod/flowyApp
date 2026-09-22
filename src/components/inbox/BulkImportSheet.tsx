@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/Button';
 import { useBulkImport } from '@/hooks/useBulkImport';
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
 import { parsePastedUrls } from '@/lib/urls';
 
@@ -24,6 +25,7 @@ type Props = {
 };
 
 export const BulkImportSheet: React.FC<Props> = ({ visible, onClose, onStatusChange }) => {
+  const { t, tKey, formatNumber } = useI18n();
   const colors = useResolvedColors();
   const [text, setText] = useState('');
   const { phase, batch, error, submit, reset, failedUrls } = useBulkImport();
@@ -60,9 +62,9 @@ export const BulkImportSheet: React.FC<Props> = ({ visible, onClose, onStatusCha
               className="text-2xl text-fg"
               style={{ fontFamily: 'InstrumentSerif_400Regular', letterSpacing: -0.5 }}
             >
-              Save links
+              {t('inbox.addLinks.title')}
             </Text>
-            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Close">
+            <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('inbox.addLinks.close')}>
               <Feather name="x" size={22} color={colors.fg} />
             </Pressable>
           </View>
@@ -72,13 +74,12 @@ export const BulkImportSheet: React.FC<Props> = ({ visible, onClose, onStatusCha
             contentContainerStyle={{ paddingBottom: 24, gap: 16 }}
             keyboardShouldPersistTaps="handled"
           >
-            <Text className="text-sm text-muted">
-              Paste one link, or several separated by spaces or new lines. Saving continues while you use Flowy; processing happens after each link is saved.
-            </Text>
+            <Text className="text-sm text-muted">{t('inbox.addLinks.intro')}</Text>
 
-            <TextInput accessibilityLabel="Links to save"
+            <TextInput accessibilityLabel={t('inbox.addLinks.inputLabel')}
               value={text}
               onChangeText={setText}
+              // Example URLs, not prose — the same in every language.
               placeholder={'https://example.com\nhttps://news.example/article'}
               placeholderTextColor={colors.muted}
               autoCapitalize="none"
@@ -91,19 +92,23 @@ export const BulkImportSheet: React.FC<Props> = ({ visible, onClose, onStatusCha
             />
 
             <View className="flex-row gap-4">
-              <Stat label="Links" value={parsed.valid.length} tone="success" />
-              <Stat label="Duplicates" value={parsed.duplicates} tone="muted" />
-              <Stat label="Invalid" value={parsed.invalid.length} tone="danger" />
+              <Stat label={t('inbox.addLinks.statLinks')} value={parsed.valid.length} tone="success" />
+              <Stat label={t('inbox.addLinks.statDuplicates')} value={parsed.duplicates} tone="muted" />
+              <Stat label={t('inbox.addLinks.statInvalid')} value={parsed.invalid.length} tone="danger" />
             </View>
 
             {batch ? (
               <View className="rounded-xl border border-border bg-card p-4 gap-2">
                 <View className="flex-row items-center justify-between">
                   <Text className="text-sm text-fg font-semibold">
-                    {isDone ? (failedUrls.length ? 'Some links could not be saved' : 'Saved to your inbox') : 'Saving links…'}
+                    {isDone
+                      ? failedUrls.length
+                        ? t('inbox.addLinks.partialTitle')
+                        : t('inbox.addLinks.doneTitle')
+                      : t('inbox.addLinks.progressTitle')}
                   </Text>
                   <Text className="text-sm text-muted">
-                    {batch.processed} / {batch.total}
+                    {formatNumber(batch.processed)} / {formatNumber(batch.total)}
                   </Text>
                 </View>
                 <View className="h-1.5 overflow-hidden rounded-full bg-surface">
@@ -117,32 +122,26 @@ export const BulkImportSheet: React.FC<Props> = ({ visible, onClose, onStatusCha
                 </View>
                 {batch.dead_count > 0 ? (
                   <Text className="text-xs text-muted">
-                    {batch.dead_count} {batch.dead_count === 1 ? 'link could' : 'links could'} not be saved. Try again below.
+                    {t('inbox.addLinks.deadCount', { count: batch.dead_count })}
                   </Text>
                 ) : null}
               </View>
             ) : null}
 
-            {parsed.invalid.length > 0 && !isWorking ? <Text className="text-danger text-sm">{parsed.invalid.length} invalid entries will be skipped. Check that links start with https://.</Text> : null}
-            {failedUrls.length && !isWorking ? <View className="gap-2"><Text className="text-muted text-sm" selectable>{failedUrls.join('\n')}</Text><Button title={`Retry ${failedUrls.length} failed links`} variant="secondary" onPress={() => { setText(failedUrls.join('\n')); void submit(failedUrls); }} /></View> : null}
+            {parsed.invalid.length > 0 && !isWorking ? <Text className="text-danger text-sm">{t('inbox.addLinks.invalidHint', { count: parsed.invalid.length })}</Text> : null}
+            {failedUrls.length && !isWorking ? <View className="gap-2"><Text className="text-muted text-sm" selectable>{failedUrls.join('\n')}</Text><Button title={t('inbox.addLinks.retryFailed', { count: failedUrls.length })} variant="secondary" onPress={() => { setText(failedUrls.join('\n')); void submit(failedUrls); }} /></View> : null}
             {error ? (
-              <Text className="text-sm text-danger">{error.message}</Text>
+              <Text accessibilityRole="alert" className="text-sm text-danger">{tKey(error.key, error.vars)}</Text>
             ) : null}
           </ScrollView>
 
           <View className="px-4 pb-4 pt-2 gap-2 border-t border-border">
-            {isWorking ? <Button title="Continue using Flowy" variant="secondary" onPress={onClose} /> : null}
+            {isWorking ? <Button title={t('inbox.addLinks.keepUsing')} variant="secondary" onPress={onClose} /> : null}
             {isDone ? (
-              <Button title="Done" onPress={() => { reset(); setText(''); onClose(); }} />
+              <Button title={t('inbox.addLinks.done')} onPress={() => { reset(); setText(''); onClose(); }} />
             ) : (
               <Button
-                title={
-                  isWorking
-                    ? phase === 'submitting'
-                      ? 'Saving…'
-                      : 'Saving…'
-                    : `Save ${parsed.valid.length || ''} ${parsed.valid.length === 1 ? 'link' : 'links'}`.trim()
-                }
+                title={isWorking ? t('inbox.addLinks.saving') : t('inbox.addLinks.submit', { count: parsed.valid.length })}
                 onPress={onSubmit}
                 loading={isWorking}
                 disabled={parsed.valid.length === 0}
@@ -160,11 +159,12 @@ const Stat: React.FC<{ label: string; value: number; tone: 'success' | 'muted' |
   value,
   tone,
 }) => {
+  const { formatNumber } = useI18n();
   const valueColor =
     tone === 'success' ? 'text-success' : tone === 'danger' ? 'text-danger' : 'text-muted';
   return (
     <View className="flex-1">
-      <Text className={`text-2xl font-semibold ${valueColor}`}>{value}</Text>
+      <Text className={`text-2xl font-semibold ${valueColor}`}>{formatNumber(value)}</Text>
       <Text className="text-xs text-muted">{label}</Text>
     </View>
   );

@@ -4,6 +4,7 @@ import { LabelSection } from './LabelSection';
 import { Feather } from '@expo/vector-icons';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
 
 type Props = {
@@ -25,18 +26,19 @@ export const FilterBar: React.FC<Props> = ({
   category,
   onCategoryChange,
 }) => {
+  const { t } = useI18n();
   const colors = useResolvedColors();
   return (
     <View className="bg-bg px-4 pt-3 pb-1 gap-2">
       <View className="flex-row items-center rounded-xl border border-border bg-card">
-      <TextInput accessibilityLabel="Search all saved content" returnKeyType="search" autoCorrect={false}
+      <TextInput accessibilityLabel={t('inbox.filters.searchLabel')} returnKeyType="search" autoCorrect={false}
         value={search}
         onChangeText={onSearchChange}
-        placeholder="Search all saved content"
+        placeholder={t('inbox.filters.searchPlaceholder')}
         placeholderTextColor={colors.muted}
         className="flex-1 h-11 px-3 text-fg"
       />
-      {search ? <Pressable accessibilityRole="button" accessibilityLabel="Clear search" className="w-11 h-11 items-center justify-center" onPress={() => onSearchChange('')}><Feather name="x" size={18} color={colors.muted} /></Pressable> : null}
+      {search ? <Pressable accessibilityRole="button" accessibilityLabel={t('inbox.filters.clearSearch')} className="w-11 h-11 items-center justify-center" onPress={() => onSearchChange('')}><Feather name="x" size={18} color={colors.muted} /></Pressable> : null}
       </View>
       <LabelSection reading={reading} onReading={onReadingChange} category={category} onCategory={onCategoryChange} tag={tag} onTag={onTagChange} />
 

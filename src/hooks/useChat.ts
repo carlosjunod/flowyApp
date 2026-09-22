@@ -7,8 +7,10 @@ import React, {
 } from 'react';
 import { AppState } from 'react-native';
 import { nativeChatAdapters, nativeConversation } from '@/lib/chatSync';
+import { useI18n } from '@/lib/i18n';
 import { useChatEngine } from './useChatEngine';
 export function useChatState(accountId: string) {
+  const { t } = useI18n();
   const engine = useChatEngine(accountId, nativeChatAdapters),
     ref = useRef(engine);
   ref.current = engine;
@@ -50,7 +52,9 @@ export function useChatState(accountId: string) {
         .filter((c) => !c.deleting)
         .map(nativeConversation),
     },
-    storageError: engine.storageError || engine.syncError,
+    // One banner slot, one key. Storage wins: a device that cannot write its
+    // local copy has a more urgent problem than a failed sync.
+    storageErrorKey: engine.storageErrorKey || engine.syncErrorKey,
     unread,
     messages: active.messages,
     draft: active.draft,
@@ -66,12 +70,21 @@ export function useChatState(accountId: string) {
     select: engine.open,
     reset: () => engine.startNew(),
     startDigest: (digestId: string, itemIds?: string[], selectedText?: string) =>
-      engine.startNew({
-        digestId,
-        itemIds,
-        selectedText,
-        scope: itemIds ? 'items' : 'digest',
-      }),
+      engine.startNew(
+        {
+          digestId,
+          itemIds,
+          selectedText,
+          scope: itemIds ? 'items' : 'digest',
+        },
+        // The seed is a prefilled draft the user edits before sending, so it is
+        // written in the interface language rather than left in English.
+        {
+          title: t('chat.digestSeed.title'),
+          sourceDraft: t('chat.digestSeed.sourceDraft'),
+          digestDraft: t('chat.digestSeed.digestDraft'),
+        },
+      ),
   };
 }
 type ChatApi = ReturnType<typeof useChatState>;

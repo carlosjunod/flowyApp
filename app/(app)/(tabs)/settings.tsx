@@ -6,23 +6,30 @@ import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DeleteAccountSection } from '@/components/settings/DeleteAccountSection';
+import { LanguageSelector } from '@/components/settings/LanguageSelector';
 import { PushNotificationSettings } from '@/components/settings/PushNotificationSettings';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/lib/auth';
 import { ENV } from '@/lib/env';
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors, useTheme } from '@/lib/theme';
 
 type ThemeOption = 'system' | 'light' | 'dark';
 
-const THEME_OPTIONS: { value: ThemeOption; label: string; icon: keyof typeof Feather.glyphMap }[] = [
-  { value: 'system', label: 'System', icon: 'monitor' },
-  { value: 'light', label: 'Light', icon: 'sun' },
-  { value: 'dark', label: 'Dark', icon: 'moon' },
+const THEME_OPTIONS: {
+  value: ThemeOption;
+  labelKey: 'common.theme.system' | 'common.theme.light' | 'common.theme.dark';
+  icon: keyof typeof Feather.glyphMap;
+}[] = [
+  { value: 'system', labelKey: 'common.theme.system', icon: 'monitor' },
+  { value: 'light', labelKey: 'common.theme.light', icon: 'sun' },
+  { value: 'dark', labelKey: 'common.theme.dark', icon: 'moon' },
 ];
 
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { t } = useI18n();
   const colors = useResolvedColors();
   const version = Constants.expoConfig?.version ?? '0.0.0';
 
@@ -33,45 +40,55 @@ export default function SettingsScreen() {
           className="text-3xl text-fg"
           style={{ fontFamily: 'InstrumentSerif_400Regular', letterSpacing: -0.5 }}
         >
-          Settings
+          {t('settings.index.title')}
         </Text>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 32, gap: 24 }} className="px-4">
-        <Section title="Account">
+        <Section title={t('settings.index.sectionAccount')}>
           <View className="rounded-xl border border-border bg-card px-4 py-3">
-            <Text className="text-xs uppercase tracking-wide text-muted">Signed in as</Text>
-            <Text className="text-base text-fg mt-1">{user?.email ?? 'Unknown'}</Text>
+            <Text className="text-xs uppercase tracking-wide text-muted">
+              {t('settings.index.signedInAs')}
+            </Text>
+            {/* The address itself is account data, never translated. */}
+            <Text className="text-base text-fg mt-1">
+              {user?.email ?? t('settings.index.unknownAccount')}
+            </Text>
           </View>
-          <Button title="Sign out" variant="danger" onPress={signOut} />
+          <Button title={t('settings.index.signOut')} variant="danger" onPress={signOut} />
           <DeleteAccountSection />
         </Section>
 
-        <Section title="Storage">
+        <Section title={t('settings.index.sectionStorage')}>
           <Link href="/storage" asChild>
             <Pressable accessibilityRole="link" className="rounded-xl border border-border bg-card px-4 py-3 flex-row items-center gap-3" style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
               <Feather name="hard-drive" size={20} color={colors.muted} />
               <View className="flex-1">
-                <Text className="text-base text-fg">Storage</Text>
-                <Text className="text-xs text-muted mt-1">Original files, space and retention.</Text>
-              </View>
-              <Feather name="chevron-right" size={18} color={colors.muted} />
-            </Pressable>
-          </Link>
-        </Section>
-        <Section title="Personalization">
-          <Link href="/personalization" asChild>
-            <Pressable accessibilityRole="link" className="rounded-xl border border-border bg-card px-4 py-3 flex-row items-center gap-3">
-              <View className="flex-1">
-                <Text className="text-base text-fg">What Flowy knows about you</Text>
-                <Text className="text-xs text-muted mt-1">Your work, goals, and preferences for better answers.</Text>
+                <Text className="text-base text-fg">{t('settings.index.storageLabel')}</Text>
+                <Text className="text-xs text-muted mt-1">{t('settings.index.storageDesc')}</Text>
               </View>
               <Feather name="chevron-right" size={18} color={colors.muted} />
             </Pressable>
           </Link>
         </Section>
 
-        <Section title="Appearance">
+        <Section title={t('settings.index.sectionPersonalization')}>
+          <Link href="/personalization" asChild>
+            <Pressable accessibilityRole="link" className="rounded-xl border border-border bg-card px-4 py-3 flex-row items-center gap-3">
+              <View className="flex-1">
+                <Text className="text-base text-fg">{t('settings.index.personalizationLabel')}</Text>
+                <Text className="text-xs text-muted mt-1">{t('settings.index.personalizationDesc')}</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={colors.muted} />
+            </Pressable>
+          </Link>
+        </Section>
+
+        <Section title={t('settings.index.sectionLanguage')}>
+          <LanguageSelector />
+        </Section>
+
+        <Section title={t('settings.index.sectionAppearance')}>
           <View className="rounded-xl border border-border bg-card p-1 flex-row">
             {THEME_OPTIONS.map((opt) => {
               const active = theme === opt.value;
@@ -96,18 +113,16 @@ export default function SettingsScreen() {
                       fontWeight: active ? '600' : '500',
                     }}
                   >
-                    {opt.label}
+                    {t(opt.labelKey)}
                   </Text>
                 </Pressable>
               );
             })}
           </View>
-          <Text className="text-xs text-muted px-1">
-            System follows your device's appearance setting.
-          </Text>
+          <Text className="text-xs text-muted px-1">{t('common.theme.systemHint')}</Text>
         </Section>
 
-        <Section title="Notifications">
+        <Section title={t('settings.index.sectionNotifications')}>
           <PushNotificationSettings />
         </Section>
 
@@ -116,38 +131,38 @@ export default function SettingsScreen() {
             <Pressable accessibilityRole="link" className="rounded-xl border border-border bg-card px-4 py-3 flex-row items-center gap-3" style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
               <Feather name="instagram" size={20} color={colors.muted} />
               <View className="flex-1">
-                <Text className="text-base text-fg">Save from Instagram</Text>
-                <Text className="text-xs text-muted mt-1">Connect your account to save post links by DM.</Text>
+                <Text className="text-base text-fg">{t('settings.index.instagramTitle')}</Text>
+                <Text className="text-xs text-muted mt-1">{t('settings.index.instagramBody')}</Text>
               </View>
               <Feather name="chevron-right" size={18} color={colors.muted} />
             </Pressable>
           </Link>
         </Section>
 
-        <Section title="Inbox">
+        <Section title={t('settings.index.sectionInbox')}>
           <Link href="/inbox-alias" asChild>
             <Pressable
               style={({ pressed }) => [pressed && { opacity: 0.7 }]}
               className="rounded-xl border border-border bg-card px-4 py-3 flex-row items-center justify-between"
             >
               <View className="flex-1">
-                <Text className="text-base text-fg">Email to inbox</Text>
-                <Text className="text-xs text-muted mt-1">View, copy, regenerate your inbox address.</Text>
+                <Text className="text-base text-fg">{t('settings.index.aliasLabel')}</Text>
+                <Text className="text-xs text-muted mt-1">{t('settings.index.aliasDesc')}</Text>
               </View>
               <Feather name="chevron-right" size={18} color={colors.muted} />
             </Pressable>
           </Link>
         </Section>
 
-        <Section title="Daily digest">
+        <Section title={t('settings.index.sectionDigest')}>
           <Link href="/digest" asChild>
             <Pressable
               style={({ pressed }) => [pressed && { opacity: 0.7 }]}
               className="rounded-xl border border-border bg-card px-4 py-3 flex-row items-center justify-between"
             >
               <View className="flex-1">
-                <Text className="text-base text-fg">Past digests</Text>
-                <Text className="text-xs text-muted mt-1">Browse your daily recaps.</Text>
+                <Text className="text-base text-fg">{t('settings.index.pastDigestsLabel')}</Text>
+                <Text className="text-xs text-muted mt-1">{t('settings.index.pastDigestsDesc')}</Text>
               </View>
               <Feather name="chevron-right" size={18} color={colors.muted} />
             </Pressable>
@@ -158,21 +173,21 @@ export default function SettingsScreen() {
               className="rounded-xl border border-border bg-card px-4 py-3 flex-row items-center justify-between"
             >
               <View className="flex-1">
-                <Text className="text-base text-fg">Digest settings</Text>
-                <Text className="text-xs text-muted mt-1">Enable + schedule time.</Text>
+                <Text className="text-base text-fg">{t('settings.index.digestSettingsLabel')}</Text>
+                <Text className="text-xs text-muted mt-1">{t('settings.index.digestSettingsDesc')}</Text>
               </View>
               <Feather name="chevron-right" size={18} color={colors.muted} />
             </Pressable>
           </Link>
         </Section>
 
-        <Section title="About">
-          <Row label="Version" value={version} />
-          <Row label="Build" value={Constants.expoConfig?.runtimeVersion?.toString() ?? '—'} />
+        <Section title={t('settings.index.sectionAbout')}>
+          <Row label={t('settings.index.version')} value={version} />
+          <Row label={t('settings.index.build')} value={Constants.expoConfig?.runtimeVersion?.toString() ?? '—'} />
           {/* App Store Connect requires a reachable privacy policy, and the
               terms are linked beside it so both live in one obvious place. */}
-          <LegalRow label="Privacy Policy" path="/privacy" />
-          <LegalRow label="Terms of Service" path="/terms" />
+          <LegalRow label={t('settings.index.privacy')} path="/privacy" />
+          <LegalRow label={t('settings.index.terms')} path="/terms" />
         </Section>
       </ScrollView>
     </SafeAreaView>
@@ -195,12 +210,14 @@ const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
 
 const LegalRow: React.FC<{ label: string; path: string }> = ({ label, path }) => {
   const colors = useResolvedColors();
+  const { t } = useI18n();
   return (
     <Pressable
       onPress={() => {
         void Linking.openURL(`${ENV.API_BASE_URL}${path}`);
       }}
       accessibilityRole="link"
+      accessibilityHint={t('common.a11y.externalLink')}
       style={({ pressed }) => [pressed && { opacity: 0.7 }]}
       className="flex-row items-center justify-between rounded-xl border border-border bg-card px-4 py-3"
     >

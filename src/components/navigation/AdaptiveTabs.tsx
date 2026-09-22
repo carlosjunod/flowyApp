@@ -9,6 +9,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ItemReader } from '@/components/inbox/ItemReader';
 import { useChat } from '@/hooks/useChat';
 import { adaptiveLayout, tabIsVisible } from '@/lib/adaptiveLayout';
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
 
 const PaneContext = createContext<{
@@ -20,15 +21,21 @@ const PaneContext = createContext<{
 }>({ visible: false, width: 0, split: false });
 export const useAdaptivePane = () => useContext(PaneContext);
 
+/**
+ * `title` is a translation key. `useTabsWithTriggers` consumes this array as
+ * route configuration — the *rendered* label is resolved below, so a language
+ * switch does not have to rebuild the navigator.
+ */
 const tabs = [
-  { name: 'inbox', href: '/inbox' as const, title: 'Inbox', icon: 'inbox' as const },
-  { name: 'chat', href: '/chat' as const, title: 'Chat', icon: 'message-square' as const },
-  { name: 'digest', href: '/digest' as const, title: 'Digests', icon: 'sunrise' as const },
-  { name: 'settings', href: '/settings' as const, title: 'Settings', icon: 'settings' as const },
+  { name: 'inbox', href: '/inbox' as const, title: 'app.nav.inbox', icon: 'inbox' as const },
+  { name: 'chat', href: '/chat' as const, title: 'app.nav.chat', icon: 'message-square' as const },
+  { name: 'digest', href: '/digest' as const, title: 'app.nav.digests', icon: 'sunrise' as const },
+  { name: 'settings', href: '/settings' as const, title: 'app.nav.settings', icon: 'settings' as const },
 ];
 
 export function AdaptiveTabs() {
   const colors = useResolvedColors();
+  const { t, tKey } = useI18n();
   const chat = useChat();
   const focused = useIsFocused();
   const { width, height, fontScale } = useWindowDimensions();
@@ -92,7 +99,7 @@ export function AdaptiveTabs() {
                 <SafeAreaView edges={['top']} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 20 }}>
                   <Feather name="book-open" size={32} color={colors.muted} />
                   <Text style={{ color: colors.fg, fontFamily: 'InstrumentSerif_400Regular', fontSize: 30, textAlign: 'center' }}>
-                    Select a saved item to start reading
+                    {t('app.reader.placeholder')}
                   </Text>
                 </SafeAreaView>
               )}
@@ -104,13 +111,14 @@ export function AdaptiveTabs() {
             const selected = tab.name === active;
             const color = selected ? colors.accent : colors.muted;
             const badge = tab.name === 'chat' ? chat.generatingId ? '…' : chat.unread ? '•' : '' : '';
+            const title = tKey(tab.title);
             return (
               <Pressable key={tab.name} accessibilityRole="tab" accessibilityState={{ selected }}
-                accessibilityLabel={`${tab.title}${badge === '…' ? ', preparing response' : badge ? ', new response' : ''}`}
+                accessibilityLabel={badge === '…' ? t('app.nav.tabPreparing', { tab: title }) : badge ? t('app.nav.tabUnread', { tab: title }) : title}
                 onPress={() => { Keyboard.dismiss(); lastPane.current = tab.name; navigation.navigate(tab.name); }}
                 style={{ flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', gap: 3 }}>
                 <View style={{ flexDirection: 'row', gap: 4 }}><Feather name={tab.icon} size={20} color={color} />{badge ? <Text style={{ color }}>{badge}</Text> : null}</View>
-                <Text style={{ fontSize: 11, color }}>{tab.title}</Text>
+                <Text style={{ fontSize: 11, color }}>{title}</Text>
               </Pressable>
             );
           })}

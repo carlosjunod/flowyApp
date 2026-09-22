@@ -5,6 +5,7 @@ import { Alert, ActivityIndicator, Pressable, Text, TextInput, View } from 'reac
 import { useChat } from '@/hooks/useChat';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
 
 // Account deletion — App Store Review 5.1.1(v) requires an app that offers
@@ -15,37 +16,43 @@ import { useResolvedColors } from '@/lib/theme';
 // @privaterelay.appleid.com address, which nobody can recall or type. The same
 // phrase is used on web so the two surfaces behave identically.
 
+// NOT translated: the server compares this phrase literally, so a Spanish
+// variant would fail the check and make deletion impossible. The instruction
+// around it is translated; the phrase the user types is not.
 const CONFIRMATION_PHRASE = 'delete my account';
 
-const DESTROYED = [
-  'Your account and sign-in details',
-  'Every item you saved, with its summaries, tags and notes',
-  'Every file you uploaded',
-  'Your search index, digests and notifications',
-  'Chat history saved on this device',
-];
+const DESTROYED_KEYS = [
+  'settings.deleteAccount.destroyed1',
+  'settings.deleteAccount.destroyed2',
+  'settings.deleteAccount.destroyed3',
+  'settings.deleteAccount.destroyed4',
+  'settings.deleteAccount.destroyed5',
+] as const;
 
 export const DeleteAccountSection: React.FC = () => {
   const { signOut } = useAuth();
   const chat = useChat();
+  const { t } = useI18n();
   const colors = useResolvedColors();
   const [open, setOpen] = useState(false);
   const [phrase, setPhrase] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorKey, setErrorKey] = useState<
+    'settings.deleteAccount.phraseMismatch' | 'settings.deleteAccount.failed' | null
+  >(null);
 
   const matches = phrase.trim().toLowerCase() === CONFIRMATION_PHRASE;
 
   const onDelete = async () => {
     if (!matches || busy) return;
     setBusy(true);
-    setError(null);
+    setErrorKey(null);
     const res = await api.deleteAccount(phrase.trim());
     if (res.error) {
-      setError(
+      setErrorKey(
         res.error.code === 'CONFIRMATION_MISMATCH'
-          ? 'That phrase does not match.'
-          : 'We could not delete your account. Please try again.',
+          ? 'settings.deleteAccount.phraseMismatch'
+          : 'settings.deleteAccount.failed',
       );
       setBusy(false);
       return;
@@ -53,7 +60,7 @@ export const DeleteAccountSection: React.FC = () => {
     // Clears the PocketBase session AND the shared keychain entry, so the
     // share extension loses its session too rather than posting as a user
     // that no longer exists.
-    try { await chat.removeAccountHistory(); } catch { Alert.alert('Account deleted', 'Saved chats could not be removed from this device. Remove Flowy’s app data to clear local storage.'); }
+    try { await chat.removeAccountHistory(); } catch { Alert.alert(t('settings.deleteAccount.localChatTitle'), t('settings.deleteAccount.localChatBody')); }
     await signOut();
   };
 
@@ -66,9 +73,9 @@ export const DeleteAccountSection: React.FC = () => {
         className="rounded-xl border border-danger/40 px-4 py-3 flex-row items-center justify-between"
       >
         <View className="flex-1">
-          <Text className="text-base text-danger">Delete account</Text>
+          <Text className="text-base text-danger">{t('settings.deleteAccount.title')}</Text>
           <Text className="text-xs text-muted mt-1">
-            Permanently deletes everything. Cannot be undone.
+            {t('settings.deleteAccount.summary')}
           </Text>
         </View>
         <Feather name="chevron-right" size={18} color={colors.muted} />
@@ -78,21 +85,23 @@ export const DeleteAccountSection: React.FC = () => {
 
   return (
     <View className="rounded-xl border border-danger/40 px-4 py-4 gap-3">
-      <Text className="text-base text-danger">Delete account</Text>
+      <Text className="text-base text-danger">{t('settings.deleteAccount.title')}</Text>
 
       <View className="gap-1">
-        <Text className="text-xs text-fg">This will destroy:</Text>
-        {DESTROYED.map((line) => (
-          <Text key={line} className="text-xs text-muted">
+        <Text className="text-xs text-fg">{t('settings.deleteAccount.willDestroy')}</Text>
+        {DESTROYED_KEYS.map((key) => (
+          <Text key={key} className="text-xs text-muted">
             {'•  '}
-            {line}
+            {t(key)}
           </Text>
         ))}
       </View>
 
       <View className="gap-1.5">
         <Text className="text-xs text-muted">
-          Type <Text className="text-fg">{CONFIRMATION_PHRASE}</Text> to confirm.
+          {t('settings.deleteAccount.typeBefore')}
+          <Text className="text-fg">{CONFIRMATION_PHRASE}</Text>
+          {t('settings.deleteAccount.typeAfter')}
         </Text>
         <TextInput
           value={phrase}
@@ -101,7 +110,7 @@ export const DeleteAccountSection: React.FC = () => {
           autoCapitalize="none"
           autoCorrect={false}
           spellCheck={false}
-          accessibilityLabel="Type the confirmation phrase"
+          accessibilityLabel={t('settings.deleteAccount.phraseLabel')}
           placeholder={CONFIRMATION_PHRASE}
           placeholderTextColor={colors.muted}
           className="rounded-lg border border-border bg-card px-3 py-2.5 text-base text-fg"
@@ -109,9 +118,9 @@ export const DeleteAccountSection: React.FC = () => {
         />
       </View>
 
-      {error ? (
+      {errorKey ? (
         <Text accessibilityRole="alert" className="text-xs text-danger">
-          {error}
+          {t(errorKey)}
         </Text>
       ) : null}
 
@@ -129,21 +138,21 @@ export const DeleteAccountSection: React.FC = () => {
           {busy ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text className="text-sm font-semibold text-white">Delete forever</Text>
+            <Text className="text-sm font-semibold text-white">{t('settings.deleteAccount.deleteForever')}</Text>
           )}
         </Pressable>
         <Pressable
           onPress={() => {
             setOpen(false);
             setPhrase('');
-            setError(null);
+            setErrorKey(null);
           }}
           disabled={busy}
           accessibilityRole="button"
           style={({ pressed }) => [pressed && { opacity: 0.7 }]}
           className="items-center justify-center rounded-lg border border-border px-4 py-3"
         >
-          <Text className="text-sm text-muted">Cancel</Text>
+          <Text className="text-sm text-muted">{t('settings.deleteAccount.cancel')}</Text>
         </Pressable>
       </View>
     </View>

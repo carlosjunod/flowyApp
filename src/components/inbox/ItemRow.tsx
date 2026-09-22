@@ -11,6 +11,7 @@ import { ItemActionsMenu } from './ItemActionsMenu';
 import { Pressable, Text, View } from 'react-native';
 
 import { hostOf, thumbnailFor } from '@/lib/thumbnails';
+import { useI18n } from '@/lib/i18n';
 import { useSelection } from '@/lib/selection';
 import type { Item } from '@/types';
 
@@ -18,33 +19,29 @@ const isPending = (item: Item) => item.status === 'pending' || item.status === '
 
 const stripWww = (host: string): string => host.replace(/^www\./, '');
 
-const monthDayLabel = (input: string): string => {
-  const d = new Date(input);
-  if (Number.isNaN(d.getTime())) return '';
-  const day = d.getDate();
-  const month = d.toLocaleString('en-US', { month: 'short' });
-  return `${day} ${month}`;
-};
-
-const compactRelative = (input: string, now: Date = new Date()): string => {
-  const then = new Date(input);
-  const diff = now.getTime() - then.getTime();
-  if (Number.isNaN(diff)) return '';
-  const HOUR = 3_600_000;
-  const DAY = 24 * HOUR;
-  if (diff < HOUR) return `${Math.max(1, Math.floor(diff / 60_000))}m ago`;
-  if (diff < DAY) return `${Math.floor(diff / HOUR)}h ago`;
-  if (diff < 2 * DAY) return 'yesterday';
-  if (diff < 7 * DAY) return `${Math.floor(diff / DAY)}d ago`;
-  return monthDayLabel(input);
-};
+const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
 
 type Props = { onOpen?: (id: string) => void; active?: boolean; item: Item; inColumn?: boolean; detailed?: boolean };
 
 export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColumn = false, detailed = false }) => {
   const pending = isPending(item);
+  const { t, tKey, formatDate, formatRelativeDate } = useI18n();
   const colors = useResolvedColors();
   const presentation = itemPresentation(item);
+  /**
+   * A tighter ladder than `formatRelativeDate`: rows switch to an absolute
+   * day/month after a week rather than continuing with "3w ago", and call out
+   * "yesterday" explicitly. The translated pieces come from the same
+   * `common.time.*` keys so the wording never diverges.
+   */
+  const compactRelative = (input: string): string => {
+    const diff = Date.now() - new Date(input).getTime();
+    if (Number.isNaN(diff)) return '';
+    if (diff < 2 * DAY && diff >= DAY) return t('common.time.yesterday');
+    if (diff < 7 * DAY) return formatRelativeDate(input);
+    return formatDate(input, { day: 'numeric', month: 'short' });
+  };
   const selection = useSelection();
   const selected = selection.selectedIds.has(item.id);
   const thumb = thumbnailFor(item);
@@ -76,9 +73,9 @@ export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColum
     <View>
       <Pressable
         accessibilityRole={selection.mode ? 'checkbox' : 'button'}
-        accessibilityLabel={`${item.title ?? item.raw_url ?? 'Saved item'}${item.read_at ? ', marked as read' : ', no read mark recorded'}${", " + presentation.label + (presentation.notice ? ", " + presentation.notice : "")}`}
+        accessibilityLabel={`${item.title ?? item.raw_url ?? t('inbox.card.savedItem')}${item.read_at ? t('inbox.card.markedRead') : t('inbox.card.noReadMark')}, ${tKey(presentation.labelKey)}${presentation.noticeKey ? ', ' + tKey(presentation.noticeKey) : ''}`}
         accessibilityState={{ checked: selection.mode ? selected : undefined, selected: !selection.mode && active }}
-        accessibilityActions={[{ name: 'longpress', label: 'Select item' }]}
+        accessibilityActions={[{ name: 'longpress', label: t('inbox.card.selectItem') }]}
         onAccessibilityAction={event => { if (event.nativeEvent.actionName === 'longpress') handleLongPress(); }}
         onPress={handlePress}
         onLongPress={handleLongPress}
@@ -138,7 +135,7 @@ export const ItemRow: React.FC<Props> = ({ onOpen, active = false, item, inColum
             style={{ fontFamily: 'Inter_500Medium', fontSize: 15 }}
             numberOfLines={2}
           >
-            {item.title ?? item.raw_url ?? (pending ? 'Preparing saved content…' : 'Saved item')}
+            {item.title ?? item.raw_url ?? (pending ? t('inbox.card.preparing') : t('inbox.card.savedItem'))}
           </Text>
           <SemanticPreview item={item} compact />
           <Text

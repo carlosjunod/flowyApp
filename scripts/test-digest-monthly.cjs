@@ -7,11 +7,24 @@ const root = path.resolve(__dirname, '..');
 const scenarios = [];
 const passed = name => scenarios.push(name);
 
+// Directory imports (`@/lib/i18n`) resolve to their index, as the bundler does.
+function resolveModule(candidate) {
+  for (const attempt of [candidate, `${candidate}.ts`, `${candidate}.tsx`, path.join(candidate, 'index.ts'), path.join(candidate, 'index.tsx')]) {
+    try { if (fs.statSync(attempt).isFile()) return attempt; } catch { /* try next */ }
+  }
+  throw new Error(`Cannot resolve module: ${candidate}`);
+}
+
 // Exercise the real TypeScript models without importing native modules in Node.
-function loader(mocks = {}) {
+// The i18n layer persists the language choice; Node has no keychain, so the
+// storage boundary (and only that) is an in-memory stand-in.
+const secureStore = (() => { const m = new Map(); return { getItemAsync: async k => m.get(k) ?? null, setItemAsync: async (k, v) => { m.set(k, v); }, deleteItemAsync: async k => { m.delete(k); } }; })();
+
+function loader(overrides = {}) {
+  const mocks = { 'expo-secure-store': secureStore, ...overrides };
   const cache = new Map();
   function load(filename) {
-    const absolute = path.resolve(root, filename);
+    const absolute = resolveModule(path.resolve(root, filename));
     if (cache.has(absolute)) return cache.get(absolute).exports;
     const mod = new Module(absolute, module);
     cache.set(absolute, mod);
@@ -19,8 +32,8 @@ function loader(mocks = {}) {
     mod.paths = module.paths;
     mod.require = id => {
       if (Object.hasOwn(mocks, id)) return mocks[id];
-      if (id.startsWith('@/')) return load(`src/${id.slice(2)}.ts`);
-      if (id.startsWith('.')) return load(path.resolve(path.dirname(absolute), `${id}.ts`));
+      if (id.startsWith('@/')) return load(`src/${id.slice(2)}`);
+      if (id.startsWith('.')) return load(path.resolve(path.dirname(absolute), id));
       return require(id);
     };
     const source = ts.transpileModule(fs.readFileSync(absolute, 'utf8'), {
@@ -106,14 +119,14 @@ const textOf = node => node == null || typeof node==='boolean' ? '' : Array.isAr
   const f=fixture();f.render();await tick();let tree=f.render();
   assert.equal(byLabel(tree,'monthly digest').props.value,false);
   assert.equal(byLabel(tree,'monthly digest').props.disabled,false);
-  assert.equal(byLabel(tree,'monthly push'),undefined);
+  assert.equal(byLabel(tree,'monthly Push notification'),undefined);
   byLabel(tree,'monthly digest').props.onValueChange(true);tree=f.render();
-  assert.equal(byLabel(tree,'monthly push').props.value,false);
-  assert.equal(byLabel(tree,'monthly email').props.value,false);
+  assert.equal(byLabel(tree,'monthly Push notification').props.value,false);
+  assert.equal(byLabel(tree,'monthly Email').props.value,false);
   const days=walk(tree).filter(n=>n.props?.accessibilityLabel?.match(/^Day \d+ of each month$/));assert.equal(days.length,28);
   byLabel(tree,'Day 28 of each month').props.onPress();tree=f.render();
   const time=walk(tree).find(n=>n.props?.label==='monthly publication time');time.props.onChange('21:35');tree=f.render();
-  byLabel(tree,'monthly push').props.onValueChange(true);tree=f.render();
+  byLabel(tree,'monthly Push notification').props.onValueChange(true);tree=f.render();
   assert.match(textOf(tree),/previous complete calendar month/);
   assert.match(textOf(tree),/2\s+of\s+30\s+digests used this month/);
   byLabel(tree,'Save choices').props.onPress();await tick();tree=f.render();

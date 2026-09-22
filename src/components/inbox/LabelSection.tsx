@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { useI18n } from "@/lib/i18n";
 import { useResolvedColors } from "@/lib/theme";
 import React, { useState } from "react";
 import {
@@ -10,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLabels } from "@/hooks/useLabels";
+import { LabelError, useLabels } from "@/hooks/useLabels";
 import type { LabelKind, LabelPreview } from "@/types/labels";
 import type { LabelOrder } from "@/lib/labels";
 import { LabelPicker } from "./LabelPicker";
@@ -31,6 +32,7 @@ export function LabelSection({
   reading?: ReadingFilter;
   onReading?: (value: ReadingFilter) => void;
 }) {
+  const { t, tKey } = useI18n();
   const colors = useResolvedColors();
   const { query, preview: loadPreview, change } = useLabels();
   const [kind, setKind] = useState<LabelKind>("category");
@@ -43,24 +45,26 @@ export function LabelSection({
     (LabelPreview & { replacement: string | null }) | null
   >(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  // A translation key. `useLabels` throws `LabelError`, whose message *is* the
+  // key, so a failure relabels itself when the language changes.
+  const [errorKey, setErrorKey] = useState("");
+  const [updatedCount, setUpdatedCount] = useState<number | null>(null);
   const labels =
     (kind === "category" ? query.data?.categories : query.data?.tags) ?? [];
   const select = (name: string | null) => {
     setSelected(name);
     setReplacement(name ?? "");
     setPreview(null);
-    setError("");
+    setErrorKey("");
   };
   async function review(next: string | null) {
     if (!selected || busy) return;
     setBusy(true);
-    setError("");
+    setErrorKey("");
     try {
       setPreview({ ...(await loadPreview(kind, selected)), replacement: next });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Please try again.");
+      setErrorKey(e instanceof LabelError ? e.messageKey : 'inbox.labels.reviewFailed');
     } finally {
       setBusy(false);
     }
@@ -68,7 +72,7 @@ export function LabelSection({
   async function apply() {
     if (!selected || !preview || busy) return;
     setBusy(true);
-    setError("");
+    setErrorKey("");
     try {
       const result = await change({
         kind,
@@ -81,12 +85,10 @@ export function LabelSection({
         onCategory(next === "tech" ? "technology" : next);
       if (kind === "tag" && tag === selected) onTag(next);
       select(null);
-      setNotice(
-        `Updated ${result.count} ${result.count === 1 ? "item" : "items"}.`,
-      );
+      setUpdatedCount(result.count);
     } catch (e) {
       setPreview(null);
-      setError(e instanceof Error ? e.message : "Please try again.");
+      setErrorKey(e instanceof LabelError ? e.messageKey : 'inbox.labels.updateFailed');
     } finally {
       setBusy(false);
     }
@@ -108,7 +110,7 @@ export function LabelSection({
           <Text
             className={`text-xs ${kind === value ? "text-fg" : "text-muted"}`}
           >
-            {value === "category" ? "Categories" : "Tags"}
+            {value === "category" ? t('inbox.labels.categories') : t('inbox.labels.tags')}
           </Text>
         </Pressable>
       ))}
@@ -121,10 +123,11 @@ export function LabelSection({
         actions={
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Manage labels"
+            accessibilityLabel={t('inbox.labels.manage')}
             onPress={() => {
               select(null);
-              setNotice("");
+              setUpdatedCount(null);
+              setErrorKey("");
               setOpen(true);
             }}
             className="h-11 w-11 items-center justify-center rounded-lg"
@@ -150,27 +153,29 @@ export function LabelSection({
         onExpand={() => setExpanded((v) => !v)}
         allCount={query.data?.totalItems}
         activeFilter={!expanded && reading !== "all" && onReading ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="Clear reading filter" onPress={() => onReading("all")} style={{ minHeight: 44, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, borderRadius: 24, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.accent }}>
-            <Text style={{ color: colors.accent, fontSize: 13 }}>{reading === "unread" ? "Unread" : "Read"}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('inbox.labels.clearReading')} onPress={() => onReading("all")} style={{ minHeight: 44, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, borderRadius: 24, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.accent }}>
+            <Text style={{ color: colors.accent, fontSize: 13 }}>{reading === "unread" ? t('inbox.labels.unread') : t('inbox.labels.read')}</Text>
             <Feather name="x" size={14} color={colors.accent} />
           </Pressable>
         ) : null}
       >
         {onReading ? (
-          <View accessibilityLabel="Reading status" style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <Text style={{ color: colors.muted, fontSize: 12 }}>Reading</Text>
+          <View accessibilityLabel={t('inbox.labels.readingGroup')} style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+            <Text style={{ color: colors.muted, fontSize: 12 }}>{t('inbox.labels.reading')}</Text>
             <View style={{ flexDirection: "row", padding: 2, borderRadius: 26, backgroundColor: colors.card }}>
-              {(["all", "unread", "read"] as const).map(value => (
-                <Pressable key={value} accessibilityRole="button" accessibilityLabel={value === "all" ? "All reading states" : value === "unread" ? "Unread" : "Read"} accessibilityState={{ selected: reading === value }} onPress={() => onReading(value)} style={{ minHeight: 44, paddingHorizontal: 12, justifyContent: "center", borderRadius: 24, backgroundColor: reading === value ? colors.fg : colors.card }}>
-                  <Text style={{ color: reading === value ? colors.bg : colors.muted, fontSize: 13, fontFamily: "Inter_500Medium" }}>{value === "all" ? "All" : value === "unread" ? "Unread" : "Read"}</Text>
+              {(["all", "unread", "read"] as const).map(value => {
+                const label = value === "all" ? t('inbox.labels.readingAll') : value === "unread" ? t('inbox.labels.unread') : t('inbox.labels.read');
+                return (
+                <Pressable key={value} accessibilityRole="button" accessibilityLabel={value === "all" ? t('inbox.labels.readingAllLabel') : label} accessibilityState={{ selected: reading === value }} onPress={() => onReading(value)} style={{ minHeight: 44, paddingHorizontal: 12, justifyContent: "center", borderRadius: 24, backgroundColor: reading === value ? colors.fg : colors.card }}>
+                  <Text style={{ color: reading === value ? colors.bg : colors.muted, fontSize: 13, fontFamily: "Inter_500Medium" }}>{label}</Text>
                 </Pressable>
-              ))}
+              ); })}
             </View>
           </View>
         ) : null}
       </LabelPicker>
       {query.isLoading && (
-        <Text className="text-muted text-xs">Loading labels…</Text>
+        <Text className="text-muted text-xs">{t('inbox.labels.loading')}</Text>
       )}
       {query.isError && (
         <Pressable
@@ -178,7 +183,7 @@ export function LabelSection({
           onPress={() => void query.refetch()}
         >
           <Text accessibilityRole="alert" className="text-danger text-sm">
-            Could not load labels. Tap to retry.
+            {t('inbox.labels.loadFailed')}
           </Text>
         </Pressable>
       )}
@@ -192,14 +197,14 @@ export function LabelSection({
       >
         <SafeAreaView className="flex-1 bg-bg" edges={["top", "bottom"]}>
           <View className="flex-row items-center justify-between px-4">
-            <Text className="text-fg text-xl font-semibold">Manage labels</Text>
+            <Text className="text-fg text-xl font-semibold">{t('inbox.labels.dialogTitle')}</Text>
             <Pressable
               disabled={busy}
               accessibilityRole="button"
               onPress={() => setOpen(false)}
               className="min-h-11 justify-center px-3"
             >
-              <Text className="text-accent">Done</Text>
+              <Text className="text-accent">{t('inbox.labels.done')}</Text>
             </Pressable>
           </View>
           <ScrollView
@@ -207,10 +212,7 @@ export function LabelSection({
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ padding: 16, gap: 16 }}
           >
-            <Text className="text-muted text-sm">
-              Rename or remove a label across your whole library. Your saved
-              items are kept.
-            </Text>
+            <Text className="text-muted text-sm">{t('inbox.labels.dialogIntro')}</Text>
             <LabelPicker
               leading={tabs}
               labels={labels}
@@ -222,10 +224,11 @@ export function LabelSection({
             />
             {selected && (
               <View className="gap-3 rounded-xl border border-border p-4">
+                {/* The label itself is the user's own text. */}
                 <Text className="text-fg font-semibold">{selected}</Text>
-                <Text className="text-fg text-sm">New name</Text>
+                <Text className="text-fg text-sm">{t('inbox.labels.newName')}</Text>
                 <TextInput
-                  accessibilityLabel="New label name"
+                  accessibilityLabel={t('inbox.labels.newNameField')}
                   editable={!busy}
                   value={replacement}
                   onChangeText={(v) => {
@@ -236,9 +239,7 @@ export function LabelSection({
                   autoCapitalize="none"
                   className="min-h-11 rounded-lg border border-border px-3 text-fg"
                 />
-                <Text className="text-muted text-xs">
-                  An existing name combines the labels.
-                </Text>
+                <Text className="text-muted text-xs">{t('inbox.labels.mergeHint')}</Text>
                 <View className="flex-row gap-3">
                   <Pressable
                     accessibilityRole="button"
@@ -250,7 +251,7 @@ export function LabelSection({
                     onPress={() => void review(replacement.trim())}
                     className="min-h-11 justify-center rounded-lg bg-primary px-3 disabled:opacity-40"
                   >
-                    <Text className="text-bg">Rename</Text>
+                    <Text className="text-bg">{t('inbox.labels.rename')}</Text>
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
@@ -258,17 +259,16 @@ export function LabelSection({
                     onPress={() => void review(null)}
                     className="min-h-11 justify-center rounded-lg border border-border px-3"
                   >
-                    <Text className="text-danger">Delete label</Text>
+                    <Text className="text-danger">{t('inbox.labels.deleteLabel')}</Text>
                   </Pressable>
                 </View>
                 {preview && (
                   <View className="gap-3 border-t border-border pt-3">
                     <Text accessibilityRole="alert" className="text-fg">
                       {preview.replacement === null
-                        ? `Delete “${selected}”`
-                        : `Rename “${selected}” to “${preview.replacement}”`}
-                      ? This affects {preview.count}{" "}
-                      {preview.count === 1 ? "item" : "items"}.
+                        ? t('inbox.labels.confirmDelete', { name: selected })
+                        : t('inbox.labels.confirmRename', { name: selected, replacement: preview.replacement })}
+                      {t('inbox.labels.affects', { count: preview.count })}
                     </Text>
                     <View className="flex-row gap-3">
                       <Pressable
@@ -277,7 +277,7 @@ export function LabelSection({
                         onPress={() => void apply()}
                         className="min-h-11 justify-center rounded-lg bg-primary px-3"
                       >
-                        <Text className="text-bg">Confirm</Text>
+                        <Text className="text-bg">{t('inbox.labels.confirm')}</Text>
                       </Pressable>
                       <Pressable
                         accessibilityRole="button"
@@ -285,22 +285,22 @@ export function LabelSection({
                         onPress={() => setPreview(null)}
                         className="min-h-11 justify-center px-3"
                       >
-                        <Text className="text-fg">Cancel</Text>
+                        <Text className="text-fg">{t('inbox.labels.cancel')}</Text>
                       </Pressable>
                     </View>
                   </View>
                 )}
               </View>
             )}
-            {busy && <Text className="text-muted">Updating…</Text>}
-            {error && (
+            {busy && <Text className="text-muted">{t('inbox.labels.updating')}</Text>}
+            {errorKey && (
               <Text accessibilityRole="alert" className="text-danger">
-                {error}
+                {tKey(errorKey)}
               </Text>
             )}
-            {notice && (
+            {updatedCount !== null && (
               <Text accessibilityLiveRegion="polite" className="text-fg">
-                {notice}
+                {t('inbox.labels.updated', { count: updatedCount })}
               </Text>
             )}
           </ScrollView>

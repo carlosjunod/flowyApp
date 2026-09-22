@@ -2,6 +2,7 @@ import React, { useMemo, type ReactNode } from "react";
 import { Feather } from "@expo/vector-icons";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { orderLabels, type LabelOrder } from "@/lib/labels";
+import { useI18n } from "@/lib/i18n";
 import { useResolvedColors } from "@/lib/theme";
 import type { LabelCount } from "@/types/labels";
 
@@ -37,6 +38,7 @@ export function LabelPicker({
   children?: ReactNode;
   activeFilter?: ReactNode;
 }) {
+  const { t } = useI18n();
   const colors = useResolvedColors();
   const sorted = useMemo(() => orderLabels(labels, order), [labels, order]);
   const pills = (
@@ -46,7 +48,7 @@ export function LabelPicker({
         <Pressable
           onPress={onClear}
           accessibilityRole="button"
-          accessibilityLabel="Clear filters"
+          accessibilityLabel={t('inbox.filters.clearFilters')}
           className="h-11 w-11 items-center justify-center rounded-full bg-card"
         >
           <Feather name="x" size={15} color={colors.muted} />
@@ -54,7 +56,7 @@ export function LabelPicker({
       )}
       {allCount !== undefined && (
         <Pill
-          name="All"
+          name={t('inbox.labels.all')}
           count={allCount}
           active={selected === null}
           onPress={() => onSelect(null)}
@@ -71,22 +73,22 @@ export function LabelPicker({
         />
       ))}
       {!sorted.length && (
-        <Text className="py-3 text-muted">No labels yet.</Text>
+        <Text className="py-3 text-muted">{t('inbox.labels.none')}</Text>
       )}
     </>
   );
   return (
     <View className="gap-2">
       <View className="flex-row items-center justify-between gap-1">
-        {leading ?? <Text className="text-xs text-muted">Labels</Text>}
+        {leading ?? <Text className="text-xs text-muted">{t('inbox.labels.heading')}</Text>}
         <View className="flex-row items-center">
           <Pressable
             disabled={disabled}
             accessibilityRole="button"
             accessibilityLabel={
               order === "alphabetical"
-                ? "Sorted A to Z. Sort by most saved"
-                : "Sorted by most saved. Sort A to Z"
+                ? t('inbox.labels.sortToCount')
+                : t('inbox.labels.sortToAlphabetical')
             }
             onPress={() =>
               onOrder(order === "alphabetical" ? "count" : "alphabetical")
@@ -100,7 +102,7 @@ export function LabelPicker({
               style={{ transform: [{ rotate: "90deg" }] }}
             />
             <Text className="text-xs text-muted">
-              {order === "alphabetical" ? "A–Z" : "9–1"}
+              {order === "alphabetical" ? t('inbox.labels.sortAlphabetical') : t('inbox.labels.sortCount')}
             </Text>
           </Pressable>
           {actions}
@@ -109,7 +111,7 @@ export function LabelPicker({
               disabled={disabled}
               accessibilityRole="button"
               accessibilityLabel={
-                expanded ? "Collapse filters" : "Show all filters"
+                expanded ? t('inbox.labels.collapse') : t('inbox.labels.expand')
               }
               accessibilityState={{ expanded }}
               onPress={onExpand}
@@ -148,12 +150,14 @@ function Pill({
   onPress,
   disabled,
 }: LabelCount & { active: boolean; onPress: () => void; disabled?: boolean }) {
+  const { t } = useI18n();
   return (
     <Pressable
       disabled={disabled}
       accessibilityRole="button"
       accessibilityState={{ selected: active, disabled }}
-      accessibilityLabel={`${name}, ${count} items`}
+      // `name` is the user's own label; only the frame around it is translated.
+      accessibilityLabel={t('inbox.labels.pill', { name, count })}
       onPress={onPress}
       className={`min-h-11 max-w-64 flex-row items-center gap-2 rounded-full px-3.5 ${active ? "bg-fg" : "bg-card"}`}
     >

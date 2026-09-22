@@ -19,14 +19,23 @@ import { AppIcon } from "@/components/ui/AppIcon";
 import { Spinner } from "@/components/ui/Spinner";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { relativeDate } from "@/lib/relativeDate";
+import { useI18n } from "@/lib/i18n";
 import { hostOf } from "@/lib/thumbnails";
 import { useResolvedColors } from "@/lib/theme";
 import type { Digest, DigestSection } from "@/types";
 
+/** Section headings, in the order the report renders them. */
+const SECTION_KEYS = {
+  ideas: 'digest.reader.ideas',
+  themes: 'digest.reader.themes',
+  highlights: 'digest.reader.highlights',
+  connections: 'digest.reader.connections',
+} as const;
+
 export default function DigestDetailScreen() {
   const { user } = useAuth();
   const chat = useChat();
+  const { t, tKey, locale, formatRelativeDate } = useI18n();
   const { id } = useLocalSearchParams<{ id: string }>();
   const query = useQuery<Digest, Error>({
     queryKey: ["digest", user?.id, id],
@@ -39,7 +48,7 @@ export default function DigestDetailScreen() {
     },
   });
 
-  const [notice, setNotice] = useState("");
+  const [noticeKey, setNoticeKey] = useState("");
   useFocusEffect(
     useCallback(() => {
       const mark = () => {
@@ -65,8 +74,8 @@ export default function DigestDetailScreen() {
   ) => {
     if (!id) return;
     const result = await api.digestFeedback(id, target, value);
-    setNotice(
-      result.error ? "Could not save feedback. Try again." : "Feedback saved",
+    setNoticeKey(
+      result.error ? 'digest.reader.feedbackFailed' : 'digest.reader.feedbackSaved',
     );
     if (!result.error) void query.refetch();
   };
@@ -85,20 +94,20 @@ export default function DigestDetailScreen() {
   if (query.error || !query.data) {
     return (
       <SafeAreaView className="flex-1 bg-bg items-center justify-center px-6">
-        <Text className="text-base text-danger mb-4">
+        <Text accessibilityRole="alert" className="text-base text-danger mb-4">
           {query.error?.message === "DIGEST_NOT_FOUND"
-            ? "Report no longer available"
-            : "Could not load your report. Check your connection and try again."}
+            ? t('digest.reader.notAvailable')
+            : t('digest.reader.loadFailed')}
         </Text>
         <Button
-          title="Retry"
+          title={t('digest.reader.retry')}
           variant="secondary"
           onPress={() => {
             void query.refetch();
           }}
         />
         <Button
-          title="Back"
+          title={t('common.actions.back')}
           variant="secondary"
           onPress={() => router.back()}
         />
@@ -107,12 +116,13 @@ export default function DigestDetailScreen() {
   }
 
   const digest = query.data;
+  const cadenceLabel = tKey(`digest.history.${digest.cadence ?? 'daily'}`);
   const highlightAction = (blockId: string, sourceIds: string[], selectedText: string) => (
     <View className="flex-row items-center gap-2">
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Ask about this"
-        accessibilityHint="Starts a chat draft scoped to this highlight's sources"
+        accessibilityLabel={t('digest.reader.askAboutThis')}
+        accessibilityHint={t('digest.reader.askAboutThisHint')}
         accessibilityState={{ disabled: !chat.ready }}
         disabled={!chat.ready}
         onPress={() => {
@@ -123,12 +133,12 @@ export default function DigestDetailScreen() {
         className={`h-11 flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 ${!chat.ready ? "opacity-50" : ""}`}
       >
         <AppIcon name="message-circle" size={17} />
-        <Text className="text-sm font-semibold text-fg">Ask about this</Text>
+        <Text className="text-sm font-semibold text-fg">{t('digest.reader.askAboutThis')}</Text>
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Not interested"
-        accessibilityHint="Hides this highlight. You can undo this later."
+        accessibilityLabel={t('digest.reader.notInterested')}
+        accessibilityHint={t('digest.reader.notInterestedHint')}
         onPress={() => {
           void feedback(blockId, "not_interested");
         }}
@@ -144,11 +154,11 @@ export default function DigestDetailScreen() {
       <View className="flex-row items-center justify-between px-4 py-3">
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Back to digests"
+          accessibilityLabel={t('digest.reader.backLabel')}
           className="min-h-11 justify-center"
           onPress={() => router.back()}
         >
-          <Text className="text-accent text-base">← Back</Text>
+          <Text className="text-accent text-base">{t('digest.reader.back')}</Text>
         </Pressable>
       </View>
       <ScrollView
@@ -156,9 +166,10 @@ export default function DigestDetailScreen() {
       >
         <View className="gap-1">
           <Text className="text-xs uppercase text-muted">
-            {digest.cadence || "digest"} · {relativeDate(digest.generated_at)}
+            {cadenceLabel} · {formatRelativeDate(digest.generated_at)}
             {digest.content.timezone ? ` · ${digest.content.timezone}` : ""}
           </Text>
+          {/* The report title is AI output in the account's report language. */}
           <Text
             className="text-3xl text-fg"
             style={{
@@ -167,30 +178,29 @@ export default function DigestDetailScreen() {
             }}
           >
             {digest.status === "source_removed"
-              ? "Report unavailable"
-              : digest.content.title || "Your digest"}
+              ? t('digest.reader.unavailableTitle')
+              : digest.content.title || t('digest.history.untitled')}
           </Text>
           {digest.content.window_start && (
             <Text className="text-sm text-muted">
               {new Date(digest.content.window_start).toLocaleDateString(
-                undefined,
+                locale,
                 { timeZone: digest.content.timezone },
               )}{" "}
               —{" "}
               {new Date(digest.content.window_end).toLocaleDateString(
-                undefined,
+                locale,
                 { timeZone: digest.content.timezone },
               )}
             </Text>
           )}
           <Text className="text-sm text-muted">
-            {digest.items_count} {digest.items_count === 1 ? "item" : "items"}{" "}
-            in the period
+            {t('digest.reader.itemsInPeriod', { count: digest.items_count })}
           </Text>
         </View>
         {digest.content.tldr && (
           <View className="rounded-2xl border border-border bg-surface p-5 gap-3">
-            <Text className="text-lg font-semibold text-fg">TL;DR</Text>
+            <Text className="text-lg font-semibold text-fg">{t('digest.reader.tldr')}</Text>
             {digest.content.tldr.bullets.map((b) => (
               <View key={b.id}>
                 <Text className="text-base leading-6 text-fg">{b.text}</Text>
@@ -201,7 +211,7 @@ export default function DigestDetailScreen() {
                     onPress={() => open(source)}
                     className="min-h-11 justify-center"
                   >
-                    <Text className="text-accent">Open source</Text>
+                    <Text className="text-accent">{t('digest.reader.openSource')}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -209,9 +219,7 @@ export default function DigestDetailScreen() {
           </View>
         )}
         {digest.status === "source_removed" ? (
-          <Text className="text-fg">
-            Report no longer available after a source was removed.
-          </Text>
+          <Text className="text-fg">{t('digest.reader.removedBody')}</Text>
         ) : (
           <>
             {(["ideas", "themes", "highlights", "connections"] as const).map(
@@ -221,10 +229,10 @@ export default function DigestDetailScreen() {
                 return (
                 <View key={section} className="gap-4">
                   <Text
-                    className="text-2xl capitalize text-fg"
+                    className="text-2xl text-fg"
                     style={{ fontFamily: "InstrumentSerif_400Regular" }}
                   >
-                    {section}
+                    {t(SECTION_KEYS[section])}
                   </Text>
                   {blocks.map((block) => {
                     const hidden = digest.feedback?.some(
@@ -234,7 +242,7 @@ export default function DigestDetailScreen() {
                     return hidden ? (
                       <Button
                         key={block.id}
-                        title="Highlight hidden · Undo"
+                        title={t('digest.reader.highlightHidden')}
                         variant="secondary"
                         onPress={() => {
                           void feedback(block.id, null);
@@ -244,7 +252,7 @@ export default function DigestDetailScreen() {
                       <View key={block.id} className="gap-2">
                         <SectionCard
                           section={{
-                            category: section,
+                            category: t(SECTION_KEYS[section]),
                             summary: block.text,
                             image_urls: [],
                             item_ids: block.source_item_ids,
@@ -255,7 +263,7 @@ export default function DigestDetailScreen() {
                           highlightAction(block.id, block.source_item_ids, block.text)
                         ) : (
                           <Button
-                            title="Ask about this"
+                            title={t('digest.reader.askAboutThis')}
                             variant="secondary"
                             disabled={!chat.ready}
                             onPress={() => {
@@ -273,40 +281,35 @@ export default function DigestDetailScreen() {
             )}
             {digest.content.selection && (
               <Text className="text-sm text-muted">
-                {digest.content.selection.selected} selected from{" "}
-                {digest.content.selection.total} items in the period.
+                {t('digest.reader.selection', {
+                  selected: digest.content.selection.selected,
+                  total: digest.content.selection.total,
+                })}
                 {digest.content.selection.pending > 0
-                  ? " Some saves are still processing and may appear in a later digest."
+                  ? t('digest.reader.selectionPending')
                   : ""}
                 {digest.content.selection.carryover_item_ids.length > 0
-                  ? " Includes earlier saves that are ready now."
+                  ? t('digest.reader.selectionCarryover')
                   : ""}
               </Text>
             )}
             {digest.content.quality_mode === "fallback" && (
-              <Text className="text-muted">
-                A selection based on your saved summaries and metadata.
-              </Text>
+              <Text className="text-muted">{t('digest.reader.fallbackMode')}</Text>
             )}
             <Button
-              title="Ask about this digest"
+              title={t('digest.reader.askAboutDigest')}
               disabled={!chat.ready}
               onPress={() => {
                 chat.startDigest(digest.id);
                 router.push("/chat");
               }}
             />
-            <Text className="text-sm text-muted">
-              Chat uses this report’s sources. Edit your question before
-              sending.
-            </Text>
+            <Text className="text-sm text-muted">{t('digest.reader.askHint')}</Text>
             <View className="gap-1">
               <Text className="text-2xl text-fg" style={{ fontFamily: "InstrumentSerif_400Regular" }}>
-                Sources
+                {t('digest.reader.sources')}
               </Text>
-              <Text className="text-sm text-muted">
-                Open a saved item or visit its original link.
-              </Text>
+              <Text className="text-sm text-muted">{t('digest.reader.sourcesHint')}</Text>
             </View>
             {digest.sources?.map((source) => {
               const url = source.source_url || source.raw_url;
@@ -321,11 +324,11 @@ export default function DigestDetailScreen() {
               );
             })}
             <View className="flex-row gap-2">
-              <Button title="Useful" variant="secondary" className="flex-1" onPress={() => { void feedback("digest", "useful"); }} />
-              <Button title="Not useful" variant="secondary" className="flex-1" onPress={() => { void feedback("digest", "not_useful"); }} />
+              <Button title={t('digest.reader.useful')} variant="secondary" className="flex-1" onPress={() => { void feedback("digest", "useful"); }} />
+              <Button title={t('digest.reader.notUseful')} variant="secondary" className="flex-1" onPress={() => { void feedback("digest", "not_useful"); }} />
             </View>
             <Text accessibilityLiveRegion="polite" className="text-fg">
-              {notice}
+              {noticeKey ? tKey(noticeKey) : ''}
             </Text>
           </>
         )}
@@ -337,47 +340,51 @@ export default function DigestDetailScreen() {
 const SectionCard: React.FC<{
   section: DigestSection;
   open: (id: string) => void;
-}> = ({ section, open }) => (
-  <View className="rounded-2xl border border-border bg-card p-4 gap-3">
-    <Text
-      className="text-xl text-fg"
-      style={{ fontFamily: "InstrumentSerif_400Regular", letterSpacing: -0.3 }}
-    >
-      {section.category}
-    </Text>
-    <Text className="text-base text-fg leading-6">{section.summary}</Text>
-    {section.image_urls.length > 0 ? (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8 }}
+}> = ({ section, open }) => {
+  const { t } = useI18n();
+  return (
+    <View className="rounded-2xl border border-border bg-card p-4 gap-3">
+      <Text
+        className="text-xl text-fg"
+        style={{ fontFamily: "InstrumentSerif_400Regular", letterSpacing: -0.3 }}
       >
-        {section.image_urls.map((url, i) => (
-          <Image
-            key={`${url}-${i}`}
-            source={{ uri: url }}
-            style={{ width: 88, height: 88, borderRadius: 8 }}
-            contentFit="cover"
-          />
-        ))}
-      </ScrollView>
-    ) : null}
-    {section.item_ids.length > 0 ? (
-      <View className="flex-row flex-wrap gap-2 pt-1">
-        {section.item_ids.map((id) => (
-          <Pressable
-            key={id}
-            onPress={() => open(id)}
-            style={({ pressed }) => [pressed && { opacity: 0.6 }]}
-            className="px-3 py-1.5 rounded-full bg-surface border border-border"
-          >
-            <Text className="text-xs text-fg">Open item</Text>
-          </Pressable>
-        ))}
-      </View>
-    ) : null}
-  </View>
-);
+        {section.category}
+      </Text>
+      {/* AI-written summary — rendered in the report language, not translated. */}
+      <Text className="text-base text-fg leading-6">{section.summary}</Text>
+      {section.image_urls.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 8 }}
+        >
+          {section.image_urls.map((url, i) => (
+            <Image
+              key={`${url}-${i}`}
+              source={{ uri: url }}
+              style={{ width: 88, height: 88, borderRadius: 8 }}
+              contentFit="cover"
+            />
+          ))}
+        </ScrollView>
+      ) : null}
+      {section.item_ids.length > 0 ? (
+        <View className="flex-row flex-wrap gap-2 pt-1">
+          {section.item_ids.map((id) => (
+            <Pressable
+              key={id}
+              onPress={() => open(id)}
+              style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+              className="px-3 py-1.5 rounded-full bg-surface border border-border"
+            >
+              <Text className="text-xs text-fg">{t('digest.reader.openItem')}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+};
 
 type SourceRowProps = {
   title?: string;
@@ -388,11 +395,15 @@ type SourceRowProps = {
 
 const SourceRow: React.FC<SourceRowProps> = ({ title, url, onOpenItem, onOpenOriginal }) => {
   const colors = useResolvedColors();
+  const { t } = useI18n();
   const [faviconFailed, setFaviconFailed] = useState(false);
   const host = url ? hostOf(url) : null;
   const favicon = host
     ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`
     : null;
+  // The saved item's own title wins; the host is source data; only the last
+  // resort is interface copy.
+  const name = title || host || t('digest.reader.sourceFallback');
   return (
     <View className="flex-row items-center gap-3 rounded-2xl border border-border bg-card p-3">
       <View className="h-12 w-12 overflow-hidden rounded-xl bg-surface items-center justify-center">
@@ -410,22 +421,22 @@ const SourceRow: React.FC<SourceRowProps> = ({ title, url, onOpenItem, onOpenOri
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Open saved source: ${title || host || "source"}`}
-        accessibilityHint="Opens this item in Flowy"
+        accessibilityLabel={t('digest.reader.openSavedSource', { title: name })}
+        accessibilityHint={t('digest.reader.openSavedSourceHint')}
         className="min-h-11 flex-1 justify-center"
         onPress={onOpenItem}
         style={({ pressed }) => [pressed && { opacity: 0.7 }]}
       >
         <Text className="text-base font-semibold text-fg" numberOfLines={2}>
-          {title || host || "Saved source"}
+          {title || host || t('digest.reader.savedSource')}
         </Text>
         {host && <Text className="mt-0.5 text-sm text-muted" numberOfLines={1}>{host}</Text>}
       </Pressable>
       {onOpenOriginal && (
         <Pressable
           accessibilityRole="link"
-          accessibilityLabel={`Open original source: ${title || host || "source"}`}
-          accessibilityHint="Opens the original link in your browser"
+          accessibilityLabel={t('digest.reader.openOriginalSource', { title: name })}
+          accessibilityHint={t('digest.reader.openOriginalSourceHint')}
           className="h-11 w-11 items-center justify-center rounded-xl bg-surface"
           onPress={onOpenOriginal}
           style={({ pressed }) => [pressed && { opacity: 0.7 }]}

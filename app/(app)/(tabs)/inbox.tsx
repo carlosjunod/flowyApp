@@ -45,6 +45,7 @@ import {
   useItems,
 } from '@/hooks/useItems';
 import { useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
 import { pb } from '@/lib/pb';
 import { useResolvedColors } from '@/lib/theme';
 import { useViewMode } from '@/lib/viewMode';
@@ -53,6 +54,7 @@ import type { Item, ViewMode } from '@/types';
 
 export default function InboxScreen() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const { fontScale } = useWindowDimensions();
   const { width, visible: paneVisible, selectedItemId, onOpenItem } = useAdaptivePane();
@@ -141,17 +143,17 @@ export default function InboxScreen() {
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
       <View style={{ flex: 1, display: chatSources ? 'none' : 'flex' }} accessibilityElementsHidden={chatOpen} importantForAccessibility={chatOpen ? 'no-hide-descendants' : 'auto'}>
       <PersonalizationInvitation />
-      {author ? <View className="mx-4 px-3 flex-row flex-wrap items-center justify-between gap-x-3 rounded-xl border border-border bg-surface"><Text className="text-fg text-sm py-2" style={{ flexShrink: 1 }}>Your saves · @{author.replace(/^instagram:/, '')}</Text><Pressable accessibilityRole="button" accessibilityLabel="Clear author filter" onPress={clearAuthor} style={{ minHeight: 44, justifyContent: 'center' }}><Text className="text-accent font-medium">Clear</Text></Pressable></View> : null}
+      {author ? <View className="mx-4 px-3 flex-row flex-wrap items-center justify-between gap-x-3 rounded-xl border border-border bg-surface"><Text className="text-fg text-sm py-2" style={{ flexShrink: 1 }}>{t('inbox.page.authorFilter', { author: author.replace(/^instagram:/, '') })}</Text><Pressable accessibilityRole="button" accessibilityLabel={t('inbox.page.clearAuthor')} onPress={clearAuthor} style={{ minHeight: 44, justifyContent: 'center' }}><Text className="text-accent font-medium">{t('inbox.page.clear')}</Text></Pressable></View> : null}
       <View className="flex-row items-center justify-between px-4 pt-2 pb-1">
         <Text
           className="text-3xl text-fg"
           style={{ fontFamily: 'InstrumentSerif_400Regular', letterSpacing: -0.5 }}
         >
-          Inbox
+          {t('inbox.page.title')}
         </Text>
         <View className="flex-row items-center gap-2">
-          <Pressable onPress={() => selection.mode ? selection.exit() : selection.enter()} accessibilityRole="button" accessibilityLabel={selection.mode ? 'Cancel selection' : 'Select items'} className="h-11 justify-center px-2"><Text className="text-fg text-sm">{selection.mode ? 'Cancel' : 'Select'}</Text></Pressable>
-          <Pressable onPress={() => setBulkOpen(true)} accessibilityRole="button" accessibilityLabel="Save a link" className="h-11 rounded-full bg-primary px-4 justify-center"><Text className="text-bg font-semibold">{captureStatus === 'working' ? 'Saving…' : captureStatus === 'done' ? 'Saved' : 'Save'}</Text></Pressable>
+          <Pressable onPress={() => selection.mode ? selection.exit() : selection.enter()} accessibilityRole="button" accessibilityLabel={selection.mode ? t('inbox.page.cancelSelection') : t('inbox.page.selectItems')} className="h-11 justify-center px-2"><Text className="text-fg text-sm">{selection.mode ? t('inbox.page.cancel') : t('inbox.page.select')}</Text></Pressable>
+          <Pressable onPress={() => setBulkOpen(true)} accessibilityRole="button" accessibilityLabel={t('inbox.page.saveLink')} className="h-11 rounded-full bg-primary px-4 justify-center"><Text className="text-bg font-semibold">{captureStatus === 'working' ? t('inbox.page.saving') : captureStatus === 'done' ? t('inbox.page.saved') : t('inbox.page.save')}</Text></Pressable>
         </View>
       </View>
       <ViewModeToggle value={viewMode} onChange={onViewModeChange} />
@@ -167,9 +169,13 @@ export default function InboxScreen() {
         category={category}
         onCategoryChange={setCategory}
       />
-      {query.isError ? <View className="px-4 py-3 flex-row items-center gap-2"><Text accessibilityRole="alert" className="text-danger flex-1 text-sm">Your inbox could not be loaded. Check your connection and try again.</Text><Button title="Retry" variant="secondary" onPress={() => { void query.refetch(); }} /></View> : null}
-      {query.isLoading ? <View accessibilityLabel="Loading saved content" className="px-4 gap-3 pt-3">{[1, 2, 3].map(n => <View key={n} className="h-20 bg-surface rounded-xl overflow-hidden relative"><Shimmer /></View>)}</View> : null}
-      {!query.isLoading && !query.isError ? <Text className="text-xs text-muted px-4 pt-2">{query.data?.pages[0]?.totalItems ?? 0} {search || category || tag || reading !== 'all' || author ? 'results' : 'saved items'}</Text> : null}
+      {query.isError ? <View className="px-4 py-3 flex-row items-center gap-2"><Text accessibilityRole="alert" className="text-danger flex-1 text-sm">{t('inbox.states.loadFailed')}</Text><Button title={t('inbox.states.retry')} variant="secondary" onPress={() => { void query.refetch(); }} /></View> : null}
+      {query.isLoading ? <View accessibilityLabel={t('inbox.page.loadingSaved')} className="px-4 gap-3 pt-3">{[1, 2, 3].map(n => <View key={n} className="h-20 bg-surface rounded-xl overflow-hidden relative"><Shimmer /></View>)}</View> : null}
+      {!query.isLoading && !query.isError ? <Text className="text-xs text-muted px-4 pt-2">{
+        search || category || tag || reading !== 'all' || author
+          ? t('inbox.page.countResults', { count: query.data?.pages[0]?.totalItems ?? 0 })
+          : t('inbox.page.countSaved', { count: query.data?.pages[0]?.totalItems ?? 0 })
+      }</Text> : null}
       {viewMode === 'grid' ? (
         <FlatList
           key={`${viewMode}-${columns}`}
@@ -217,7 +223,7 @@ export default function InboxScreen() {
             query.hasNextPage ? (
               <View className="p-4">
                 <Button
-                  title={query.isFetchingNextPage ? 'Loading…' : 'Load more'}
+                  title={query.isFetchingNextPage ? t('inbox.states.loading') : t('inbox.states.loadMore')}
                   variant="secondary"
                   loading={query.isFetchingNextPage}
                   onPress={() => query.fetchNextPage()}
@@ -231,14 +237,14 @@ export default function InboxScreen() {
           key="list"
           data={groupForList(visible)}
           keyExtractor={(row) =>
-            row.kind === 'header' ? `h-${row.label}` : row.item.id
+            row.kind === 'header' ? `h-${row.labelKey}` : row.item.id
           }
           contentContainerStyle={{ paddingTop: 8, paddingBottom: selection.mode ? 116 : 24 }}
           refreshing={query.isRefetching}
           onRefresh={onRefresh}
           renderItem={({ item }) =>
             item.kind === 'header' ? (
-              <SectionHeader label={item.label} count={item.count} />
+              <SectionHeader labelKey={item.labelKey} count={item.count} />
             ) : (
               <ItemRow item={item.item} onOpen={onOpenItem} active={item.item.id === selectedItemId} />
             )
@@ -262,7 +268,7 @@ export default function InboxScreen() {
             query.hasNextPage ? (
               <View className="p-4">
                 <Button
-                  title={query.isFetchingNextPage ? 'Loading…' : 'Load more'}
+                  title={query.isFetchingNextPage ? t('inbox.states.loading') : t('inbox.states.loadMore')}
                   variant="secondary"
                   loading={query.isFetchingNextPage}
                   onPress={() => query.fetchNextPage()}
@@ -281,7 +287,7 @@ export default function InboxScreen() {
 }
 
 type ListRow =
-  | { kind: 'header'; label: string; count: number }
+  | { kind: 'header'; labelKey: string; count: number }
   | { kind: 'item'; item: Item };
 
 // Distinguishes a filtered empty inbox (user search/category produced no
@@ -294,17 +300,20 @@ const EmptyState: React.FC<{
   onClearFilters: () => void;
   onSave: () => void;
 }> = ({ hasFilters, search, category, onClearFilters, onSave }) => {
+  const { t } = useI18n();
   if (hasFilters) {
+    // The search term and the category are the user's own words, so they are
+    // interpolated verbatim into a translated frame rather than concatenated.
     const what = search
-      ? `“${search}”`
+      ? t('inbox.states.noMatchesSearch', { search })
       : category
-        ? `the ${category} category`
-        : 'your filters';
+        ? t('inbox.states.noMatchesCategory', { category })
+        : t('inbox.states.noMatchesFilters');
     return (
       <View className="items-center justify-center px-6 pt-16">
         <View className="mb-3"><AppIcon name="search" size={40} /></View>
         <Text className="text-base text-muted text-center mb-3">
-          No items match {what}.
+          {t('inbox.states.noMatches', { what })}
         </Text>
         <Pressable
           onPress={onClearFilters}
@@ -313,7 +322,7 @@ const EmptyState: React.FC<{
           style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
         >
           <Text className="text-accent" style={{ fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>
-            Clear filters
+            {t('inbox.filters.clearFilters')}
           </Text>
         </Pressable>
       </View>
@@ -322,29 +331,32 @@ const EmptyState: React.FC<{
   return (
     <View className="items-center justify-center px-6 pt-16">
       <View className="mb-3"><AppIcon name="inbox" size={40} /></View>
-      <Text className="text-xl text-fg font-semibold mb-2">Keep something worth revisiting</Text>
-      <Text className="text-base text-muted text-center mb-5">Save a link here, or choose Share → Flowy from another app to save links, images and files.</Text>
-      <Button title="Save your first link" onPress={onSave} />
+      <Text className="text-xl text-fg font-semibold mb-2">{t('inbox.states.emptyTitle')}</Text>
+      <Text className="text-base text-muted text-center mb-5">{t('inbox.states.emptyBody')}</Text>
+      <Button title={t('inbox.states.emptyAction')} onPress={onSave} />
     </View>
   );
 };
 
-const SectionHeader: React.FC<{ label: string; count: number }> = ({ label, count }) => (
-  <View className="flex-row items-baseline justify-between px-4 pt-5 pb-2">
-    <Text
-      className="text-fg"
-      style={{ fontFamily: 'Inter_600SemiBold', fontSize: 12, letterSpacing: 1 }}
-    >
-      {label.toUpperCase()}
-    </Text>
-    <Text
-      className="text-muted"
-      style={{ fontFamily: 'Inter_400Regular', fontSize: 11 }}
-    >
-      {count} {count === 1 ? 'item' : 'items'}
-    </Text>
-  </View>
-);
+const SectionHeader: React.FC<{ labelKey: string; count: number }> = ({ labelKey, count }) => {
+  const { t, tKey } = useI18n();
+  return (
+    <View className="flex-row items-baseline justify-between px-4 pt-5 pb-2">
+      <Text
+        className="text-fg"
+        style={{ fontFamily: 'Inter_600SemiBold', fontSize: 12, letterSpacing: 1 }}
+      >
+        {tKey(labelKey).toUpperCase()}
+      </Text>
+      <Text
+        className="text-muted"
+        style={{ fontFamily: 'Inter_400Regular', fontSize: 11 }}
+      >
+        {t('inbox.groups.count', { count })}
+      </Text>
+    </View>
+  );
+};
 
 const startOfDay = (d: Date): Date => {
   const c = new Date(d);
@@ -360,12 +372,12 @@ const groupForList = (items: Item[]): ListRow[] => {
   const weekAgo = today - 7 * 24 * 60 * 60 * 1000;
   const monthAgo = today - 30 * 24 * 60 * 60 * 1000;
 
-  const buckets: { label: string; cutoff: number; items: Item[] }[] = [
-    { label: 'Today', cutoff: today, items: [] },
-    { label: 'Yesterday', cutoff: yesterday, items: [] },
-    { label: 'Earlier this week', cutoff: weekAgo, items: [] },
-    { label: 'This month', cutoff: monthAgo, items: [] },
-    { label: 'Older', cutoff: -Infinity, items: [] },
+  const buckets: { labelKey: string; cutoff: number; items: Item[] }[] = [
+    { labelKey: 'inbox.groups.today', cutoff: today, items: [] },
+    { labelKey: 'inbox.groups.yesterday', cutoff: yesterday, items: [] },
+    { labelKey: 'inbox.groups.earlierThisWeek', cutoff: weekAgo, items: [] },
+    { labelKey: 'inbox.groups.thisMonth', cutoff: monthAgo, items: [] },
+    { labelKey: 'inbox.groups.older', cutoff: -Infinity, items: [] },
   ];
 
   const fallback = buckets[buckets.length - 1]!;
@@ -378,7 +390,7 @@ const groupForList = (items: Item[]): ListRow[] => {
   const rows: ListRow[] = [];
   for (const b of buckets) {
     if (b.items.length === 0) continue;
-    rows.push({ kind: 'header', label: b.label, count: b.items.length });
+    rows.push({ kind: 'header', labelKey: b.labelKey, count: b.items.length });
     for (const item of b.items) rows.push({ kind: 'item', item });
   }
   return rows;

@@ -4,11 +4,17 @@ const path = require('node:path');
 const Module = require('node:module');
 const ts = require('typescript');
 const root = path.resolve(__dirname, '..');
-function loader(mocks) {
+// Node has no keychain: the i18n layer's storage boundary (only) is in-memory.
+const secureStore = (() => { const m = new Map(); return { getItemAsync: async k => m.get(k) ?? null, setItemAsync: async (k, v) => { m.set(k, v); }, deleteItemAsync: async k => { m.delete(k); } }; })();
+function loader(overrides) {
+  const mocks = { 'expo-secure-store': secureStore, '@expo/vector-icons': { Feather: 'Feather' }, ...overrides };
   const cache = new Map();
   function load(filename) {
-    let full = path.resolve(root, filename);
-    if (!fs.existsSync(full)) full += fs.existsSync(`${full}.ts`) ? '.ts' : '.tsx';
+    // Only regular files count: `@/lib/i18n` is a directory and resolves to its index.
+    const base = path.resolve(root, filename);
+    const isFile = candidate => { try { return fs.statSync(candidate).isFile(); } catch { return false; } };
+    const full = [base, `${base}.ts`, `${base}.tsx`, path.join(base, 'index.ts'), path.join(base, 'index.tsx')].find(isFile);
+    if (!full) throw new Error(`Cannot resolve module: ${base}`);
     if (cache.has(full)) return cache.get(full).exports;
     const mod = new Module(full, module);
     cache.set(full, mod);
@@ -34,6 +40,9 @@ function hooks() {
   let effects = [];
   return {
     react: {
+      // No provider is mounted: components read the i18n layer's English fallback context.
+      createContext: fallback => ({ fallback, Provider: 'Provider' }),
+      useContext: context => context.current ?? context.fallback,
       useState(initial) {
         const id = index++;
         if (!slots[id]) slots[id] = { value: initial };
@@ -136,7 +145,9 @@ const passed = label => { checks++; console.log(`PASS ${label}`); };
   for (const code of ['INVALID_TOKEN', 'NETWORK_ERROR', 'EMAIL_IN_USE', 'RATE_LIMITED', 'SERVER_ERROR']) {
     const result = await exchangeGoogleIdentity(identity, async () => ({ data: null, error: { code } }));
     assert.equal(result.type, 'error');
-    assert.ok(!result.message.includes(code));
+    // Errors are translation keys now; the raw server code must never be the copy.
+    assert.match(result.messageKey, /^auth\.social\.errors\./);
+    assert.ok(!result.messageKey.includes(code));
   }
   assert.equal((await exchangeGoogleIdentity(identity, async () => ({ data: {}, error: null }))).type, 'error');
   passed('provider/server errors are recoverable and malformed sessions are rejected');

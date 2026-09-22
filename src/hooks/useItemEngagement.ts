@@ -13,13 +13,15 @@ export function useItemEngagement(item: Item | undefined) {
   const id = item?.id;
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // A translation key, so the reader re-renders the failure in the new
+  // language if the user switches while it is on screen.
+  const [errorKey, setErrorKey] = useState<string | null>(null);
   const inFlight = useRef(false);
   const generation = useRef(0);
 
   useEffect(() => {
     generation.current += 1;
-    setError(null);
+    setErrorKey(null);
     setBusy(false);
     inFlight.current = false;
     if (!id || !userId || item?.user !== userId) return;
@@ -62,10 +64,10 @@ export function useItemEngagement(item: Item | undefined) {
     const startedGeneration = generation.current;
     inFlight.current = true;
     setBusy(true);
-    setError(null);
+    setErrorKey(null);
     const result = await api.itemEngagement(userId, item.id, item.read_at ? 'mark_unread' : 'mark_read');
     if (generation.current !== startedGeneration || pb.authStore.model?.id !== userId || pb.authStore.token !== token) return;
-    if (result.error) setError('Could not save your reading status. Check your connection and try again.');
+    if (result.error) setErrorKey('inbox.read.syncFailed');
     else {
       // Refetch instead of merging a response that could precede another client's write.
       await Promise.all([
@@ -77,5 +79,5 @@ export function useItemEngagement(item: Item | undefined) {
     inFlight.current = false;
     setBusy(false);
   }, [item, userId, qc]);
-  return { busy, error, toggleRead };
+  return { busy, errorKey, toggleRead };
 }

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AppState, Linking } from 'react-native';
 
 import { api } from '@/lib/api';
-import { instagramChatUrl, instagramHandle, instagramConnectionError, instagramConnectionUrl } from '@/lib/instagramConnection';
+import { instagramChatUrl, instagramConnectionErrorKey, instagramConnectionUrl } from '@/lib/instagramConnection';
 import { pb } from '@/lib/pb';
 import type { ApiError, ApiResult, InstagramConnection } from '@/types';
 
@@ -16,14 +16,14 @@ export function useInstagramConnection(accountId?: string, destination?: string)
   const handoff = useRef(false);
   const [issued, setIssued] = useState<{ accountId: string; destination?: string; connection: InstagramConnection } | null>(null);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorKey, setErrorKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [handoffReturned, setHandoffReturned] = useState(false);
   useEffect(() => {
     const scope = { accountId, destination, mounted: true, busy: false };
     active.current = scope;
-    setIssued(null); setPending(false); setError(null); setCopied(false);
+    setIssued(null); setPending(false); setErrorKey(null); setCopied(false);
     handoff.current = false; setHandoffReturned(false);
     return () => { scope.mounted = false; };
   }, [accountId, destination]);
@@ -66,20 +66,20 @@ export function useInstagramConnection(accountId?: string, destination?: string)
   async function open(url: string) {
     const scope = active.current;
     if (!current(scope)) return false;
-    setError(null);
+    setErrorKey(null);
     try { await Linking.openURL(url); return true; }
-    catch { if (current(scope)) setError(`Could not open Instagram. Open @${instagramHandle(query.data)} in the Instagram app and send the connection code below.`); return false; }
+    catch { if (current(scope)) setErrorKey('settings.instagram.errors.openFailed'); return false; }
   }
   async function mutate(operation: () => Promise<ApiResult<InstagramConnection>>) {
     const scope = active.current;
     if (!current(scope) || scope.busy) return null;
-    scope.busy = true; setPending(true); setError(null); setCopied(false);
+    scope.busy = true; setPending(true); setErrorKey(null); setCopied(false);
     try {
       await client.cancelQueries({ queryKey: instagramQueryKey(accountId, destination) });
       if (!current(scope)) return null;
       const result = await operation();
       if (!current(scope)) return null;
-      if (result.error) { setError(instagramConnectionError(result.error.code)); return null; }
+      if (result.error) { setErrorKey(instagramConnectionErrorKey(result.error.code)); return null; }
       await client.cancelQueries({ queryKey: instagramQueryKey(accountId, destination) });
       if (!current(scope)) return null;
       // Connection secrets live only in this mounted screen, never in query caches.
@@ -89,7 +89,7 @@ export function useInstagramConnection(accountId?: string, destination?: string)
       setNow(Date.now());
       return result.data;
     } catch {
-      if (current(scope)) setError('Could not update Instagram. Please try again.');
+      if (current(scope)) setErrorKey('settings.instagram.errors.updateFailed');
       return null;
     } finally { scope.busy = false; if (current(scope)) setPending(false); }
   }
@@ -105,12 +105,12 @@ export function useInstagramConnection(accountId?: string, destination?: string)
     const scope = active.current;
     if (!current(scope) || !connection?.code || (connection.expiresAt ?? 0) <= Date.now()) return;
     try { await Clipboard.setStringAsync(connection.code); if (current(scope)) setCopied(true); }
-    catch { if (current(scope)) setError('Could not copy the code. Select it and copy manually.'); }
+    catch { if (current(scope)) setErrorKey('settings.instagram.errors.copyFailed'); }
   }
   return {
-    ...query, pending, error: error || (query.error ? instagramConnectionError(query.error.code) : null),
+    ...query, pending, errorKey: errorKey || (query.error ? instagramConnectionErrorKey(query.error.code) : null),
     connection, expired, copied, connect, copyCode, handoffReturned,
-    refresh: () => { setError(null); setNow(Date.now()); void refetch(); },
+    refresh: () => { setErrorKey(null); setNow(Date.now()); void refetch(); },
     openChat: () => open(instagramChatUrl(query.data)),
     disconnect: () => { handoff.current = false; setHandoffReturned(false); return mutate(() => api.disconnectInstagram(accountId!, destination || query.data?.account)); },
   };

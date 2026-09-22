@@ -13,27 +13,31 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { SocialSignIn } from '@/components/auth/SocialSignIn';
+import { LanguageSelector } from '@/components/settings/LanguageSelector';
 import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
 import { ENV } from '@/lib/env';
 
-const friendlyError = (code: string): string => {
+/** Server error *codes* are the contract; only their human sentence is translated. */
+const registerErrorKey = (code: string): string => {
   switch (code) {
     case 'EMAIL_TAKEN':
-      return 'That email is already in use. Try signing in instead.';
+      return 'auth.registerErrors.EMAIL_TAKEN';
     case 'INVALID_EMAIL':
-      return 'Please enter a valid email address.';
+      return 'auth.registerErrors.INVALID_EMAIL';
     case 'WEAK_PASSWORD':
-      return 'Password must be at least 8 characters.';
+      return 'auth.registerErrors.WEAK_PASSWORD';
     default:
-      return 'Could not create account. Please try again.';
+      return 'auth.registerErrors.DEFAULT';
   }
 };
 
 export default function SignupScreen() {
   const { signInWithSession } = useAuth();
+  const { t, tKey } = useI18n();
   const colors = useResolvedColors();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,31 +45,31 @@ export default function SignupScreen() {
   const [appleBusy, setAppleBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorKey, setErrorKey] = useState<string | null>(null);
   const [aiConsent, setAiConsent] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   const onSubmit = async () => {
     if (loading || googleBusy || appleBusy) return;
-    setError(null);
+    setErrorKey(null);
     if (!email.trim() || !password) {
-      setError('Email and password are required');
+      setErrorKey('auth.signup.missingCredentials');
       return;
     }
     if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+      setErrorKey('auth.signup.passwordTooShort');
       return;
     }
     if (password !== confirm) {
-      setError('Passwords do not match');
+      setErrorKey('auth.signup.passwordMismatch');
       return;
     }
     if (!termsAccepted) {
-      setError('Please accept the Terms of Service and Privacy Policy to create an account.');
+      setErrorKey('auth.signup.termsRequired');
       return;
     }
     if (!aiConsent) {
-      setError('Please accept the AI processing disclosure to create an account.');
+      setErrorKey('auth.signup.consentRequired');
       return;
     }
     setLoading(true);
@@ -73,13 +77,13 @@ export default function SignupScreen() {
     try {
       const res = await api.registerEmail(normalizedEmail, password, undefined, aiConsent);
       if (res.error) {
-        setError(friendlyError(res.error.code));
+        setErrorKey(registerErrorKey(res.error.code));
         return;
       }
       await signInWithSession(res.data);
       router.replace('/inbox');
     } catch {
-      setError('Could not create account. Please try again.');
+      setErrorKey('auth.signup.failed');
     } finally {
       setLoading(false);
     }
@@ -96,15 +100,15 @@ export default function SignupScreen() {
             className="text-5xl text-fg mb-2"
             style={{ fontFamily: 'InstrumentSerif_400Regular', letterSpacing: -1 }}
           >
-            Create account
+            {t('auth.signup.title')}
           </Text>
-          <Text className="text-base text-muted mb-8">Join Flowy</Text>
+          <Text className="text-base text-muted mb-8">{t('auth.signup.subtitle')}</Text>
 
           <View className="gap-3">
             <TextInput
               value={email}
               onChangeText={setEmail}
-              placeholder="Email"
+              placeholder={t('auth.fields.email')}
               placeholderTextColor={colors.muted}
               autoCapitalize="none"
               autoCorrect={false}
@@ -115,7 +119,7 @@ export default function SignupScreen() {
             <TextInput
               value={password}
               onChangeText={setPassword}
-              placeholder="Password (min 8 chars)"
+              placeholder={t('auth.fields.passwordMin')}
               placeholderTextColor={colors.muted}
               secureTextEntry
               textContentType="newPassword"
@@ -124,7 +128,7 @@ export default function SignupScreen() {
             <TextInput
               value={confirm}
               onChangeText={setConfirm}
-              placeholder="Confirm password"
+              placeholder={t('auth.fields.confirmPassword')}
               placeholderTextColor={colors.muted}
               secureTextEntry
               textContentType="newPassword"
@@ -132,7 +136,7 @@ export default function SignupScreen() {
             />
             <Pressable
               accessibilityRole="checkbox"
-              accessibilityLabel="Accept Terms of Service and Privacy Policy"
+              accessibilityLabel={t('auth.consent.termsLabel')}
               accessibilityState={{ checked: termsAccepted, disabled: loading || googleBusy || appleBusy }}
               disabled={loading || googleBusy || appleBusy}
               onPress={() => setTermsAccepted((value) => !value)}
@@ -142,15 +146,15 @@ export default function SignupScreen() {
               <View className="mt-0.5 h-5 w-5 items-center justify-center rounded border border-border" style={{ backgroundColor: termsAccepted ? colors.accent : 'transparent' }}>
                 {termsAccepted ? <Text className="text-bg text-xs">✓</Text> : null}
               </View>
-              <Text className="flex-1 text-muted text-sm leading-5">I agree to the Terms of Service and Privacy Policy.</Text>
+              <Text className="flex-1 text-muted text-sm leading-5">{t('auth.consent.terms')}</Text>
             </Pressable>
             <View className="flex-row gap-5">
-              <Text accessibilityRole="link" onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/terms`)} className="text-accent underline py-2">Terms of Service</Text>
-              <Text accessibilityRole="link" onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/privacy`)} className="text-accent underline py-2">Privacy Policy</Text>
+              <Text accessibilityRole="link" onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/terms`)} className="text-accent underline py-2">{t('auth.consent.termsLink')}</Text>
+              <Text accessibilityRole="link" onPress={() => void Linking.openURL(`${ENV.API_BASE_URL}/privacy`)} className="text-accent underline py-2">{t('auth.consent.privacyLink')}</Text>
             </View>
             <Pressable
               accessibilityRole="checkbox"
-              accessibilityLabel="Accept AI processing"
+              accessibilityLabel={t('auth.consent.aiLabel')}
               accessibilityState={{ checked: aiConsent, disabled: loading || googleBusy || appleBusy }}
               disabled={loading || googleBusy || appleBusy}
               onPress={() => setAiConsent((value) => !value)}
@@ -160,11 +164,12 @@ export default function SignupScreen() {
               <View className="mt-0.5 h-5 w-5 items-center justify-center rounded border border-border" style={{ backgroundColor: aiConsent ? colors.accent : 'transparent' }}>
                 {aiConsent ? <Text className="text-bg text-xs">✓</Text> : null}
               </View>
-              <Text className="flex-1 text-muted text-sm leading-5">I agree that Flowy may send the content I save and my chat requests to Anthropic, OpenAI, and Voyage AI to summarize, transcribe, search, and answer questions.</Text>
+              <Text className="flex-1 text-muted text-sm leading-5">{t('auth.consent.ai')}</Text>
             </Pressable>
-            {error ? <Text className="text-danger text-sm">{error}</Text> : null}
+            {errorKey ? <Text accessibilityRole="alert" className="text-danger text-sm">{tKey(errorKey)}</Text> : null}
             <Button
-              title="Create account"
+              title={t('auth.signup.submit')}
+              accessibilityLabel={loading ? t('auth.signup.submitting') : t('auth.signup.submit')}
               loading={loading}
               disabled={googleBusy || appleBusy || !termsAccepted || !aiConsent}
               onPress={onSubmit}
@@ -175,12 +180,19 @@ export default function SignupScreen() {
           </View>
 
           <View className="flex-row items-center justify-center mt-6 gap-1">
-            <Text className="text-muted text-sm">Already have an account?</Text>
+            <Text className="text-muted text-sm">{t('auth.signup.haveAccount')}</Text>
             <Link href="/login" asChild>
               <Pressable hitSlop={8}>
-                <Text className="text-accent text-sm font-medium">Sign in</Text>
+                <Text className="text-accent text-sm font-medium">{t('auth.signup.signIn')}</Text>
               </Pressable>
             </Link>
+          </View>
+
+          <View className="mt-8">
+            <Text className="mb-2 px-1 text-xs uppercase tracking-wide text-muted">
+              {t('common.language.label')}
+            </Text>
+            <LanguageSelector compact />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

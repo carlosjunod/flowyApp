@@ -1,9 +1,11 @@
 import { DIGEST_TIMEZONES } from "./digestTimezones";
 import type { DigestCadence, DigestPreferences } from "@/types";
-import { itemTypeLabel } from "./itemIcons";
+import { itemTypeLabelKey } from "./itemIcons";
 
-export const DIGEST_CADENCE_LABELS: Record<DigestCadence, string> = {
-  daily: 'Daily digest', weekly: 'Weekly digest', monthly: 'Monthly digest',
+export const DIGEST_CADENCE_LABEL_KEYS: Record<DigestCadence, string> = {
+  daily: 'digest.settings.cadenceDaily',
+  weekly: 'digest.settings.cadenceWeekly',
+  monthly: 'digest.settings.cadenceMonthly',
 };
 export const DIGEST_MONTH_DAYS = Array.from({ length: 28 }, (_, index) => index + 1);
 
@@ -16,18 +18,33 @@ export function nextDigestCadence(cadence?: DigestCadence): DigestCadence | unde
   return cadence === undefined ? 'weekly' : cadence === 'weekly' ? 'daily' : cadence === 'daily' ? 'monthly' : undefined;
 }
 
-export const DIGEST_DAYS = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
+/**
+ * Index 0 is Monday, matching `DigestPreferences.weekly_day - 1`. The order is
+ * part of the server contract; only the rendered name is translated.
+ */
+export const DIGEST_DAY_KEYS = [
+  "digest.settings.days.monday",
+  "digest.settings.days.tuesday",
+  "digest.settings.days.wednesday",
+  "digest.settings.days.thursday",
+  "digest.settings.days.friday",
+  "digest.settings.days.saturday",
+  "digest.settings.days.sunday",
 ];
-export const DIGEST_TYPES: Record<string, string> = {
-  ...itemTypeLabel,
-  note: "Private notes",
+/** Three-letter chips. Spanish abbreviations are not simply the first letters. */
+export const DIGEST_DAY_SHORT_KEYS = [
+  "digest.settings.daysShort.monday",
+  "digest.settings.daysShort.tuesday",
+  "digest.settings.daysShort.wednesday",
+  "digest.settings.daysShort.thursday",
+  "digest.settings.daysShort.friday",
+  "digest.settings.daysShort.saturday",
+  "digest.settings.daysShort.sunday",
+];
+/** Exclusion chips. Keys are the API's own type values and stay untranslated. */
+export const DIGEST_TYPE_KEYS: Record<string, string> = {
+  ...itemTypeLabelKey,
+  note: "inbox.types.note",
 };
 
 export function exclusionChoices(
@@ -69,8 +86,9 @@ export function timePickerDate(value: string): Date {
 export function timePickerValue(date: Date): string {
   return `${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`;
 }
-export function displayTime(value: string): string {
-  return timePickerDate(value).toLocaleTimeString(undefined, {
+/** 12h/24h follows the interface locale, not the device's regional format. */
+export function displayTime(value: string, locale = "en"): string {
+  return timePickerDate(value).toLocaleTimeString(locale, {
     hour: "numeric",
     minute: "2-digit",
     timeZone: "UTC",

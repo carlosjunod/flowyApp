@@ -96,24 +96,34 @@ export function validateFiles(files: FileDescriptor[]): void {
   }
   if (total > FILE_LIMITS.batch) throw new Error('BATCH_TOO_LARGE');
 }
-export function formatFileBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < MIB) return `${(bytes / 1024).toFixed(1)} KB`;
+/**
+ * Byte sizes with locale-aware digits ("1.5 MB" vs "1,5 MB").
+ *
+ * The unit symbols (B/KB/MB/GB) are international and stay as they are; only
+ * the decimal separator and grouping follow the locale. Thresholds and decimal
+ * places are unchanged from the original English-only implementation, so a
+ * locale switch never resizes a column.
+ */
+export function formatFileBytes(bytes: number, locale = 'en'): string {
+  const decimal = (value: number, digits: number): string => {
+    try {
+      return new Intl.NumberFormat(locale, {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+      }).format(value);
+    } catch {
+      return value.toFixed(digits);
+    }
+  };
+  if (bytes < 1024) return `${decimal(bytes, 0)} B`;
+  if (bytes < MIB) return `${decimal(bytes / 1024, 1)} KB`;
   return bytes >= 1024 * MIB
-    ? `${(bytes / (1024 * MIB)).toFixed(1)} GB`
-    : `${(bytes / MIB).toFixed(1)} MB`;
+    ? `${decimal(bytes / (1024 * MIB), 1)} GB`
+    : `${decimal(bytes / MIB, 1)} MB`;
 }
-export function analysisLabel(state: FileAnalysisState): string {
-  return {
-    uploading: 'Uploading original',
-    stored: 'Original saved',
-    queued: 'Waiting for analysis',
-    analyzing: 'Analyzing document',
-    complete: 'Text extracted',
-    partial: 'Partially analyzed',
-    unsupported: 'Saved · content not analyzed',
-    error: 'Saved · analysis failed',
-  }[state];
+/** Translation key for a document's analysis state. */
+export function analysisLabelKey(state: FileAnalysisState): string {
+  return `inbox.files.analysis.${state}`;
 }
 
 /** Documents use file icons until an actual image preview exists. */
@@ -132,12 +142,13 @@ export function isDocumentItem(item: {
   );
 }
 
+/** `value` is the API contract; `labelKey` resolves under `settings.storage.retention.*`. */
 export const RETENTION_OPTIONS = [
-  { value: 'keep', label: 'Keep originals' },
-  { value: 'after_analysis', label: 'Discard after successful analysis' },
-  { value: '7_days', label: 'Keep for 7 days' },
-  { value: '30_days', label: 'Keep for 30 days' },
-  { value: '90_days', label: 'Keep for 90 days' },
+  { value: 'keep', labelKey: 'settings.storage.retention.keep' },
+  { value: 'after_analysis', labelKey: 'settings.storage.retention.after_analysis' },
+  { value: '7_days', labelKey: 'settings.storage.retention.7_days' },
+  { value: '30_days', labelKey: 'settings.storage.retention.30_days' },
+  { value: '90_days', labelKey: 'settings.storage.retention.90_days' },
 ] as const;
 export type FileRetention = (typeof RETENTION_OPTIONS)[number]['value'];
 export interface ManagedFile extends OriginalFile {

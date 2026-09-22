@@ -9,6 +9,7 @@ import { CollapsibleSection } from '../CollapsibleSection';
 import { Linking, Pressable, Text, View } from 'react-native';
 
 import { ENV } from '@/lib/env';
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
 import type { Item } from '@/types';
 
@@ -29,6 +30,7 @@ function r2Url(item: Item): string | null {
  * Mirrors apps/web/components/inbox/content/ReelContent.tsx.
  */
 export const ReelContent: React.FC<{ item: Item }> = ({ item }) => {
+  const { t } = useI18n();
   const colors = useResolvedColors();
   const [failed, setFailed] = useState(false);
   const directUrl = r2Url(item);
@@ -52,7 +54,7 @@ export const ReelContent: React.FC<{ item: Item }> = ({ item }) => {
               uri={videoUrl}
               style={{ height: 320 }}
               onError={() => setFailed(true)}
-              label={item.title ?? 'Reel preview'}
+              label={item.title ?? t('inbox.content.reelPreview')}
             />
           ) : (
             <ReelVideo uri={videoUrl} onError={() => setFailed(true)} />
@@ -73,14 +75,14 @@ export const ReelContent: React.FC<{ item: Item }> = ({ item }) => {
               className="text-fg"
               style={{ fontFamily: 'Inter_600SemiBold', fontSize: 12.5 }}
             >
-              Instagram Reel
+              {t('inbox.sourceChip.reel')}
             </Text>
           </View>
           <Pressable
             onPress={() => Linking.openURL(sourceUrl)}
             hitSlop={6}
             accessibilityRole="link"
-            accessibilityLabel="Watch on Instagram"
+            accessibilityLabel={t('inbox.content.watchInstagram')}
             className="active:opacity-80"
             style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 4 }}
           >
@@ -91,14 +93,14 @@ export const ReelContent: React.FC<{ item: Item }> = ({ item }) => {
                 color: colors.accent,
               }}
             >
-              Watch on Instagram
+              {t('inbox.content.watchInstagram')}
             </Text>
             <Feather name="arrow-up-right" size={11} color={colors.accent} />
           </Pressable>
         </View>
       ) : null}
 
-      {item.content?.trim() ? <CollapsibleSection label="Saved text" defaultOpen={false}><SourceText text={item.content} /></CollapsibleSection> : null}
+      {item.content?.trim() ? <CollapsibleSection label={t('inbox.content.savedText')} defaultOpen={false}><SourceText text={item.content} /></CollapsibleSection> : null}
     </View>
   );
 };
@@ -124,10 +126,11 @@ const ReelVideo: React.FC<{ uri: string; onError: () => void }> = ({ uri, onErro
 };
 
 const ReelPlaceholder: React.FC<{ url: string; title?: string }> = ({ url, title }) => {
+  const { t } = useI18n();
   const colors = useResolvedColors();
-  return <Pressable onPress={() => url ? Linking.openURL(url) : undefined} disabled={!url} accessibilityRole="link" accessibilityLabel="Watch on Instagram" className="active:opacity-80 bg-surface" style={{ width: '100%', height: 160, alignItems: 'center', justifyContent: 'center', padding: 16, gap: 12 }}>
+  return <Pressable onPress={() => url ? Linking.openURL(url) : undefined} disabled={!url} accessibilityRole="link" accessibilityLabel={t('inbox.content.watchInstagram')} className="active:opacity-80 bg-surface" style={{ width: '100%', height: 160, alignItems: 'center', justifyContent: 'center', padding: 16, gap: 12 }}>
     <Feather name="external-link" size={24} color={colors.accent} />
-    <Text style={{ color: colors.fg, textAlign: 'center', fontSize: 14 }}>{title ?? 'Open this reel on Instagram'}</Text>
-    <Text style={{ color: colors.muted, fontSize: 12 }}>Preview unavailable · Watch on Instagram</Text>
+    <Text style={{ color: colors.fg, textAlign: 'center', fontSize: 14 }}>{title ?? t('inbox.content.openReel')}</Text>
+    <Text style={{ color: colors.muted, fontSize: 12 }}>{t('inbox.content.previewUnavailable')}</Text>
   </Pressable>;
 };
