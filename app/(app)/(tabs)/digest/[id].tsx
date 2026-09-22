@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useWindowDimensions } from "react-native";
 
-import { EditorialImage } from "@/components/digest/EditorialImage";
+import { EditorialImage, editorialImageIdentity } from "@/components/digest/EditorialImage";
 import {
   CADENCE_LABEL,
   SECTION_LABEL,
@@ -39,7 +39,7 @@ export default function DigestDetailScreen() {
   const chat = useChat();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { width: windowWidth } = useWindowDimensions();
-  const [coverFailed, setCoverFailed] = useState(false);
+  const [failedCover, setFailedCover] = useState<string | null>(null);
   const query = useQuery<{ digest: Digest; presentation: DigestPresentation }, Error>({
     queryKey: ["digest", user?.id, id],
     enabled: !!id && !!user,
@@ -122,7 +122,8 @@ export default function DigestDetailScreen() {
   const locale = digest.content.locale === "es" ? "es" : "en";
   const removed = digest.status === "source_removed";
   const edition = removed ? null : readEdition(digest.content, presentation, __DEV__);
-  const cover = coverFailed ? null : edition?.cover ?? null;
+  const coverIdentity = edition?.cover ? `${id}:${editorialImageIdentity(edition.cover.image)}` : null;
+  const cover = failedCover === coverIdentity ? null : edition?.cover ?? null;
   const contentWidth = Math.min(windowWidth, 720) - 32;
   const period = periodLabel(digest.content.window_start, digest.content.window_end, digest.content.timezone, locale);
   const highlightAction = (blockId: string, sourceIds: string[], selectedText: string) => (
@@ -214,7 +215,7 @@ export default function DigestDetailScreen() {
           </View>
         )}
         {cover ? (
-          <EditorialImage image={cover.image} locale={locale} width={contentWidth} onUnavailable={() => setCoverFailed(true)} />
+          <EditorialImage key={coverIdentity} image={cover.image} locale={locale} width={contentWidth} onUnavailable={() => setFailedCover(coverIdentity)} />
         ) : null}
         {digest.status === "source_removed" ? (
           <Text className="text-fg">

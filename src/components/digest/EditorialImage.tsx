@@ -15,14 +15,19 @@ type Props = {
   onUnavailable?: () => void;
 };
 
+export function editorialImageIdentity(image: DigestEditorialImage) {
+  return JSON.stringify([image.id, image.variants.webp.map((v) => v.url), image.variants.jpeg.map((v) => v.url)]);
+}
+
 /**
  * Stable 3:2 frame for a published editorial illustration. Natural colors in both
  * themes (no tint), focal-point cropping, localized alt text and a discreet AI label.
  * A failed load removes the figure so the report stays readable.
  */
 export function EditorialImage({ image, locale, width, caption = true, radius = 8, onUnavailable }: Props) {
-  const [failed, setFailed] = useState(false);
-  if (failed) return null;
+  const [failedAsset, setFailedAsset] = useState<string | null>(null);
+  const asset = editorialImageIdentity(image);
+  if (failedAsset === asset) return null;
   const variant = pickVariant(image, Math.round(width * PixelRatio.get()));
   return (
     <View>
@@ -36,7 +41,7 @@ export function EditorialImage({ image, locale, width, caption = true, radius = 
           accessible
           accessibilityLabel={image.alt[locale]}
           onError={() => {
-            setFailed(true);
+            setFailedAsset(asset);
             onUnavailable?.();
           }}
         />

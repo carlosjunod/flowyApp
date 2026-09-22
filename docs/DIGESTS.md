@@ -159,3 +159,12 @@ Server counterpart: Flowy `codex/digest-editorial` (D-039, `docs/digest-editoria
 - Detail (`app/(app)/(tabs)/digest/[id].tsx`): brand/cadence, period, title, items, TL;DR, cover, then sections with localized headings and interior images before their block. Hidden highlights, sources, chat, feedback and read marking are unchanged. History (`app/(app)/(tabs)/digest/index.tsx`): title, TL;DR excerpt and a 96pt cover thumbnail when an edition exists.
 - API: `api.getDigestDetail(id)` returns `{digest, presentation}`; `api.listDigestPage` also returns `presentation`. `api.getDigest` is unchanged. PDF and email remain server/web features; no native PDF action.
 - Checks: `npm run typecheck` (0 errors, as at baseline); `FLOWY_SERVER_ROOT=<server checkout> npm run test:digest-editorial` (6 scenarios against the server's real fixture output); `npm run test:digest-monthly` still passes. `scripts/test-ui-models.cjs` still stops on the previously documented `src/lib/chatSync.ts` transpile issue. **No simulator/device validation**, no prebuild or distribution build; native capabilities and dependencies unchanged. Real images need the server variants published to R2 first.
+
+
+### Editorial review correction — 2026-09-17
+
+Image failures now belong to the image ID and variant URLs; cover failures also
+belong to the report ID. A different image/report can display after a failure,
+while the same failed asset does not create an automatic retry loop. Web regression
+coverage lives in the paired server's `tests/unit/digest-editorial-image.test.tsx`.
+Native type/contract checks are local evidence, not a simulator/device claim.
