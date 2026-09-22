@@ -65,6 +65,7 @@ function InstagramDestinationScreen({ accountId, destination, accounts, onAccoun
         {state.isLoading && <View className="flex-row items-center gap-2"><Spinner /><Text className="text-muted">Loading connection…</Text></View>}
         {state.data?.connected ? <View className="rounded-xl border border-border bg-card p-4 gap-4">
           <Text accessibilityLiveRegion="polite" className="text-fg font-semibold">Instagram connected</Text>
+          {state.data.username ? <Text className="text-muted text-sm">Connected as @{state.data.username}</Text> : null}
           <Text className="text-muted text-sm leading-5">Send your next post link to @{handle}.</Text>
           <Button title="Open Instagram" onPress={() => void state.openChat()} />
           <Text className="text-muted text-xs leading-5">Disconnecting stops future saves. Posts already in your library stay there.</Text>
@@ -77,12 +78,14 @@ function InstagramDestinationScreen({ accountId, destination, accounts, onAccoun
           {state.expired && <Text accessibilityLiveRegion="polite" className="text-muted">Your connection link expired. Generate a new one to continue.</Text>}
           <Button title={showCode && state.data.referralEnabled ? 'Open Instagram' : state.expired ? 'Generate a new connection' : 'Connect Instagram'} loading={state.pending} onPress={() => void state.connect()} />
           {showCode && <>
-            <Text accessibilityLiveRegion="polite" className="text-muted text-sm">Waiting for your connection. Flowy checks again when you return.</Text>
+            <Text accessibilityLiveRegion="polite" className="text-muted text-sm">{state.handoffReturned
+              ? `Instagram may have asked you for a code. Send the code below to @${handle} as a message, then return here.`
+              : 'Waiting for your connection. Flowy checks again when you return.'}</Text>
             <Text className="text-muted text-xs">Expires at {new Date(state.connection!.expiresAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.</Text>
-            <Pressable accessibilityRole="button" accessibilityState={{ expanded: manual || !state.data.referralEnabled }} onPress={() => setManual(v => !v)} className="py-2">
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: manual || !state.data.referralEnabled || state.handoffReturned }} onPress={() => setManual(v => !v)} className="py-2">
               <Text className="text-accent text-sm">Having trouble? Connect with a code</Text>
             </Pressable>
-            {(manual || !state.data.referralEnabled) && <View className="gap-3">
+            {(manual || !state.data.referralEnabled || state.handoffReturned) && <View className="gap-3">
               <Text className="text-muted text-sm">Send this code to @{handle} as a message.</Text>
               <Text selectable className="text-fg text-sm">{state.connection!.code}</Text>
               <Button title={state.copied ? 'Copied' : 'Copy code'} variant="secondary" onPress={() => void state.copyCode()} />

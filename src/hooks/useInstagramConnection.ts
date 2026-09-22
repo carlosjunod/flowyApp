@@ -13,15 +13,18 @@ export const instagramQueryKey = (accountId?: string, destination?: string) => [
 export function useInstagramConnection(accountId?: string, destination?: string) {
   const client = useQueryClient();
   const active = useRef({ accountId, destination, mounted: true, busy: false });
+  const handoff = useRef(false);
   const [issued, setIssued] = useState<{ accountId: string; destination?: string; connection: InstagramConnection } | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [handoffReturned, setHandoffReturned] = useState(false);
   useEffect(() => {
     const scope = { accountId, destination, mounted: true, busy: false };
     active.current = scope;
     setIssued(null); setPending(false); setError(null); setCopied(false);
+    handoff.current = false; setHandoffReturned(false);
     return () => { scope.mounted = false; };
   }, [accountId, destination]);
   const query = useQuery<InstagramConnection, ApiError>({
@@ -36,30 +39,36 @@ export function useInstagramConnection(accountId?: string, destination?: string)
   const expired = !!connection && (connection.expiresAt ?? 0) <= now;
   const { refetch } = query;
   useEffect(() => {
-    if (query.data?.connected) { setIssued(null); setCopied(false); }
+    if (query.data?.connected) { setIssued(null); setCopied(false); handoff.current = false; setHandoffReturned(false); }
   }, [query.data?.connected]);
+  useEffect(() => { if (expired) setHandoffReturned(false); }, [expired]);
   useEffect(() => {
     const refresh = () => {
       setNow(Date.now());
       if (accountId && pb.authStore.model?.id === accountId) void refetch();
     };
-    const subscription = AppState.addEventListener('change', state => { if (state === 'active') refresh(); });
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        refresh();
+        if (handoff.current && connection && (connection.expiresAt ?? 0) > Date.now() && !query.data?.connected) setHandoffReturned(true);
+      }
+    });
     const timer = connection ? setInterval(() => {
       setNow(Date.now());
       if (AppState.currentState === 'active' && (connection.expiresAt ?? 0) > Date.now()) refresh();
     }, 5000) : undefined;
     return () => { subscription.remove(); if (timer) clearInterval(timer); };
-  }, [accountId, connection, refetch]);
+  }, [accountId, connection, query.data?.connected, refetch]);
 
   function current(scope: typeof active.current) {
     return !!accountId && scope.mounted && scope === active.current && scope.accountId === accountId && scope.destination === destination && pb.authStore.model?.id === accountId;
   }
   async function open(url: string) {
     const scope = active.current;
-    if (!current(scope)) return;
+    if (!current(scope)) return false;
     setError(null);
-    try { await Linking.openURL(url); }
-    catch { if (current(scope)) setError(`Could not open Instagram. Open @${instagramHandle(query.data)} in the Instagram app and send the connection code below.`); }
+    try { await Linking.openURL(url); return true; }
+    catch { if (current(scope)) setError(`Could not open Instagram. Open @${instagramHandle(query.data)} in the Instagram app and send the connection code below.`); return false; }
   }
   async function mutate(operation: () => Promise<ApiResult<InstagramConnection>>) {
     const scope = active.current;
@@ -85,11 +94,12 @@ export function useInstagramConnection(accountId?: string, destination?: string)
     } finally { scope.busy = false; if (current(scope)) setPending(false); }
   }
   async function connect(regenerate = false) {
+    if (regenerate) { handoff.current = false; setHandoffReturned(false); }
     const existing = connection && instagramConnectionUrl(connection);
-    if (!regenerate && existing) { await open(existing); return; }
+    if (!regenerate && existing) { if (await open(existing)) handoff.current = true; return; }
     const next = await mutate(() => api.createInstagramConnection(accountId!, destination || query.data?.account));
     const url = next && instagramConnectionUrl(next);
-    if (url) await open(url);
+    if (url) { if (await open(url)) handoff.current = true; }
   }
   async function copyCode() {
     const scope = active.current;
@@ -99,9 +109,9 @@ export function useInstagramConnection(accountId?: string, destination?: string)
   }
   return {
     ...query, pending, error: error || (query.error ? instagramConnectionError(query.error.code) : null),
-    connection, expired, copied, connect, copyCode,
+    connection, expired, copied, connect, copyCode, handoffReturned,
     refresh: () => { setError(null); setNow(Date.now()); void refetch(); },
     openChat: () => open(instagramChatUrl(query.data)),
-    disconnect: () => mutate(() => api.disconnectInstagram(accountId!, destination || query.data?.account)),
+    disconnect: () => { handoff.current = false; setHandoffReturned(false); return mutate(() => api.disconnectInstagram(accountId!, destination || query.data?.account)); },
   };
 }

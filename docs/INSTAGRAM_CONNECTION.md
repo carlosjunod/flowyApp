@@ -84,3 +84,35 @@ Automatic App Store Connect submission: `097c2743-3b17-4d2b-a5f0-a687088e2904`.
 Build 30 completed successfully at 2026-09-17 02:41:21 UTC; automatic submission
 finished successfully. Apple processing, TestFlight availability and physical
 Instagram handoff remain separate acceptance steps.
+
+
+## New-thread fallback and linked username — 2026-09-22
+
+For a brand-new Instagram thread, Meta does not deliver the `ref` query param,
+so the welcome-button handoff silently drops the connection: the server (fixed
+in parallel) now replies with an ice-breaker DM asking the user to open
+"Connect with a code" and send that code instead. The status response's `data`
+gains an optional top-level `username?: string | null` (also on each
+`accounts[]` entry) — the linked Instagram username, `null` until resolved or
+not connected. Clients must tolerate the field being absent; `code`/`expiresAt`
+are still never cached.
+
+`useInstagramConnection` tracks whether the last `connect()` handoff actually
+opened Instagram (`Linking.openURL` resolved) and exposes `handoffReturned`:
+`true` once the app returns to the foreground with that handoff still pending
+(issued code unexpired, status not yet connected), cleared when the status
+confirms `connected`, on regenerate (`connect(true)`), on disconnect, or once
+the code expires. The `/instagram` screen uses this to force the manual-code
+disclosure open (`manual || !referralEnabled || handoffReturned`) and swaps the
+"waiting" copy for "Instagram may have asked you for a code. Send the code
+below to @handle as a message, then return here." while it is true. When
+connected and the server has resolved a username, the screen also renders
+"Connected as @{username}" under "Instagram connected".
+
+Validation: `npm run typecheck` passes; `node scripts/test-instagram-connection.cjs`
+now covers 10 scenario groups, including the three new ones — handoff returning
+unconnected, regenerate clearing the hint, and the username passing through
+without entering the code/expiry cache. No native dependency, capability or
+config change. BLOCKER: physical-device acceptance of the new-thread fallback
+(ice-breaker DM → manual code → linked username) is still pending; this was
+validated only through the Node harness and `tsc`, not a device build.
