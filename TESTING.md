@@ -22,18 +22,7 @@ manual gate rather than pretended in a script.
 | `npm run test:push-contract` | Push device contract | — |
 | `node scripts/test-labels.cjs` | Label filters, ordering, pagination | — |
 | `node scripts/test-source-identity.cjs` | Source identity rendering | — |
-| `npm run test:ui-models` | UI model regressions | ❌ **known failure**, see below |
-
-## Known failure: `test:ui-models`
-
-`npm run test:ui-models` stops with a `SyntaxError` while the script's custom
-loader transpiles a TypeScript generic in `src/lib/chatSync.ts`. This is a
-limitation of that harness's transpile step, not of the app — `tsc --noEmit`
-compiles the same file cleanly and the iOS Metro/Hermes export bundles it.
-
-It predates the Spanish interface work and was deliberately left alone: fixing
-an unrelated harness inside a translation change would mix two concerns in one
-review. **This suite is not passing; do not report it as such.**
+| `npm run test:ui-models` | UI model regressions (29 scenarios) | ✅ passes |
 
 ## The i18n suites in detail
 
