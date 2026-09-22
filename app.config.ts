@@ -56,7 +56,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     googleServicesFile: process.env.GOOGLE_SERVICES_JSON,
     adaptiveIcon: {
       foregroundImage: './icons/adaptive-icon-1024.png',
-      backgroundColor: '#F2764C',
+      backgroundColor: '#DF5020',
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,

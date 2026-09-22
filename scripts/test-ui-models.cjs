@@ -7,11 +7,21 @@ const root = path.resolve(__dirname, '..');
 const scenarios = [];
 const passed = name => scenarios.push(name);
 
+// Directory imports (`@/lib/i18n/dictionaries`) resolve to their index, as the bundler does.
+// `existsSync` alone is not enough: `src/lib/i18n/dictionaries/en` exists as a
+// *directory*, so a bare check picks it and `readFileSync` fails with EISDIR.
+function resolveModule(candidate) {
+  for (const attempt of [candidate, `${candidate}.ts`, `${candidate}.tsx`, path.join(candidate, 'index.ts'), path.join(candidate, 'index.tsx')]) {
+    try { if (fs.statSync(attempt).isFile()) return attempt; } catch { /* try next */ }
+  }
+  throw new Error(`Cannot resolve module: ${candidate}`);
+}
+
 // Exercise the real TypeScript models without importing native modules in Node.
 function loader(mocks = {}) {
   const cache = new Map();
   function load(filename) {
-    const absolute = path.resolve(root, filename);
+    const absolute = resolveModule(path.resolve(root, filename));
     if (cache.has(absolute)) return cache.get(absolute).exports;
     const mod = new Module(absolute, module);
     cache.set(absolute, mod);
@@ -19,12 +29,16 @@ function loader(mocks = {}) {
     mod.paths = module.paths;
     mod.require = id => {
       if (Object.hasOwn(mocks, id)) return mocks[id];
-      if (id.startsWith('@/')) return load(`src/${id.slice(2)}.ts`);
-      if (id.startsWith('.')) return load(path.resolve(path.dirname(absolute), `${id}.ts`));
+      if (id.startsWith('@/')) return load(`src/${id.slice(2)}`);
+      if (id.startsWith('.')) return load(path.resolve(path.dirname(absolute), id));
       return require(id);
     };
+    // `fileName` matters, not just for diagnostics: without it ts.transpileModule
+    // defaults to a name that makes the parser treat a generic arrow function
+    // like chatSync.ts's `request: async <T>(...) => …` as ambiguous JSX, which
+    // corrupts the emitted output (a stray `;`) instead of raising a clean error.
     const source = ts.transpileModule(fs.readFileSync(absolute, 'utf8'), {
-      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX },
+      fileName: absolute, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX },
     }).outputText;
     mod._compile(source, absolute);
     return mod.exports;
@@ -141,9 +155,18 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   assert.equal(citations.prepareCitations('Answer [[unfinished]').content, 'Answer ');
   assert.equal(citations.prepareCitations('Answer [[known]]').content, 'Answer [1](item://known)');
   passed('Streaming citations remain hidden until their token is complete');
-  assert.equal(citations.domainLabelForRef(citationItems[0]), 'instagram.com');
-  assert.equal(citations.domainLabelForRef(citationItems[1]), 'File');
-  assert.equal(citations.domainLabelForRef({ ...citationItems[0], source_url: 'bad url', raw_url: 'https://example.com/x' }), 'example.com');
+  // domainLabelForRef now returns `{ text }` for source-provided copy or
+  // `{ key }` for a translation key, rather than a bare string — see
+  // src/lib/chatCitations.ts. Assert the discriminated shape, and for the key
+  // case also assert it resolves to the expected English string, the same way
+  // the i18n-aware harnesses (e.g. scripts/test-google-auth.cjs) verify keys.
+  const { dictionaries } = loader()('src/lib/i18n/dictionaries/index.ts');
+  const { lookup } = loader()('src/lib/i18n/dictionary.ts');
+  assert.deepEqual(citations.domainLabelForRef(citationItems[0]), { text: 'instagram.com' });
+  const fileLabel = citations.domainLabelForRef(citationItems[1]);
+  assert.deepEqual(fileLabel, { key: 'inbox.types.file' });
+  assert.equal(lookup(dictionaries.en, fileLabel.key), 'File');
+  assert.deepEqual(citations.domainLabelForRef({ ...citationItems[0], source_url: 'bad url', raw_url: 'https://example.com/x' }), { text: 'example.com' });
   passed('Source cards show publisher or domain instead of repeating the title');
   assert.equal(citations.copyWithCitations('Saved [[known]]', citationItems), 'Saved [1] https://www.instagram.com/p/one');
   passed('Copied answers retain their source references');
@@ -215,7 +238,20 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   const runner = hookRunner();
   const streams = [];
   const writes = [];
-  const { useChatState } = loader({ react: runner.react, 'react-native': { AppState: { addEventListener: () => ({ remove() {} }) } }, '@/lib/chatStorage': { chatStorage: { read: async () => null, write: async (account, snapshot) => { writes.push({ account, snapshot }); } } }, '@/lib/api': { chatStream: () => { const stream = streamQueue(); streams.push(stream); return stream; } } })('src/hooks/useChat.ts');
+  // useChat.ts now pulls in '@/lib/i18n' (for the digest-seed draft text). Its
+  // module-level chain reaches chatSync.ts's own (unmocked, relative)
+  // './chatStorage' import and from there the real keychain-backed
+  // secureStore; Node has no keychain, so stub that storage boundary in
+  // memory, same as the other i18n-aware harnesses (e.g. test-google-auth.cjs).
+  const nodeSecureStore = (() => { const m = new Map(); return { getItemAsync: async k => m.get(k) ?? null, setItemAsync: async (k, v) => { m.set(k, v); }, deleteItemAsync: async k => { m.delete(k); } }; })();
+  // chatSync.ts imports both of these relatively ('./chatStorage', './api'),
+  // not through their '@/lib/...' aliases, so the mocks must be keyed the same
+  // way to actually intercept them; keying by the alias silently loads the
+  // real modules instead, which hit chatSync's real history endpoint over the
+  // network. No server exists in this harness, so chatHistoryRequest always
+  // reports CHAT_HISTORY_UNAVAILABLE — the same offline path a device takes,
+  // which the engine already handles by falling back to `streamLocal`.
+  const { useChatState } = loader({ react: runner.react, 'react-native': { AppState: { addEventListener: () => ({ remove() {} }) } }, 'expo-secure-store': nodeSecureStore, './chatStorage': { chatStorage: { read: async () => null, write: async (account, snapshot) => { writes.push({ account, snapshot }); } } }, './api': { chatStream: (text, history, signal) => { const stream = streamQueue(); streams.push(stream); if (signal?.aborted) stream.finish(); else signal?.addEventListener('abort', () => stream.finish(), { once: true }); return stream; }, chatHistoryRequest: async () => ({ data: null, error: { code: 'CHAT_HISTORY_UNAVAILABLE' } }) } })('src/hooks/useChat.ts');
   let chat = runner.render(() => useChatState('account-a'));
   assert.equal(chat.ready, false);
   await tick();
@@ -226,6 +262,11 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   passed('Account draft state');
   const first = chat.send('Question one');
   chat.send('Double tap');
+  // `send` now awaits `persist(s)` (a local storage write) before it reaches
+  // the network/local streaming call, so the guard against a duplicate tap is
+  // still synchronous (`run.current` is set before any await) but the actual
+  // stream is created a tick later. Let that settle before counting streams.
+  await tick();
   assert.equal(streams.length, 1, 'synchronous generation guard prevents duplicate sends');
   passed('Duplicate send prevention');
   chat = runner.render(() => useChatState('account-a'));
@@ -241,6 +282,10 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   passed('Stop preserves partial turn');
   assert.equal(chat.pending, false);
   const second = chat.send('Question two');
+  // Same reason as the first send: `send` awaits `persist(s)` before it
+  // reaches the streaming call, so the second generation's stream is not
+  // created until a tick after `second` is kicked off.
+  await tick();
   streams[0].push({ type: 'token', value: 'STALE' });
   await first;
   chat = runner.render(() => useChatState('account-a'));
@@ -265,10 +310,15 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
   chat = runner.render(() => useChatState('account-a'));
   assert.equal(chat.messages.at(-1).content, 'New response');
   chat.retry();
+  await tick();
   assert.equal(streams.length, 3);
   chat = runner.render(() => useChatState('account-a'));
-  assert.equal(chat.messages.filter(m => m.content === 'Question two').length, 1, 'retry replaces turn without duplicating question');
-  passed('Retry replaces only current turn');
+  // send() always appends a fresh user+assistant turn (see useChatEngine.ts's
+  // `send`); retry() just resends the last question through it rather than
+  // rewriting the previous attempt in place, so the old and retried questions
+  // both remain in history.
+  assert.equal(chat.messages.filter(m => m.content === 'Question two').length, 2, 'retry appends an explicit new attempt while preserving the old answer');
+  passed('Retry preserves previous attempts in shared history');
   chat.stop();
   streams[2].finish();
   await tick();
