@@ -1,5 +1,18 @@
 # FlowyApp — Parity Red-Priority Handover
 
+> **Instagram new-thread fallback + linked username — 2026-09-22:** For a
+> brand-new Instagram thread Meta drops the `ref` handoff, so `/instagram` now
+> forces the manual-code disclosure open (`handoffReturned`, tracked in
+> `useInstagramConnection` from foreground return + a still-pending handoff)
+> and swaps in copy pointing back to "Connect with a code" instead of leaving
+> the user stuck on the ice-breaker DM. The connection screen also shows
+> "Connected as @{username}" once the server resolves the linked account's
+> `username` (server contract addition, optional and nullable, on `data` and
+> each `accounts[]` entry). No native dependency, entitlement or config change.
+> `npm run typecheck` and `node scripts/test-instagram-connection.cjs` (10
+> scenario groups) pass. Physical-device acceptance of a brand-new-thread
+> handoff remains pending; see `docs/INSTAGRAM_CONNECTION.md`.
+
 ## Spanish interface — 2026-09-17 (branch `codex/i18n-es`, not merged)
 
 The native client now ships English and Spanish. Operating guide, glossary and

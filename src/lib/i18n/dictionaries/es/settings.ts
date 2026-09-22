@@ -56,6 +56,8 @@ export const settings: Dictionary['settings'] = {
     regenerate: 'Generar una conexión nueva',
     connect: 'Conectar Instagram',
     waiting: 'Esperando tu conexión. Flowy vuelve a comprobar cuando regreses.',
+    manualHint: 'Es posible que Instagram te haya pedido un código. Envía el código de abajo a @{handle} como mensaje y luego vuelve aquí.',
+    connectedAs: 'Conectado como @{username}',
     expiresAt: 'Caduca a las {time}.',
     trouble: '¿Tienes problemas? Conecta con un código',
     sendCode: 'Envía este código a @{handle} como mensaje.',

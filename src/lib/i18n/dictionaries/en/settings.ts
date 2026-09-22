@@ -58,6 +58,8 @@ export const settings = {
     regenerate: 'Generate a new connection',
     connect: 'Connect Instagram',
     waiting: 'Waiting for your connection. Flowy checks again when you return.',
+    manualHint: 'Instagram may have asked you for a code. Send the code below to @{handle} as a message, then return here.',
+    connectedAs: 'Connected as @{username}',
     expiresAt: 'Expires at {time}.',
     trouble: 'Having trouble? Connect with a code',
     sendCode: 'Send this code to @{handle} as a message.',

@@ -4,6 +4,7 @@ export interface InstagramDestination {
   language: "en" | "es";
   connected: boolean;
   linkedAt?: number | null;
+  username?: string | null;
 }
 export interface InstagramConnection {
   enabled: boolean;
@@ -16,4 +17,5 @@ export interface InstagramConnection {
   accounts?: InstagramDestination[];
   code?: string;
   expiresAt?: number;
+  username?: string | null;
 }

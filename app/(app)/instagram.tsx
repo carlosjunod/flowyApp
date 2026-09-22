@@ -67,6 +67,7 @@ function InstagramDestinationScreen({ accountId, destination, accounts, onAccoun
         {state.isLoading && <View className="flex-row items-center gap-2"><Spinner /><Text className="text-muted">{t('settings.instagram.loading')}</Text></View>}
         {state.data?.connected ? <View className="rounded-xl border border-border bg-card p-4 gap-4">
           <Text accessibilityLiveRegion="polite" className="text-fg font-semibold">{t('settings.instagram.connected')}</Text>
+          {state.data.username ? <Text className="text-muted text-sm">{t('settings.instagram.connectedAs', { username: state.data.username })}</Text> : null}
           <Text className="text-muted text-sm leading-5">{t('settings.instagram.connectedBody', { handle })}</Text>
           <Button title={t('settings.instagram.openInstagram')} onPress={() => void state.openChat()} />
           <Text className="text-muted text-xs leading-5">{t('settings.instagram.disconnectHint')}</Text>
@@ -79,12 +80,14 @@ function InstagramDestinationScreen({ accountId, destination, accounts, onAccoun
           {state.expired && <Text accessibilityLiveRegion="polite" className="text-muted">{t('settings.instagram.expired')}</Text>}
           <Button title={showCode && state.data.referralEnabled ? t('settings.instagram.openInstagram') : state.expired ? t('settings.instagram.regenerate') : t('settings.instagram.connect')} loading={state.pending} onPress={() => void state.connect()} />
           {showCode && <>
-            <Text accessibilityLiveRegion="polite" className="text-muted text-sm">{t('settings.instagram.waiting')}</Text>
+            <Text accessibilityLiveRegion="polite" className="text-muted text-sm">{state.handoffReturned
+              ? t('settings.instagram.manualHint', { handle })
+              : t('settings.instagram.waiting')}</Text>
             <Text className="text-muted text-xs">{t('settings.instagram.expiresAt', { time: formatTime(state.connection!.expiresAt!) })}</Text>
-            <Pressable accessibilityRole="button" accessibilityState={{ expanded: manual || !state.data.referralEnabled }} onPress={() => setManual(v => !v)} className="py-2">
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: manual || !state.data.referralEnabled || state.handoffReturned }} onPress={() => setManual(v => !v)} className="py-2">
               <Text className="text-accent text-sm">{t('settings.instagram.trouble')}</Text>
             </Pressable>
-            {(manual || !state.data.referralEnabled) && <View className="gap-3">
+            {(manual || !state.data.referralEnabled || state.handoffReturned) && <View className="gap-3">
               <Text className="text-muted text-sm">{t('settings.instagram.sendCode', { handle })}</Text>
               <Text selectable className="text-fg text-sm">{state.connection!.code}</Text>
               <Button title={state.copied ? t('settings.instagram.copied') : t('settings.instagram.copyCode')} variant="secondary" onPress={() => void state.copyCode()} />
