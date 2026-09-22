@@ -7,8 +7,15 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { thumbnailFor } from '@/lib/thumbnails';
 import { formatCurrency } from '@/lib/currency';
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
 import type { Item, ReceiptData, ReceiptItem } from '@/types';
+
+/** Amounts follow the interface locale for grouping; the symbol is the account's. */
+function useMoney(): (amount: number) => string {
+  const { locale } = useI18n();
+  return (amount: number) => formatCurrency(amount, locale);
+}
 
 /**
  * Receipt detail renderer. Reads the structured payload from
@@ -23,6 +30,8 @@ import type { Item, ReceiptData, ReceiptItem } from '@/types';
  *   - Spending Insights (deterministic — derived from receipt + payment data)
  */
 export const ReceiptContent: React.FC<{ item: Item }> = ({ item }) => {
+  const { t } = useI18n();
+  const money = useMoney();
   const data = item.structured_content as ReceiptData | undefined;
   const thumbnail = thumbnailFor(item);
   const photoUrl = data?.originalPhotoUrl ?? item.original_media_urls?.[0] ?? (thumbnail.kind === 'image' ? thumbnail.uri : undefined);
@@ -51,7 +60,7 @@ export const ReceiptContent: React.FC<{ item: Item }> = ({ item }) => {
           className="text-muted"
           style={{ fontFamily: 'Inter_400Regular', fontSize: 12.5, fontStyle: 'italic' }}
         >
-          {item.status === 'pending' || item.status === 'processing' ? 'Receipt details will appear when processing finishes.' : 'Receipt details could not be extracted. Open the original or try processing again.'}
+          {item.status === 'pending' || item.status === 'processing' ? t('inbox.receipt.pending') : t('inbox.receipt.failed')}
         </Text>
       </View>
     );
@@ -59,7 +68,8 @@ export const ReceiptContent: React.FC<{ item: Item }> = ({ item }) => {
 
   return (
     <View style={{ gap: 4 }}>
-      <View className="flex-row items-baseline justify-between pb-4"><Text className="text-fg text-lg font-semibold flex-1">{data.store.name}</Text><Text className="text-fg text-2xl font-semibold">{formatCurrency(data.total)}</Text></View>
+      {/* The store's name is printed on the receipt; it is data, not copy. */}
+      <View className="flex-row items-baseline justify-between pb-4"><Text className="text-fg text-lg font-semibold flex-1">{data.store.name}</Text><Text className="text-fg text-2xl font-semibold">{money(data.total)}</Text></View>
       <StoreCard data={data} photoUrl={photoUrl} />
       <LineItemsTable data={data} />
       <PaymentGrid data={data} />
@@ -87,12 +97,13 @@ const CATEGORY_GRADIENTS = {
 } as const satisfies Record<string, Gradient>;
 
 const StoreCard: React.FC<{ data: ReceiptData; photoUrl?: string }> = ({ data, photoUrl }) => {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const initial = data.store.name.charAt(0).toUpperCase() || '?';
   const gradient = CATEGORY_GRADIENTS[data.userCategory] ?? CATEGORY_GRADIENTS.other;
 
   return (
-    <Section title="Store" defaultOpen>
+    <Section title={t('inbox.receipt.store')} defaultOpen>
       <View className="flex-row items-start gap-3">
         <LinearGradient
           colors={gradient}
@@ -130,16 +141,17 @@ const StoreCard: React.FC<{ data: ReceiptData; photoUrl?: string }> = ({ data, p
               className="text-muted"
               style={{ fontFamily: 'Inter_400Regular', fontSize: 11.5, marginTop: 2, opacity: 0.8 }}
             >
-              {data.store.taxId ? `NIT: ${data.store.taxId}` : ''}
+              {data.store.taxId ? t('inbox.receipt.taxId', { value: data.store.taxId }) : ''}
               {data.store.taxId && data.store.phone ? ' · ' : ''}
-              {data.store.phone ? `Tel: ${data.store.phone}` : ''}
+              {data.store.phone ? t('inbox.receipt.phone', { value: data.store.phone }) : ''}
             </Text>
           ) : null}
         </View>
         {photoUrl ? (
           <Pressable
             onPress={() => setOpen((v) => !v)}
-            accessibilityLabel={open ? 'Collapse original photo' : 'View original photo'}
+            accessibilityRole="button"
+            accessibilityLabel={open ? t('inbox.receipt.collapsePhoto') : t('inbox.receipt.viewPhoto')}
             className="border border-border bg-surface rounded-md"
             style={[
               {
@@ -156,7 +168,7 @@ const StoreCard: React.FC<{ data: ReceiptData; photoUrl?: string }> = ({ data, p
               className="text-muted"
               style={{ fontFamily: 'Inter_600SemiBold', fontSize: 8, letterSpacing: 0.5, marginTop: 4 }}
             >
-              PHOTO
+              {t('inbox.receipt.photo')}
             </Text>
           </Pressable>
         ) : null}
@@ -192,9 +204,11 @@ const ConfidenceFlag: React.FC<{ value: number }> = ({ value }) => {
 };
 
 const LineItemsTable: React.FC<{ data: ReceiptData }> = ({ data }) => {
+  const { t, formatNumber } = useI18n();
+  const money = useMoney();
   const colors = useResolvedColors();
   return (
-    <Section title="Items" badge={String(data.items.length)} defaultOpen>
+    <Section title={t('inbox.receipt.items')} badge={formatNumber(data.items.length)} defaultOpen>
       <View
         style={{
           borderWidth: 1,
@@ -209,19 +223,21 @@ const LineItemsTable: React.FC<{ data: ReceiptData }> = ({ data }) => {
         ))}
         {/* Totals */}
         <View style={{ borderTopWidth: 2, borderTopColor: colors.border, backgroundColor: colors.surface }}>
-          <TotalsRow label="Subtotal" amount={formatCurrency(data.subtotal)} muted />
+          <TotalsRow label={t('inbox.receipt.subtotal')} amount={money(data.subtotal)} muted />
           {data.discountAmount && data.discountAmount > 0 ? (
+            // A named promotion is printed on the receipt; only the generic
+            // "Discount" fallback is interface copy.
             <TotalsRow
-              label={data.discountLabel ?? 'Discount'}
-              amount={`-${formatCurrency(data.discountAmount)}`}
+              label={data.discountLabel ?? t('inbox.receipt.discount')}
+              amount={`-${money(data.discountAmount)}`}
               variant="discount"
             />
           ) : null}
           {data.taxAmount > 0 ? (
-            <TotalsRow label="Tax" amount={formatCurrency(data.taxAmount)} muted />
+            <TotalsRow label={t('inbox.receipt.tax')} amount={money(data.taxAmount)} muted />
           ) : null}
           {data.tipAmount && data.tipAmount > 0 ? (
-            <TotalsRow label="Tip" amount={formatCurrency(data.tipAmount)} muted />
+            <TotalsRow label={t('inbox.receipt.tip')} amount={money(data.tipAmount)} muted />
           ) : null}
           <View
             style={{
@@ -237,7 +253,7 @@ const LineItemsTable: React.FC<{ data: ReceiptData }> = ({ data }) => {
               className="text-fg"
               style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15, flex: 1 }}
             >
-              Total
+              {t('inbox.receipt.total')}
             </Text>
             <Text
               className="text-fg"
@@ -249,7 +265,7 @@ const LineItemsTable: React.FC<{ data: ReceiptData }> = ({ data }) => {
                 width: 100,
               }}
             >
-              {formatCurrency(data.total)}
+              {money(data.total)}
             </Text>
           </View>
         </View>
@@ -259,11 +275,14 @@ const LineItemsTable: React.FC<{ data: ReceiptData }> = ({ data }) => {
 };
 
 const ReceiptItemRow: React.FC<{ item: ReceiptItem }> = ({ item }) => {
-  const qty = item.quantity % 1 === 0 ? String(item.quantity) : item.quantity.toFixed(2);
+  const { t, formatNumber } = useI18n();
+  const money = useMoney();
+  const qty = formatNumber(item.quantity, item.quantity % 1 === 0 ? {} : { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return (
     <View className="px-3 py-3 border-t border-border bg-surface gap-1">
-      <View className="flex-row items-start gap-4"><Text className="text-fg flex-1 text-base">{item.name}</Text><Text className="text-fg font-semibold">{formatCurrency(item.totalPrice)}</Text></View>
-      <View className="flex-row items-center gap-3"><Text className="text-muted text-sm flex-1">{qty} × {formatCurrency(item.unitPrice)}</Text>{item.ocrConfidence < 0.95 ? <View className="flex-row items-center gap-1"><Text className="text-muted text-xs">Check original</Text><ConfidenceFlag value={item.ocrConfidence} /></View> : null}</View>
+      {/* The line item's name is printed on the receipt. */}
+      <View className="flex-row items-start gap-4"><Text className="text-fg flex-1 text-base">{item.name}</Text><Text className="text-fg font-semibold">{money(item.totalPrice)}</Text></View>
+      <View className="flex-row items-center gap-3"><Text className="text-muted text-sm flex-1">{qty} × {money(item.unitPrice)}</Text>{item.ocrConfidence < 0.95 ? <View className="flex-row items-center gap-1"><Text className="text-muted text-xs">{t('inbox.receipt.checkOriginal')}</Text><ConfidenceFlag value={item.ocrConfidence} /></View> : null}</View>
     </View>
   );
 };
@@ -321,6 +340,9 @@ const TotalsRow: React.FC<{
 // ─────────────────────────────────────────────────────────────
 
 const PaymentGrid: React.FC<{ data: ReceiptData }> = ({ data }) => {
+  const { t } = useI18n();
+  const money = useMoney();
+  // Provider, card digits and the printed date all come from the receipt.
   const methodLabel = data.payment.provider
     ? `${data.payment.provider}${data.payment.last4 ? ` ···${data.payment.last4}` : ''}`
     : data.payment.method;
@@ -328,13 +350,13 @@ const PaymentGrid: React.FC<{ data: ReceiptData }> = ({ data }) => {
     ? `${data.receiptDate} · ${data.receiptTime}`
     : data.receiptDate;
   const cells: Array<[string, string]> = [
-    ['Method', methodLabel],
-    ['Date', dateLabel],
-    ['Total', formatCurrency(data.total)],
+    [t('inbox.receipt.method'), methodLabel],
+    [t('inbox.receipt.date'), dateLabel],
+    [t('inbox.receipt.total'), money(data.total)],
   ];
 
   return (
-    <Section title="Payment" defaultOpen={false}>
+    <Section title={t('inbox.receipt.payment')} defaultOpen={false}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {cells.map(([label, value]) => (
           <View
@@ -398,28 +420,32 @@ const buildCategoryRows = (items: ReceiptItem[]): CategoryRow[] => {
   return rows.sort((a, b) => b.total - a.total);
 };
 
-const CATEGORY_DISPLAY: Record<string, string> = {
-  dairy: 'Dairy & Eggs',
-  produce: 'Produce',
-  protein: 'Protein',
-  beverages: 'Beverages',
-  household: 'Household',
-  pantry: 'Pantry Staples',
-  frozen: 'Frozen',
-  snacks: 'Snacks',
-  personal_care: 'Personal Care',
-  other: 'Other',
+/** Worker-assigned category codes; an unknown code falls back to itself. */
+const CATEGORY_KEYS: Record<string, string> = {
+  dairy: 'inbox.receipt.categories.dairy',
+  produce: 'inbox.receipt.categories.produce',
+  protein: 'inbox.receipt.categories.protein',
+  beverages: 'inbox.receipt.categories.beverages',
+  household: 'inbox.receipt.categories.household',
+  pantry: 'inbox.receipt.categories.pantry',
+  frozen: 'inbox.receipt.categories.frozen',
+  snacks: 'inbox.receipt.categories.snacks',
+  personal_care: 'inbox.receipt.categories.personal_care',
+  other: 'inbox.receipt.categories.other',
 };
 
 const CategoryBreakdown: React.FC<{ items: ReceiptItem[] }> = ({ items }) => {
+  const { t, tKey, formatNumber } = useI18n();
+  const money = useMoney();
   const rows = useMemo(() => buildCategoryRows(items), [items]);
   if (rows.length === 0) return null;
 
   return (
-    <Section title="Category Breakdown" sparkle defaultOpen={false}>
+    <Section title={t('inbox.receipt.breakdown')} sparkle defaultOpen={false}>
       <View style={{ gap: 6 }}>
         {rows.map((row, i) => {
-          const display = CATEGORY_DISPLAY[row.category] ?? row.category;
+          const key = CATEGORY_KEYS[row.category];
+          const display = key ? tKey(key) : row.category;
           const hue = (20 + i * 25) % 360;
           const lightness = 45 + ((i * 3) % 20);
           return (
@@ -465,7 +491,7 @@ const CategoryBreakdown: React.FC<{ items: ReceiptItem[] }> = ({ items }) => {
                   fontSize: 11,
                 }}
               >
-                {formatCurrency(row.total)}
+                {money(row.total)}
               </Text>
               <Text
                 className="text-muted"
@@ -476,7 +502,7 @@ const CategoryBreakdown: React.FC<{ items: ReceiptItem[] }> = ({ items }) => {
                   fontSize: 10,
                 }}
               >
-                {row.pct}%
+                {formatNumber(row.pct)}%
               </Text>
             </View>
           );
@@ -490,53 +516,65 @@ const CategoryBreakdown: React.FC<{ items: ReceiptItem[] }> = ({ items }) => {
 // Spending insights — deterministic, derived from receipt data
 // ─────────────────────────────────────────────────────────────
 
-const buildInsights = (data: ReceiptData): string[] => {
-  const insights: string[] = [];
+/** Each insight is a key plus its variables; the sentence is assembled by `t`. */
+type Insight = { key: string; vars: Record<string, string | number> };
+
+const buildInsights = (data: ReceiptData): Insight[] => {
+  const insights: Insight[] = [];
 
   if (data.discountAmount && data.discountAmount > 0) {
-    const label = data.discountLabel ?? 'discount';
-    insights.push(`You saved ${formatCurrency(data.discountAmount)} with ${label}.`);
+    insights.push({
+      key: 'inbox.receipt.insightSaved',
+      // `discountLabel` is the promotion's printed name; the fallback is copy.
+      vars: { amount: data.discountAmount, label: data.discountLabel ?? '' },
+    });
   }
 
   if (data.items.length > 0) {
-    const avg = Math.round(data.subtotal / data.items.length);
-    insights.push(
-      `${data.items.length} item${data.items.length === 1 ? '' : 's'}, averaging ${formatCurrency(avg)} each.`,
-    );
+    insights.push({
+      key: 'inbox.receipt.insightAverage',
+      vars: { count: data.items.length, amount: Math.round(data.subtotal / data.items.length) },
+    });
   }
 
   const largest = [...data.items].sort((a, b) => b.totalPrice - a.totalPrice)[0];
   if (largest && data.subtotal > 0) {
     const sharePct = Math.round((largest.totalPrice / data.subtotal) * 100);
     if (sharePct >= 25) {
-      insights.push(`${largest.name} alone is ${sharePct}% of this receipt.`);
+      insights.push({
+        key: 'inbox.receipt.insightLargest',
+        vars: { name: largest.name, percent: sharePct },
+      });
     }
   }
 
   if (data.isRecurring) {
-    const freq = data.recurringFrequency ?? 'recurring';
-    insights.push(
-      `This is a ${freq} stop at ${data.store.name} — pattern detected from your last 30 days.`,
-    );
+    insights.push({
+      key: 'inbox.receipt.insightRecurring',
+      vars: { frequency: data.recurringFrequency ?? '', store: data.store.name },
+    });
   }
 
   if (data.ocrOverallConfidence > 0 && data.ocrOverallConfidence < 0.85) {
-    insights.push(
-      `Some line items had low OCR confidence (${Math.round(data.ocrOverallConfidence * 100)}%). Double-check totals before exporting.`,
-    );
+    insights.push({
+      key: 'inbox.receipt.insightOcr',
+      vars: { percent: Math.round(data.ocrOverallConfidence * 100) },
+    });
   }
 
   return insights;
 };
 
 const SpendingInsights: React.FC<{ data: ReceiptData }> = ({ data }) => {
+  const { t, tKey } = useI18n();
+  const money = useMoney();
   const insights = useMemo(() => buildInsights(data), [data]);
   if (insights.length === 0) return null;
 
   return (
-    <Section title="Spending Insights" sparkle defaultOpen={false}>
+    <Section title={t('inbox.receipt.insights')} sparkle defaultOpen={false}>
       <View style={{ gap: 8 }}>
-        {insights.map((line, i) => (
+        {insights.map((insight, i) => (
           <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
             <View
               className="bg-accent/10"
@@ -560,7 +598,20 @@ const SpendingInsights: React.FC<{ data: ReceiptData }> = ({ data }) => {
                 opacity: 0.85,
               }}
             >
-              {line}
+              {tKey(insight.key, {
+                ...insight.vars,
+                // Money is pre-formatted so the symbol and grouping stay under
+                // `formatCurrency`'s control rather than the interpolator's.
+                ...(typeof insight.vars.amount === 'number'
+                  ? { amount: money(insight.vars.amount) }
+                  : {}),
+                ...(insight.vars.label === ''
+                  ? { label: t('inbox.receipt.discount').toLocaleLowerCase() }
+                  : {}),
+                ...(insight.vars.frequency === ''
+                  ? { frequency: t('inbox.receipt.insightRecurringDefault') }
+                  : {}),
+              })}
             </Text>
           </View>
         ))}

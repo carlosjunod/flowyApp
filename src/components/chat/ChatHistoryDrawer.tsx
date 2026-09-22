@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Keyboard, Modal, PanResponder, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
 
 /** Left-edge conversation drawer; dragging left follows the finger and dismisses. */
 export function ChatHistoryDrawer({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   const colors = useResolvedColors();
   const drawerWidth = Math.min(320, width * 0.86);
   const progress = useRef(new Animated.Value(0)).current;
@@ -51,7 +53,7 @@ export function ChatHistoryDrawer({ open, onClose, children }: { open: boolean; 
     <Modal visible={present} transparent animationType="none" presentationStyle="overFullScreen" statusBarTranslucent onRequestClose={onClose}>
       <View style={styles.fill}>
         <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: progress.interpolate({ inputRange: [0, 1], outputRange: [0, 0.4] }) }]}>
-          <Pressable style={styles.fill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close chat history" />
+          <Pressable style={styles.fill} onPress={onClose} accessibilityRole="button" accessibilityLabel={t('chat.history.close')} />
         </Animated.View>
         <Animated.View {...pan.panHandlers} accessibilityViewIsModal onAccessibilityEscape={onClose}
           style={[styles.panel, { width: drawerWidth, paddingTop: insets.top, paddingBottom: insets.bottom, backgroundColor: colors.surface, borderRightColor: colors.border,

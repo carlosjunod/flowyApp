@@ -5,9 +5,20 @@ import { Alert } from 'react-native';
 
 import { pb } from '@/lib/pb';
 import { api } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 import type { ApiError, BulkActionResult } from '@/types';
 
-type SingleResult = { ok: true } | { ok: false; error: ApiError };
+/**
+ * `cancelled` is a structural flag rather than a sentinel message.
+ *
+ * Callers used to detect a dismissed confirmation by comparing the error text
+ * to the literal `'Cancelled'`, which stops working the moment that text is
+ * translated. The shape now says what happened.
+ */
+type SingleResult =
+  | { ok: true }
+  | { ok: false; cancelled: true }
+  | { ok: false; error: ApiError };
 type BulkResult =
   | { ok: true; data: BulkActionResult }
   | { ok: false; error: ApiError }
@@ -15,17 +26,21 @@ type BulkResult =
 
 const invalidateItem = (id: string) => ['item', id] as const;
 
-const confirm = (message: string): Promise<boolean> =>
-  new Promise((resolve) => {
-    Alert.alert('Confirm', message, [
-      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-      { text: 'Delete', style: 'destructive', onPress: () => resolve(true) },
-    ]);
-  });
-
 export const useItemActions = () => {
   const qc = useQueryClient();
+  const { t } = useI18n();
   const [pending, setPending] = useState<Set<string>>(new Set());
+
+  const confirm = useCallback(
+    (message: string): Promise<boolean> =>
+      new Promise((resolve) => {
+        Alert.alert(t('inbox.selection.confirmTitle'), message, [
+          { text: t('inbox.selection.cancel'), style: 'cancel', onPress: () => resolve(false) },
+          { text: t('inbox.selection.delete'), style: 'destructive', onPress: () => resolve(true) },
+        ]);
+      }),
+    [t],
+  );
 
   const mark = useCallback((ids: string[], on: boolean) => {
     setPending((prev) => {
@@ -58,8 +73,8 @@ export const useItemActions = () => {
   const deleteItem = useCallback(
     async (id: string, opts: { confirm?: boolean } = { confirm: true }): Promise<SingleResult> => {
       if (opts.confirm) {
-        const ok = await confirm('Delete this item? This cannot be undone.');
-        if (!ok) return { ok: false, error: { code: 'INVALID_INPUT', message: 'Cancelled' } };
+        const ok = await confirm(t('inbox.selection.confirmDeleteItem'));
+        if (!ok) return { ok: false, cancelled: true };
       }
       mark([id], true);
       const res = await api.deleteItem(id);
@@ -69,7 +84,7 @@ export const useItemActions = () => {
       void qc.invalidateQueries({ queryKey: ['items'] });
       return { ok: true };
     },
-    [qc, mark],
+    [qc, mark, confirm, t],
   );
 
   const reloadMany = useCallback(
@@ -89,7 +104,9 @@ export const useItemActions = () => {
     async (ids: string[]): Promise<BulkResult> => {
       if (ids.length === 0) return { ok: true, data: { succeeded: [], failed: [] } };
       const ok = await confirm(
-        ids.length === 1 ? 'Delete 1 item?' : `Delete ${ids.length} items? This cannot be undone.`,
+        ids.length === 1
+          ? t('inbox.selection.confirmDeleteOne')
+          : t('inbox.selection.confirmDeleteMany', { count: ids.length }),
       );
       if (!ok) return { ok: false, cancelled: true };
       mark(ids, true);
@@ -99,7 +116,7 @@ export const useItemActions = () => {
       void qc.invalidateQueries({ queryKey: ['items'] });
       return { ok: true, data: res.data };
     },
-    [qc, mark],
+    [qc, mark, confirm, t],
   );
 
   const exploreMany = useCallback(
@@ -124,7 +141,7 @@ export const useItemActions = () => {
 
   const setRead = useCallback(async (id: string, read: boolean): Promise<SingleResult> => {
     const userId = pb.authStore.model?.id, token = pb.authStore.token;
-    if (!userId) return { ok: false, error: { code: 'UNAUTHORIZED', message: 'Please sign in again.' } };
+    if (!userId) return { ok: false, error: { code: 'UNAUTHORIZED', message: t('chat.errors.UNAUTHORIZED') } };
     mark([id], true);
     try {
       const result = await api.itemEngagement(userId, id, read ? 'mark_read' : 'mark_unread');
@@ -132,7 +149,7 @@ export const useItemActions = () => {
       if (pb.authStore.token === token) await Promise.all([qc.invalidateQueries({ queryKey: ['item', id, userId] }), qc.invalidateQueries({ queryKey: ['items', userId] })]);
       return { ok: true };
     } finally { mark([id], false); }
-  }, [qc, mark]);
+  }, [qc, mark, t]);
 
   return useMemo(
     () => ({ setRead, open, reloadItem, deleteItem, reloadMany, deleteMany, exploreMany, pending }),

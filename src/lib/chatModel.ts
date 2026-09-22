@@ -17,6 +17,8 @@ export type Conversation = {
 };
 export type ChatSnapshot = { activeId: string; conversations: Conversation[] };
 export const chatId = (): string => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+/** Must stay byte-identical to `DEFAULT_CONVERSATION_TITLE` in useChatEngine:
+ *  the UI recognises this exact sentinel and renders a translated label. */
 export const newConversation = (): Conversation => ({ id: chatId(), title: 'New conversation', updated: Date.now(), draft: '', messages: [] });
 export const emptyChat = (): ChatSnapshot => {
   const conversation = newConversation();
@@ -43,7 +45,13 @@ export function restoreChat(value: unknown): ChatSnapshot {
       messages.push({ sequence: typeof m.sequence === 'number' ? m.sequence : undefined, historyStatus: ['preparing','streaming','complete','stopped','error','interrupted'].includes(String(m.historyStatus)) ? m.historyStatus as ChatMessage['historyStatus'] : undefined, id: m.id, role: m.role, content: m.content,
         streaming: false,
         interrupted: m.streaming === true || m.interrupted === true,
-        error: typeof m.error === 'string' ? m.error : undefined,
+        // Only a dot-path key survives a restore. Builds before the i18n change
+        // persisted a rendered English sentence in `error`; ignoring it means a
+        // restored failure is re-rendered in the reader's current language
+        // instead of the language of the device that first saw it.
+        errorKey: typeof m.errorKey === 'string' && m.errorKey.includes('.')
+          ? m.errorKey
+          : m.historyStatus === 'error' ? 'chat.message.failed' : undefined,
         citations: Array.isArray(m.citations) ? m.citations.filter((x): x is NonNullable<ChatMessage['citations']>[number] => {
           if (!x || typeof x !== 'object') return false;
           const ref = x as Record<string, unknown>;

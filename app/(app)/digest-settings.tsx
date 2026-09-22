@@ -24,13 +24,15 @@ import { useDigestColors, useDigestVars } from "@/lib/digestAppearance";
 import { useDigestCategories } from "@/hooks/useDigestCategories";
 import { registerPushForCurrentUser } from "@/hooks/usePushRegistration";
 import { PushNotificationSettings } from "@/components/settings/PushNotificationSettings";
+import { useI18n } from "@/lib/i18n";
 import {
   availableDigestCadences,
-  DIGEST_CADENCE_LABELS,
+  DIGEST_CADENCE_LABEL_KEYS,
   DIGEST_MONTH_DAYS,
   dateInZone,
-  DIGEST_DAYS,
-  DIGEST_TYPES,
+  DIGEST_DAY_KEYS,
+  DIGEST_DAY_SHORT_KEYS,
+  DIGEST_TYPE_KEYS,
   displayTime,
   exclusionChoices,
   preferencesChanged,
@@ -44,9 +46,12 @@ export default function DigestSettingsScreen() {
   const colors = useDigestColors();
   const appearance = useDigestVars();
   const navigation = useNavigation();
+  const { t, tKey, locale, formatDateTime } = useI18n();
   const [view, setView] = useState<DigestSettings | null>(null);
   const [draft, setDraft] = useState<DigestPreferences | null>(null);
-  const [message, setMessage] = useState("");
+  // Status line and errors are translation keys so a language switch updates
+  // whatever is currently on screen.
+  const [messageKey, setMessageKey] = useState("");
   const [conflict, setConflict] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -68,12 +73,12 @@ export default function DigestSettingsScreen() {
   usePreventRemove(dirty || busy, ({ data }) => {
     if (saving.current) return;
     Alert.alert(
-      "Leave without saving?",
-      "Your digest choices have not been saved.",
+      t('digest.settings.leaveTitle'),
+      t('digest.settings.leaveBody'),
       [
-        { text: "Keep editing", style: "cancel" },
+        { text: t('digest.settings.keepEditing'), style: "cancel" },
         {
-          text: "Discard changes",
+          text: t('digest.settings.discard'),
           style: "destructive",
           onPress: () => navigation.dispatch(data.action),
         },
@@ -83,18 +88,18 @@ export default function DigestSettingsScreen() {
 
   async function load() {
     setLoading(true);
-    setMessage("");
+    setMessageKey("");
     try {
       const result = await api.getDigestSettings();
       if (result.error || !result.data.settings) {
-        setMessage("Could not load digest settings. Please try again.");
+        setMessageKey('digest.settings.loadFailed');
         return;
       }
       setView(result.data);
       setDraft(result.data.settings);
       setConflict(false);
     } catch {
-      setMessage("Could not load digest settings. Please try again.");
+      setMessageKey('digest.settings.loadFailed');
     } finally {
       setLoading(false);
     }
@@ -109,13 +114,13 @@ export default function DigestSettingsScreen() {
   ) {
     if (saving.current) return;
     setDraft((old) => (old ? { ...old, [key]: value } : old));
-    setMessage("");
+    setMessageKey("");
   }
   async function save() {
     if (!draft || !view || saving.current) return;
     saving.current = true;
     setBusy(true);
-    setMessage("");
+    setMessageKey("");
     try {
       const result = await api.patchDigestSettings({
         ...draft,
@@ -123,21 +128,19 @@ export default function DigestSettingsScreen() {
       });
       if (result.error) {
         setConflict(result.error.status === 409);
-        setMessage(
+        setMessageKey(
           result.error.status === 409
-            ? "Changed on another device. Your edits are still here. Reload to get the saved choices."
-            : "Could not save your choices. Your edits are still here. Please try again.",
+            ? 'digest.settings.conflict'
+            : 'digest.settings.saveFailed',
         );
         return;
       }
       setView(result.data);
       setDraft(result.data.settings || draft);
       setConflict(false);
-      setMessage("Your digest choices are saved.");
+      setMessageKey('digest.settings.savedNotice');
     } catch {
-      setMessage(
-        "Could not connect. Your edits are still here. Please try again.",
-      );
+      setMessageKey('digest.settings.connectFailed');
     } finally {
       saving.current = false;
       setBusy(false);
@@ -152,16 +155,16 @@ export default function DigestSettingsScreen() {
         row
           ? {
               id: row.id,
+              // A real bullet is AI output in the report language; the fallback
+              // caption is interface copy.
               text:
-                row.content.tldr?.bullets[0]?.text || "Your published report",
+                row.content.tldr?.bullets[0]?.text ||
+                t('digest.settings.previewFallback'),
             }
-          : {
-              id: "",
-              text: "Two articles explored how short breaks support focus. Compare their evidence by opening the sources.",
-            },
+          : { id: "", text: t('digest.settings.previewExampleText') },
       );
     } catch {
-      setMessage("Could not load the preview. Please try again.");
+      setMessageKey('digest.settings.previewFailed');
     } finally {
       setPreviewBusy(false);
     }
@@ -175,16 +178,12 @@ export default function DigestSettingsScreen() {
       value.length > (key === "excluded_categories" ? 64 : 40) &&
       !draft[key].includes(value)
     ) {
-      setMessage(
-        "This saved label is too long to exclude. Rename it in your library first.",
-      );
+      setMessageKey('digest.settings.excludeTooLong');
       return;
     }
     const next = toggleExclusion(draft[key], value);
     if (next.length > 30) {
-      setMessage(
-        "You can exclude up to 30 choices in each group. Include one before excluding another.",
-      );
+      setMessageKey('digest.settings.excludeTooMany');
       return;
     }
     change(key, next);
@@ -196,7 +195,7 @@ export default function DigestSettingsScreen() {
     draft?.excluded_categories ?? [],
   );
   const allTypes = exclusionChoices(
-    Object.keys(DIGEST_TYPES),
+    Object.keys(DIGEST_TYPE_KEYS),
     draft?.excluded_types ?? [],
   );
   const visibleTypes = moreTypes
@@ -227,19 +226,28 @@ export default function DigestSettingsScreen() {
         <View className="px-5 pt-1 pb-2 flex-row items-center justify-between">
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Back"
+            accessibilityLabel={t('digest.settings.back')}
             disabled={busy}
             onPress={() => router.back()}
             className="min-h-12 min-w-12 flex-row items-center gap-2"
             style={{ opacity: 1 }}
           >
             <AppIcon name="arrow-left" color={colors.fg} />
-            <Text className="font-sans text-base text-fg">Back</Text>
+            <Text className="font-sans text-base text-fg">{t('digest.settings.back')}</Text>
           </Pressable>
           {view && (
             <Text className="text-xs font-semibold text-muted uppercase tracking-widest flex-shrink text-right">
-              {view.betaAccessEndsAt ? "Beta Pro" : view.effectivePlan || "Your plan"} ·{" "}
-              {view.canEnableDaily ? `Daily + weekly${view.settings?.monthly_enabled !== undefined ? " + monthly" : ""}` : "Weekly"}
+              {t('digest.settings.planLine', {
+                // `effectivePlan` is a server-defined plan name, shown verbatim.
+                plan: view.betaAccessEndsAt
+                  ? t('digest.settings.planBeta')
+                  : view.effectivePlan || t('digest.settings.planYour'),
+                cadences: view.canEnableDaily
+                  ? view.settings?.monthly_enabled !== undefined
+                    ? t('digest.settings.planCadencesFullMonthly')
+                    : t('digest.settings.planCadencesFull')
+                  : t('digest.settings.planCadencesWeekly'),
+              })}
             </Text>
           )}
         </View>
@@ -257,7 +265,7 @@ export default function DigestSettingsScreen() {
               className="text-xs font-medium uppercase text-muted"
               style={{ letterSpacing: 1.92 }}
             >
-              Settings
+              {t('digest.settings.eyebrow')}
             </Text>
             <Text
               accessibilityRole="header"
@@ -269,24 +277,30 @@ export default function DigestSettingsScreen() {
                 letterSpacing: -0.36,
               }}
             >
-              Digests
+              {t('digest.settings.title')}
             </Text>
             <Text className="font-sans text-sm text-muted leading-5 mt-2">
-              A few ideas worth keeping. Choose your rhythm, then save your
-              choices.
+              {t('digest.settings.intro')}
             </Text>
             {view?.monthlyReportQuota && (
               <View className="mt-3 gap-1">
                 <Text className="font-sans text-sm text-fg">
-                  {view.monthlyReportQuota.used} of {view.monthlyReportQuota.limit} digests used this month
-                  {view.monthlyReportQuota.reserved > 0 ? ` · ${view.monthlyReportQuota.reserved} preparing` : ''}
+                  {t('digest.settings.quotaUsed', {
+                    used: view.monthlyReportQuota.used,
+                    limit: view.monthlyReportQuota.limit,
+                  })}
+                  {view.monthlyReportQuota.reserved > 0
+                    ? t('digest.settings.quotaReserved', { count: view.monthlyReportQuota.reserved })
+                    : ''}
                 </Text>
                 <Text className="font-sans text-xs text-muted">
-                  Resets {new Date(view.monthlyReportQuota.resetsAt).toLocaleString()}
+                  {t('digest.settings.quotaResets', {
+                    date: formatDateTime(view.monthlyReportQuota.resetsAt),
+                  })}
                 </Text>
                 {view.monthlyReportQuota.remaining === 0 && (
                   <Text accessibilityRole="alert" className="font-sans text-sm text-muted">
-                    Your monthly allowance is allocated. New digests resume next month, or when more allowance becomes available. Your saved items remain available.
+                    {t('digest.settings.quotaExhausted')}
                   </Text>
                 )}
               </View>
@@ -296,28 +310,27 @@ export default function DigestSettingsScreen() {
             <View className="py-12 items-center gap-3">
               <ActivityIndicator color={colors.accent} />
               <Text className="font-sans text-muted">
-                Loading your choices…
+                {t('digest.settings.loading')}
               </Text>
             </View>
           ) : !draft || !view ? (
             <View className="gap-2">
               <Text accessibilityRole="alert" className="font-sans text-fg">
-                {message}
+                {messageKey ? tKey(messageKey) : ''}
               </Text>
-              <DigestAction title="Try again" onPress={() => void load()} />
+              <DigestAction title={t('digest.settings.tryAgain')} onPress={() => void load()} />
             </View>
           ) : (
             <>
               {!view.capabilities?.enabled && (
                 <Text className="font-sans text-sm text-muted leading-5">
-                  Digest subscriptions are temporarily unavailable. You can
-                  still update your preferences or turn off existing digests.
+                  {t('digest.settings.unavailable')}
                 </Text>
               )}
               <PushNotificationSettings />
               <DigestSection
-                title="Schedule"
-                subtitle="Choose when to bring your saved ideas back."
+                title={t('digest.settings.scheduleTitle')}
+                subtitle={t('digest.settings.scheduleSubtitle')}
               >
                 {availableDigestCadences(draft).map((cadence) => {
                   const enabledKey = `${cadence}_enabled` as const;
@@ -340,21 +353,21 @@ export default function DigestSettingsScreen() {
                         </View>
                         <View className="flex-1 gap-1">
                           <Text className="text-base text-fg font-semibold">
-                            {DIGEST_CADENCE_LABELS[cadence]}
+                            {tKey(DIGEST_CADENCE_LABEL_KEYS[cadence])}
                           </Text>
                           <Text className="font-sans text-sm text-muted">
                             {locked
-                              ? "Available on paid plans"
+                              ? t('digest.settings.lockedHint')
                               : cadence === "weekly"
-                                ? "A little perspective, once a week"
+                                ? t('digest.settings.weeklyHint')
                                 : cadence === "monthly"
-                                  ? "A look back at the previous calendar month"
-                                  : "A moment for yesterday’s ideas"}
+                                  ? t('digest.settings.monthlyHint')
+                                  : t('digest.settings.dailyHint')}
                           </Text>
                         </View>
                         <Switch
                           thumbColor="#FFFFFF"
-                          accessibilityLabel={`${cadence} digest`}
+                          accessibilityLabel={t('digest.settings.cadenceToggle', { cadence: tKey(`digest.history.${cadence}`) })}
                           value={enabled}
                           trackColor={{ true: colors.accent }}
                           disabled={
@@ -370,18 +383,21 @@ export default function DigestSettingsScreen() {
                           {cadence === "weekly" && (
                             <View className="gap-2">
                               <Text className="font-sans text-sm text-muted">
-                                Publication day
+                                {t('digest.settings.publicationDay')}
                               </Text>
                               <View
                                 className="flex-row flex-wrap gap-0.5 -mx-1.5"
                                 accessibilityRole="radiogroup"
-                                accessibilityLabel="Weekly publication day"
+                                accessibilityLabel={t('digest.settings.weeklyDayGroup')}
                               >
-                                {DIGEST_DAYS.map((day, index) => (
+                                {DIGEST_DAY_KEYS.map((dayKey, index) => (
                                   <DigestChip
-                                    key={day}
-                                    label={day.slice(0, 3)}
-                                    accessibilityLabel={day}
+                                    key={dayKey}
+                                    // A Spanish abbreviation is not the first
+                                    // three letters of the full name, so the
+                                    // short form is its own key.
+                                    label={tKey(DIGEST_DAY_SHORT_KEYS[index] ?? dayKey)}
+                                    accessibilityLabel={tKey(dayKey)}
                                     compact
                                     role="radio"
                                     selected={draft.weekly_day === index + 1}
@@ -396,23 +412,23 @@ export default function DigestSettingsScreen() {
                           )}
                           {cadence === "monthly" && (
                             <View className="gap-2">
-                              <Text className="font-sans text-sm text-muted">Publication day of the month</Text>
-                              <View className="flex-row flex-wrap gap-1" accessibilityRole="radiogroup" accessibilityLabel="Monthly publication day">
+                              <Text className="font-sans text-sm text-muted">{t('digest.settings.publicationDayOfMonth')}</Text>
+                              <View className="flex-row flex-wrap gap-1" accessibilityRole="radiogroup" accessibilityLabel={t('digest.settings.monthlyDayGroup')}>
                                 {DIGEST_MONTH_DAYS.map(day => (
-                                  <DigestChip key={day} label={String(day)} accessibilityLabel={`Day ${day} of each month`}
+                                  <DigestChip key={day} label={String(day)} accessibilityLabel={t('digest.settings.monthlyDayLabel', { day })}
                                     compact role="radio" selected={(draft.monthly_day ?? 1) === day} disabled={busy}
                                     onPress={() => change("monthly_day", day)} />
                                 ))}
                               </View>
-                              <Text className="font-sans text-xs text-muted">Days 1–28 are available in every month.</Text>
+                              <Text className="font-sans text-xs text-muted">{t('digest.settings.monthlyDaysHint')}</Text>
                             </View>
                           )}
                           <View className="gap-1 border-t border-border pt-3">
                             <Text className="font-sans text-sm text-muted">
-                              Publication time
+                              {t('digest.settings.publicationTime')}
                             </Text>
                             <DigestDateField
-                              label={`${cadence} publication time`}
+                              label={t('digest.settings.publicationTimeLabel', { cadence: tKey(`digest.history.${cadence}`) })}
                               mode="time"
                               value={draft[`${cadence}_local_time`] ?? "08:00"}
                               disabled={busy}
@@ -426,25 +442,34 @@ export default function DigestSettingsScreen() {
                           </View>
                           <Text className="font-sans text-sm text-muted leading-5">
                             {cadence === "weekly"
-                              ? `Every ${DIGEST_DAYS[draft.weekly_day - 1]} at ${displayTime(draft.weekly_local_time)} · the previous 7 complete days.`
+                              ? t('digest.settings.windowWeekly', {
+                                  day: tKey(DIGEST_DAY_KEYS[draft.weekly_day - 1] ?? DIGEST_DAY_KEYS[0]!),
+                                  time: displayTime(draft.weekly_local_time, locale),
+                                })
                               : cadence === "monthly"
-                                ? `Day ${draft.monthly_day ?? 1} of each month at ${displayTime(draft.monthly_local_time ?? "08:00")} · the previous complete calendar month.`
-                                : `Every day at ${displayTime(draft.daily_local_time)} · the previous complete day.`}
+                                ? t('digest.settings.windowMonthly', {
+                                    day: draft.monthly_day ?? 1,
+                                    time: displayTime(draft.monthly_local_time ?? "08:00", locale),
+                                  })
+                                : t('digest.settings.windowDaily', {
+                                    time: displayTime(draft.daily_local_time, locale),
+                                  })}
                           </Text>
                           {!dirty && !paused && next?.enabled && (
                             <Text className="font-sans text-xs text-muted">
-                              Next scheduled:{" "}
-                              {new Date(next.next_run_at).toLocaleString(
-                                undefined,
-                                {
-                                  timeZone: draft.timezone,
-                                  weekday: "short",
-                                  month: "short",
-                                  day: "numeric",
-                                  hour: "numeric",
-                                  minute: "2-digit",
-                                },
-                              )}
+                              {t('digest.settings.nextScheduled', {
+                                date: new Date(next.next_run_at).toLocaleString(
+                                  locale,
+                                  {
+                                    timeZone: draft.timezone,
+                                    weekday: "short",
+                                    month: "short",
+                                    day: "numeric",
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                  },
+                                ),
+                              })}
                             </Text>
                           )}
                         </>
@@ -454,18 +479,17 @@ export default function DigestSettingsScreen() {
                 })}
                 {draft.daily_enabled && draft.weekly_enabled && !draft.monthly_enabled && (
                   <Text className="font-sans text-sm text-muted leading-5">
-                    On your weekly digest day, it replaces the daily one. You’ll
-                    receive at most one report per day.
+                    {t('digest.settings.weeklyReplacesDaily')}
                   </Text>
                 )}
                 {draft.monthly_enabled && (draft.weekly_enabled || draft.daily_enabled) && (
                   <Text className="font-sans text-sm text-muted leading-5">
-                    When schedules overlap, monthly takes priority, then weekly, then daily. You’ll receive at most one report per day. All cadences share your monthly allowance.
+                    {t('digest.settings.monthlyPriority')}
                   </Text>
                 )}
                 <View className="gap-2 pt-1">
                   <Text className="font-sans text-sm text-muted">
-                    Schedule timezone
+                    {t('digest.settings.timezone')}
                   </Text>
                   <DigestTimezone
                     value={draft.timezone}
@@ -474,40 +498,41 @@ export default function DigestSettingsScreen() {
                   />
                   <Text className="font-sans text-xs text-muted leading-5">
                     {deviceTimezone === draft.timezone
-                      ? "Matches this device. Your schedule stays in this timezone when you travel."
-                      : `This device uses ${deviceTimezone.replaceAll("_", " ")}. Your digest follows the timezone above.`}
+                      ? t('digest.settings.timezoneMatches')
+                      : t('digest.settings.timezoneDiffers', {
+                          timezone: deviceTimezone.replaceAll("_", " "),
+                        })}
                   </Text>
                 </View>
               </DigestSection>
               <DigestSection
-                title="What goes in"
-                subtitle="Checked tags are included. Tap to exclude; tap again to include."
+                title={t('digest.settings.contentTitle')}
+                subtitle={t('digest.settings.contentSubtitle')}
               >
                 <View className="bg-surface rounded-xl border border-border p-5 gap-5">
                   <View className="gap-3">
                     <View className="flex-row flex-wrap items-center justify-between gap-2">
                       <Text className="text-base text-fg font-semibold">
-                        Categories
+                        {t('digest.settings.categories')}
                       </Text>
                       <Text className="font-sans text-xs text-muted">
                         {draft.excluded_categories.length
-                          ? `${draft.excluded_categories.length} excluded`
-                          : "All included"}
+                          ? t('digest.settings.excludedCount', { count: draft.excluded_categories.length })
+                          : t('digest.settings.allIncluded')}
                       </Text>
                     </View>
                     {categoryState === "loading" && (
                       <Text className="font-sans text-sm text-muted">
-                        Loading your library categories…
+                        {t('digest.settings.categoriesLoading')}
                       </Text>
                     )}
                     {categoryState === "error" && (
                       <View>
                         <Text className="font-sans text-sm text-muted">
-                          Could not load your categories. Your saved exclusions
-                          are preserved.
+                          {t('digest.settings.categoriesFailed')}
                         </Text>
                         <DigestAction
-                          title="Retry categories"
+                          title={t('digest.settings.categoriesRetry')}
                           onPress={() => void categoryQuery.refetch()}
                           disabled={busy}
                         />
@@ -530,30 +555,31 @@ export default function DigestSettingsScreen() {
                     </View>
                     {categoryState === "ready" && !allCategories.length && (
                       <Text className="font-sans text-sm text-muted leading-5">
-                        All categories are included. As you save items, their
-                        categories will appear here.
+                        {t('digest.settings.categoriesEmpty')}
                       </Text>
                     )}
                     <Text className="font-sans text-xs text-muted">
-                      New categories are included automatically.
+                      {t('digest.settings.categoriesAuto')}
                     </Text>
                   </View>
                   <View className="gap-3 border-t border-border pt-4">
                     <View className="flex-row flex-wrap items-center justify-between gap-2">
                       <Text className="text-base text-fg font-semibold">
-                        Content types
+                        {t('digest.settings.contentTypes')}
                       </Text>
                       <Text className="font-sans text-xs text-muted">
                         {draft.excluded_types.length
-                          ? `${draft.excluded_types.length} excluded`
-                          : "All included"}
+                          ? t('digest.settings.excludedCount', { count: draft.excluded_types.length })
+                          : t('digest.settings.allIncluded')}
                       </Text>
                     </View>
                     <View className="flex-row flex-wrap gap-2">
                       {visibleTypes.map((type) => (
                         <DigestChip
                           key={type}
-                          label={DIGEST_TYPES[type] || type}
+                          // An unknown type from a newer server falls back to
+                          // its raw enum value rather than an empty chip.
+                          label={DIGEST_TYPE_KEYS[type] ? tKey(DIGEST_TYPE_KEYS[type]) : type}
                           selected={!draft.excluded_types.includes(type)}
                           disabled={busy}
                           onPress={() => toggleFilter("excluded_types", type)}
@@ -563,47 +589,52 @@ export default function DigestSettingsScreen() {
                     <DigestAction
                       title={
                         moreTypes
-                          ? "Show fewer types"
-                          : `Show all ${allTypes.length} types`
+                          ? t('digest.settings.showFewerTypes')
+                          : t('digest.settings.showAllTypes', { count: allTypes.length })
                       }
                       disabled={busy}
                       onPress={() => setMoreTypes(!moreTypes)}
                     />
                     <Text className="font-sans text-xs text-muted leading-5">
-                      Receipts, emails and private notes start excluded. Only
-                      include what you want resurfaced.
+                      {t('digest.settings.typesHint')}
                     </Text>
                   </View>
                 </View>
               </DigestSection>
+              {/* D-041: this is the language the REPORT is generated in, a
+                  server-side preference. It is intentionally separate from the
+                  app's interface language and is never changed by it. */}
               <DigestSection
-                title="Language"
-                subtitle="The language your digest is written in."
+                title={t('digest.settings.languageTitle')}
+                subtitle={t('digest.settings.languageSubtitle')}
               >
                 <View
                   className="flex-row flex-wrap gap-2"
                   accessibilityRole="radiogroup"
-                  accessibilityLabel="Digest language"
+                  accessibilityLabel={t('digest.settings.languageGroup')}
                 >
                   <DigestChip
-                    label="English"
+                    label={t('common.language.english')}
                     role="radio"
                     selected={draft.locale === "en"}
                     disabled={busy}
                     onPress={() => change("locale", "en")}
                   />
                   <DigestChip
-                    label="Español"
+                    label={t('common.language.spanish')}
                     role="radio"
                     selected={draft.locale === "es"}
                     disabled={busy}
                     onPress={() => change("locale", "es")}
                   />
                 </View>
+                <Text className="font-sans text-xs text-muted leading-5">
+                  {t('digest.settings.languageNote')}
+                </Text>
               </DigestSection>
               <DigestSection
-                title="How it reaches you"
-                subtitle="Every published digest is saved in the app. Notifications and email are optional."
+                title={t('digest.settings.deliveryTitle')}
+                subtitle={t('digest.settings.deliverySubtitle')}
               >
                 {draft.weekly_enabled || draft.daily_enabled || draft.monthly_enabled ? (
                   <View className="bg-surface rounded-xl border border-border p-5 gap-4">
@@ -612,11 +643,14 @@ export default function DigestSettingsScreen() {
                       .map((cadence) => (
                         <View key={cadence} className="gap-3">
                           <Text className="text-base text-fg font-semibold">
-                            {DIGEST_CADENCE_LABELS[cadence]}
+                            {tKey(DIGEST_CADENCE_LABEL_KEYS[cadence])}
                           </Text>
                           {(["push", "email"] as const).map((channel) => {
                             const key =
                               `${cadence}_${channel}_enabled` as const;
+                            const channelLabel = channel === "push"
+                              ? t('digest.settings.channelPush')
+                              : t('digest.settings.channelEmail');
                             return (
                               <View
                                 key={channel}
@@ -627,13 +661,11 @@ export default function DigestSettingsScreen() {
                                   color={colors.muted}
                                 />
                                 <Text className="font-sans text-base text-fg flex-1">
-                                  {channel === "push"
-                                    ? "Push notification"
-                                    : "Email"}
+                                  {channelLabel}
                                 </Text>
                                 <Switch
                                   thumbColor="#FFFFFF"
-                                  accessibilityLabel={`${cadence} ${channel}`}
+                                  accessibilityLabel={t('digest.settings.channelToggle', { cadence: tKey(`digest.history.${cadence}`), channel: channelLabel })}
                                   value={!!draft[key]}
                                   trackColor={{ true: colors.accent }}
                                   disabled={
@@ -652,61 +684,56 @@ export default function DigestSettingsScreen() {
                       ))}
                     {!view.capabilities?.push && (
                       <Text className="font-sans text-sm text-muted">
-                        Push delivery is temporarily unavailable.
+                        {t('digest.settings.pushUnavailable')}
                       </Text>
                     )}
                     {!view.hasPushDevice && view.capabilities?.push && (
                       <View>
                         <Text className="font-sans text-sm text-muted">
-                          Enable notifications on this device to receive push
-                          alerts.
+                          {t('digest.settings.pushNoDevice')}
                         </Text>
                         <DigestAction
-                          title="Enable device notifications"
+                          title={t('digest.settings.pushEnable')}
                           disabled={busy}
                           onPress={() => {
-                            void registerPushForCurrentUser(true)
-                              .then((result) => setMessage(result.message))
-                              .catch(() =>
-                                setMessage(
-                                  "Could not enable notifications. Please try again.",
-                                ),
-                              );
+                            void registerPushForCurrentUser(true, t('settings.notifications.channelName'))
+                              .then((result) => setMessageKey(result.messageKey))
+                              .catch(() => setMessageKey('digest.settings.pushEnableFailed'));
                           }}
                         />
                       </View>
                     )}
                     <Text className="font-sans text-sm text-muted leading-5">
                       {!view.capabilities?.email
-                        ? "Email delivery is temporarily unavailable."
+                        ? t('digest.settings.emailUnavailable')
                         : !view.emailVerified
-                          ? "Verify your account email to enable email delivery."
-                          : `Email goes to ${view.emailAddress || "your verified address"}.`}
-                      {view.emailSuppressed
-                        ? " Email delivery is currently suppressed for this address."
-                        : ""}
+                          ? t('digest.settings.emailUnverified')
+                          : t('digest.settings.emailGoesTo', {
+                              address: view.emailAddress || t('digest.settings.emailVerifiedAddress'),
+                            })}
+                      {view.emailSuppressed ? t('digest.settings.emailSuppressed') : ""}
                     </Text>
                   </View>
                 ) : (
                   <Text className="font-sans text-sm text-muted">
-                    Turn on a digest above to choose its delivery channels.
+                    {t('digest.settings.deliveryNone')}
                   </Text>
                 )}
               </DigestSection>
               <DigestSection
-                title="Need a break?"
-                subtitle="Pause delivery while keeping your schedule and history."
+                title={t('digest.settings.pauseTitle')}
+                subtitle={t('digest.settings.pauseSubtitle')}
               >
                 {paused ? (
                   <View className="bg-surface border border-border rounded-xl p-5 gap-2">
                     <Text className="text-base text-fg font-semibold">
-                      Digests paused
+                      {t('digest.settings.paused')}
                     </Text>
                     <Text className="font-sans text-sm text-muted">
-                      Resume on
+                      {t('digest.settings.resumeOn')}
                     </Text>
                     <DigestDateField
-                      label="Resume digests on"
+                      label={t('digest.settings.resumeField')}
                       mode="date"
                       value={dateInZone(
                         new Date(draft.paused_until!),
@@ -722,24 +749,24 @@ export default function DigestSettingsScreen() {
                       }
                     />
                     <Text className="font-sans text-xs text-muted leading-5">
-                      From{" "}
-                      {new Date(draft.paused_until!).toLocaleString(undefined, {
-                        timeZone: draft.timezone,
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })}{" "}
-                      in {draft.timezone.replaceAll("_", " ")}, your regular
-                      schedule resumes.
+                      {t('digest.settings.resumeHint', {
+                        date: new Date(draft.paused_until!).toLocaleString(locale, {
+                          timeZone: draft.timezone,
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        }),
+                        timezone: draft.timezone.replaceAll("_", " "),
+                      })}
                     </Text>
                     <DigestAction
-                      title="Resume now"
+                      title={t('digest.settings.resumeNow')}
                       disabled={busy}
                       onPress={() => change("paused_until", null)}
                     />
                   </View>
                 ) : (
                   <DigestAction
-                    title="Pause for a week…"
+                    title={t('digest.settings.pauseWeek')}
                     disabled={
                       busy || (!draft.daily_enabled && !draft.weekly_enabled && !draft.monthly_enabled)
                     }
@@ -755,7 +782,7 @@ export default function DigestSettingsScreen() {
                   />
                 )}
                 <DigestAction
-                  title="Turn off all digests"
+                  title={t('digest.settings.turnOff')}
                   disabled={
                     busy || (!draft.daily_enabled && !draft.weekly_enabled && !draft.monthly_enabled)
                   }
@@ -766,13 +793,13 @@ export default function DigestSettingsScreen() {
                       weekly_enabled: false,
                       ...(draft.monthly_enabled !== undefined ? { monthly_enabled: false } : {}),
                     });
-                    setMessage("");
+                    setMessageKey("");
                   }}
                 />
               </DigestSection>
               <View className="border-t border-border pt-3 gap-3">
                 <DigestAction
-                  title={previewBusy ? "Loading preview…" : "Preview a digest"}
+                  title={previewBusy ? t('digest.settings.previewLoading') : t('digest.settings.preview')}
                   disabled={busy || previewBusy}
                   onPress={() => void showPreview()}
                 />
@@ -780,8 +807,8 @@ export default function DigestSettingsScreen() {
                   <View className="bg-surface border border-border rounded-xl p-5 gap-3">
                     <Text className="text-sm text-fg font-semibold">
                       {preview.id
-                        ? "Your published report · saved settings"
-                        : "Fictional example · no personal content"}
+                        ? t('digest.settings.previewPublished')
+                        : t('digest.settings.previewExample')}
                     </Text>
                     <Text className="font-sans text-base text-muted leading-6">
                       {preview.text}
@@ -789,11 +816,11 @@ export default function DigestSettingsScreen() {
                     {preview.id && (
                       <>
                         <DigestAction
-                          title="Open report"
+                          title={t('digest.settings.openReport')}
                           onPress={() => router.push(`/digest/${preview.id}`)}
                         />
                         <DigestAction
-                          title="Email this report to me"
+                          title={t('digest.settings.emailReport')}
                           disabled={
                             busy ||
                             !view.capabilities?.email ||
@@ -803,17 +830,13 @@ export default function DigestSettingsScreen() {
                             void api
                               .testDigestEmail(preview.id)
                               .then((result) =>
-                                setMessage(
+                                setMessageKey(
                                   result.error
-                                    ? "Could not queue a test email. Save your email choice first; limit 1/hour and 3/day."
-                                    : "Test email queued.",
+                                    ? 'digest.settings.testRateLimited'
+                                    : 'digest.settings.testQueued',
                                 ),
                               )
-                              .catch(() =>
-                                setMessage(
-                                  "Could not queue a test email. Please try again.",
-                                ),
-                              );
+                              .catch(() => setMessageKey('digest.settings.testFailed'));
                           }}
                         />
                       </>
@@ -826,26 +849,26 @@ export default function DigestSettingsScreen() {
         </ScrollView>
         {draft && view && (
           <View className="px-5 pt-3 pb-3 bg-bg border-t border-border gap-2">
-            {!!message && (
+            {!!messageKey && (
               <Text
                 accessibilityLiveRegion="polite"
                 accessibilityRole="alert"
                 className="font-sans text-sm text-fg"
               >
-                {message}
+                {tKey(messageKey)}
               </Text>
             )}
             {conflict && (
               <DigestAction
-                title="Reload saved choices"
+                title={t('digest.settings.reloadSaved')}
                 disabled={busy}
                 onPress={() =>
                   Alert.alert(
-                    "Replace your edits?",
-                    "Reloading replaces your unsaved choices with the settings from your other device.",
+                    t('digest.settings.reloadTitle'),
+                    t('digest.settings.reloadBody'),
                     [
-                      { text: "Keep editing", style: "cancel" },
-                      { text: "Reload", onPress: () => void load() },
+                      { text: t('digest.settings.keepEditing'), style: "cancel" },
+                      { text: t('digest.settings.reload'), onPress: () => void load() },
                     ],
                   )
                 }
@@ -854,19 +877,19 @@ export default function DigestSettingsScreen() {
             <View className="flex-row flex-wrap items-center justify-between gap-2">
               <Text className="font-sans text-xs text-muted flex-shrink">
                 {busy
-                  ? "Saving your choices…"
+                  ? t('digest.settings.statusSaving')
                   : dirty
-                    ? "Unsaved changes"
+                    ? t('digest.settings.statusDirty')
                     : paused
-                      ? "Digests are paused"
+                      ? t('digest.settings.statusPaused')
                       : draft.weekly_enabled || draft.daily_enabled || draft.monthly_enabled
-                        ? "Your schedule is saved"
-                        : "Digests are off"}
+                        ? t('digest.settings.statusScheduled')
+                        : t('digest.settings.statusOff')}
               </Text>
               <Pressable
                 accessibilityRole="button"
                 className="active:opacity-70"
-                accessibilityLabel="Save choices"
+                accessibilityLabel={t('digest.settings.save')}
                 accessibilityState={{
                   disabled: busy || !dirty || conflict,
                   busy,
@@ -893,7 +916,7 @@ export default function DigestSettingsScreen() {
                       fontFamily: "Inter_500Medium",
                     }}
                   >
-                    {dirty ? "Save choices" : "Saved"}
+                    {dirty ? t('digest.settings.save') : t('digest.settings.saved')}
                   </Text>
                 )}
               </Pressable>

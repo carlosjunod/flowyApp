@@ -1,19 +1,30 @@
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
-const WEEK = 7 * DAY;
-const MONTH = 30 * DAY;
-const YEAR = 365 * DAY;
+import { dictionaries } from './i18n/dictionaries';
+import { formatRelativeDate } from './i18n/format';
+import { DEFAULT_LOCALE, type Locale } from './i18n/locale';
+import { createTranslate } from './i18n/translate';
 
-export const relativeDate = (input: string | Date, now: Date = new Date()): string => {
-  const then = typeof input === 'string' ? new Date(input) : input;
-  const diff = now.getTime() - then.getTime();
-  if (Number.isNaN(diff)) return '';
-  if (diff < MINUTE) return 'just now';
-  if (diff < HOUR) return `${Math.floor(diff / MINUTE)}m ago`;
-  if (diff < DAY) return `${Math.floor(diff / HOUR)}h ago`;
-  if (diff < WEEK) return `${Math.floor(diff / DAY)}d ago`;
-  if (diff < MONTH) return `${Math.floor(diff / WEEK)}w ago`;
-  if (diff < YEAR) return `${Math.floor(diff / MONTH)}mo ago`;
-  return `${Math.floor(diff / YEAR)}y ago`;
-};
+/**
+ * Compact relative time, in a given locale.
+ *
+ * Kept as a standalone helper for call sites that are not React components (and
+ * for the node test scripts), but the thresholds and the wording now live in
+ * one place: `lib/i18n/format.formatRelativeDate` plus `common.time.*`.
+ *
+ * In a component prefer `useI18n().formatRelativeDate`, which already knows the
+ * active locale.
+ */
+export const relativeDate = (
+  input: string | Date,
+  now: Date = new Date(),
+  locale: Locale = DEFAULT_LOCALE,
+): string =>
+  formatRelativeDate(
+    input,
+    locale,
+    createTranslate({
+      locale,
+      dictionary: dictionaries[locale],
+      fallback: dictionaries[DEFAULT_LOCALE],
+    }),
+    now.getTime(),
+  );

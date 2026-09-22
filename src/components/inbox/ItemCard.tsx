@@ -1,7 +1,8 @@
 import { ItemStatus } from './ItemStatus';
 import { itemPresentation, type CardSize } from '@/types/inbox-presentation';
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
-import { itemTypeLabel } from '@/lib/itemIcons';
+import { itemTypeLabelKey } from '@/lib/itemIcons';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { SemanticPreview } from './content/SemanticContent';
 import { Feather } from '@expo/vector-icons';
@@ -19,20 +20,13 @@ const isPending = (item: Item) => item.status === 'pending' || item.status === '
 
 const stripWww = (host: string): string => host.replace(/^www\./, '');
 
-const monthDayLabel = (input: string): string => {
-  const d = new Date(input);
-  if (Number.isNaN(d.getTime())) return '';
-  const day = d.getDate();
-  const month = d.toLocaleString('en-US', { month: 'short' });
-  return `${day} ${month}`;
-};
-
 const VIDEO_TYPES = new Set(['youtube', 'video', 'screen_recording']);
 
 type Props = { onOpen?: (id: string) => void; active?: boolean; item: Item; size?: CardSize };
 
 export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item, size = 'medium' }) => {
   const pending = isPending(item);
+  const { t, tKey, formatDate } = useI18n();
   const colors = useResolvedColors();
   const presentation = itemPresentation(item);
   const selection = useSelection();
@@ -66,9 +60,11 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item, size =
     <View style={{ flex: 1 }}>
       <Pressable
         accessibilityRole={selection.mode ? 'checkbox' : 'button'}
-        accessibilityLabel={`${item.title ?? item.raw_url ?? 'Saved item'}${item.read_at ? ', marked as read' : ', no read mark recorded'}${", " + presentation.label + (presentation.notice ? ", " + presentation.notice : "")}`}
+        // The title is the user's own text; everything appended to it is
+        // interface copy resolved from the presentation contract's keys.
+        accessibilityLabel={`${item.title ?? item.raw_url ?? t('inbox.card.savedItem')}${item.read_at ? t('inbox.card.markedRead') : t('inbox.card.noReadMark')}, ${tKey(presentation.labelKey)}${presentation.noticeKey ? ', ' + tKey(presentation.noticeKey) : ''}`}
         accessibilityState={{ checked: selection.mode ? selected : undefined, selected: !selection.mode && active }}
-        accessibilityActions={[{ name: 'longpress', label: 'Select item' }]}
+        accessibilityActions={[{ name: 'longpress', label: t('inbox.card.selectItem') }]}
         onAccessibilityAction={event => { if (event.nativeEvent.actionName === 'longpress') handleLongPress(); }}
         onPress={handlePress}
         onLongPress={handleLongPress}
@@ -121,9 +117,10 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item, size =
             }}
             numberOfLines={2}
           >
-            {item.title ?? item.raw_url ?? (pending ? 'Preparing saved content…' : 'Saved item')}
+            {item.title ?? item.raw_url ?? (pending ? t('inbox.card.preparing') : t('inbox.card.savedItem'))}
           </Text>
           <SemanticPreview item={item} />
+          {/* AI summary — rendered as generated, never translated. */}
           {item.summary ? <Text className="text-muted text-sm" numberOfLines={size === 'small' ? 1 : size === 'large' ? 3 : 2}>{item.summary}</Text> : null}
           <View className="flex-row items-end justify-between">
             <Text
@@ -131,13 +128,14 @@ export const ItemCard: React.FC<Props> = ({ onOpen, active = false, item, size =
               numberOfLines={1}
               style={{ fontFamily: 'Inter_400Regular' }}
             >
-              {item.category ?? itemTypeLabel[item.type]}
+              {/* The user's own category wins; the type name is interface copy. */}
+              {item.category ?? tKey(itemTypeLabelKey[item.type])}
             </Text>
             <Text
               className="text-muted"
               style={{ fontFamily: 'Inter_400Regular', fontSize: 12 }}
             >
-              {monthDayLabel(item.created)}
+              {formatDate(item.created, { day: 'numeric', month: 'short' })}
             </Text>
           </View>
           <ItemStatus item={item} selectionMode={selection.mode} />
@@ -170,7 +168,9 @@ const ImageLed: React.FC<LedProps> = ({
   pending,
   selected,
   selectionMode,
-}) => (
+}) => {
+  const { t } = useI18n();
+  return (
   <View className="relative" style={{ aspectRatio: 1.6 }}>
     <Image
       source={{ uri: thumb.uri }}
@@ -214,7 +214,7 @@ const ImageLed: React.FC<LedProps> = ({
         <Text
           style={{ fontFamily: 'Inter_500Medium', fontSize: 11, color: '#fff' }}
         >
-          {item.type === 'youtube' ? 'Video' : 'Clip'}
+          {item.type === 'youtube' ? t('inbox.card.video') : t('inbox.card.clip')}
         </Text>
       </View>
     ) : null}
@@ -241,7 +241,8 @@ const ImageLed: React.FC<LedProps> = ({
     ) : null}
 
   </View>
-);
+  );
+};
 
 type EditorialProps = {
   item: Item;

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FileTextPreview } from '@/components/inbox/FileTextPreview';
+import { useI18n } from '@/lib/i18n';
 import {
   formatFileBytes,
   type FileRetention,
@@ -9,6 +10,32 @@ import {
 } from '@/types/files';
 import { FileRetentionPicker } from './FileRetentionPicker';
 import { StorageAction } from './StorageAction';
+
+/**
+ * The row's state caption collapses several independent flags into one line.
+ * It resolves to a translation key so the ladder stays readable and the copy
+ * stays in the dictionary.
+ */
+function stateKey(file: ManagedFile): string | null {
+  if (file.removalPending) return 'settings.storage.row.cleanupPending';
+  if (file.analysis.state === 'uploading') return 'settings.storage.row.uploading';
+  if (file.originalAvailable === false) return 'settings.storage.row.originalRemoved';
+  if (file.analysis.state === 'queued') return 'settings.storage.row.queued';
+  if (file.analysis.state === 'analyzing') return 'settings.storage.row.analyzing';
+  if (file.analysis.state === 'partial') return 'settings.storage.row.partial';
+  if (file.analysis.state === 'error') return 'settings.storage.row.analysisFailed';
+  if (file.analysis.state === 'unsupported') return 'settings.storage.row.notAnalyzed';
+  return null;
+}
+
+/** Why an original cannot be removed yet — one sentence per reason. */
+function lockedKey(file: ManagedFile): string {
+  if (file.removalPending) return 'settings.storage.row.lockedCleanup';
+  if (file.originalAvailable === false) return 'settings.storage.row.lockedRemoved';
+  if (file.analysis.state === 'unsupported') return 'settings.storage.row.lockedUnsupported';
+  if (file.analysis.state === 'error') return 'settings.storage.row.lockedError';
+  return 'settings.storage.row.lockedPending';
+}
 
 export function StorageFileRow({
   file,
@@ -24,26 +51,14 @@ export function StorageFileRow({
   onRetention: (v: FileRetention) => Promise<boolean>;
 }) {
   const router = useRouter();
+  const { t, tKey, locale, formatDate } = useI18n();
   const [panel, setPanel] = useState<'preview' | 'options' | null>(null),
     [confirm, setConfirm] = useState(false);
-  const extension = file.name.split('.').pop()?.toUpperCase() || 'FILE';
-  const state = file.removalPending
-    ? 'Cleanup pending'
-    : file.analysis.state === 'uploading'
-      ? 'Uploading'
-      : file.originalAvailable === false
-        ? 'Original removed'
-        : file.analysis.state === 'queued'
-          ? 'Waiting for analysis'
-          : file.analysis.state === 'analyzing'
-            ? 'Analyzing document'
-            : file.analysis.state === 'partial'
-              ? 'Partial analysis'
-              : file.analysis.state === 'error'
-                ? 'Analysis failed'
-                : file.analysis.state === 'unsupported'
-                  ? 'Not analyzed'
-                  : null;
+  // Extensions come from the filename, so they are never translated; only the
+  // "unknown extension" placeholder is.
+  const extension = file.name.split('.').pop()?.toUpperCase() || t('settings.storage.row.fallbackExtension');
+  const state = stateKey(file);
+  const created = file.created.replace(' ', 'T');
   const toggle = (next: 'preview' | 'options') => {
     setPanel(panel === next ? null : next);
     setConfirm(false);
@@ -59,7 +74,7 @@ export function StorageFileRow({
             className="mt-1 h-11 w-10 items-center justify-center rounded-lg border border-border bg-surface"
           >
             <Text className="font-sans text-[9px] font-semibold text-muted">
-              {extension.length <= 5 ? extension : 'FILE'}
+              {extension.length <= 5 ? extension : t('settings.storage.row.fallbackExtension')}
             </Text>
           </View>
           <View className="flex-1">
@@ -67,40 +82,38 @@ export function StorageFileRow({
               accessibilityRole="button"
               accessibilityLabel={file.name}
               accessibilityValue={{
-                text: `${formatFileBytes(file.size)}, ${new Date(file.created.replace(' ', 'T')).toLocaleDateString()}`,
+                text: `${formatFileBytes(file.size, locale)}, ${formatDate(created)}`,
               }}
-              accessibilityHint="Opens the saved item"
+              accessibilityHint={t('settings.storage.row.openHint')}
               onPress={() => router.push(`/item/${file.itemId}`)}
               className="min-h-[44px] justify-center"
               style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
             >
+              {/* The filename is the user's own; never translated. */}
               <Text className="font-sans text-sm font-medium text-fg">
                 {file.name}
               </Text>
               <Text className="mt-1 font-sans text-[13px] leading-5 text-muted">
-                {formatFileBytes(file.size)} ·{' '}
-                {new Date(file.created.replace(' ', 'T')).toLocaleDateString(
-                  undefined,
-                  { day: 'numeric', month: 'short', year: 'numeric' },
-                )}
+                {formatFileBytes(file.size, locale)} ·{' '}
+                {formatDate(created, { day: 'numeric', month: 'short', year: 'numeric' })}
               </Text>
             </Pressable>
             {file.duplicateCount > 1 ? (
               <Text className="mt-1 font-sans text-[13px] text-fg">
-                {file.duplicateCount} identical copies
+                {t('settings.storage.row.duplicates', { count: file.duplicateCount })}
               </Text>
             ) : null}
             {state ? (
               <Text className="mt-1 font-sans text-[13px] text-muted">
-                {state}
+                {tKey(state)}
               </Text>
             ) : null}
           </View>
         </View>
         <View className="-ml-3 mt-2 flex-row flex-wrap">
           <StorageAction
-            title="Preview"
-            label={`Preview text for ${file.name}`}
+            title={t('settings.storage.row.preview')}
+            label={t('settings.storage.row.previewLabel', { name: file.name })}
             icon="eye"
             expanded={panel === 'preview'}
             disabled={busy || file.analysis.state === 'uploading'}
@@ -108,15 +121,15 @@ export function StorageFileRow({
           />
           {file.originalAvailable ? (
             <StorageAction
-              label={`Download ${file.name}`}
+              label={t('settings.storage.row.downloadLabel', { name: file.name })}
               icon="download"
               disabled={busy}
               onPress={onDownload}
             />
           ) : null}
           <StorageAction
-            title="Options"
-            label={`Options for ${file.name}`}
+            title={t('settings.storage.row.options')}
+            label={t('settings.storage.row.optionsLabel', { name: file.name })}
             icon={panel === 'options' ? 'x' : 'sliders'}
             expanded={panel === 'options'}
             disabled={busy}
@@ -132,10 +145,10 @@ export function StorageFileRow({
             <>
               <View className="mb-3 flex-row items-center justify-between gap-2">
                 <Text className="font-sans text-sm font-medium text-fg">
-                  Original file
+                  {t('settings.storage.row.originalFile')}
                 </Text>
                 <StorageAction
-                  title="Saved item"
+                  title={t('settings.storage.row.savedItem')}
                   icon="arrow-up-right"
                   tone="action"
                   onPress={() => router.push(`/item/${file.itemId}`)}
@@ -151,9 +164,9 @@ export function StorageFileRow({
                   />
                   {file.retainUntil ? (
                     <Text className="mt-2 font-sans text-[13px] leading-5 text-muted">
-                      Eligible for removal from{' '}
-                      {new Date(file.retainUntil).toLocaleDateString()}, after
-                      complete analysis.
+                      {t('settings.storage.row.eligibleFrom', {
+                        date: formatDate(file.retainUntil),
+                      })}
                     </Text>
                   ) : null}
                   <View className="mt-4 border-t border-border pt-3">
@@ -163,20 +176,21 @@ export function StorageFileRow({
                           accessibilityRole="alert"
                           className="font-sans text-sm font-semibold text-fg"
                         >
-                          Remove “{file.name}”?
+                          {t('settings.storage.row.removeTitle', { name: file.name })}
                         </Text>
                         <Text className="my-2 font-sans text-sm leading-5 text-muted">
-                          This cannot be undone. Your saved item, extracted text
-                          and notes stay.
-                          {file.analysis.state === 'partial'
-                            ? ' This document was only partially analyzed.'
-                            : ''}{' '}
-                          Space is released after cleanup, in at least 15
-                          minutes.
+                          {t('settings.storage.row.removeBody', {
+                            partial:
+                              file.analysis.state === 'partial'
+                                ? t('settings.storage.row.removeBodyPartial')
+                                : '',
+                          })}
                         </Text>
                         <View className="flex-row flex-wrap gap-1">
                           <StorageAction
-                            title={busy ? 'Removing…' : 'Confirm removal'}
+                            title={busy
+                              ? t('settings.storage.row.removing')
+                              : t('settings.storage.row.confirmRemoval')}
                             tone="danger"
                             disabled={busy}
                             onPress={() =>
@@ -189,7 +203,7 @@ export function StorageFileRow({
                             }
                           />
                           <StorageAction
-                            title="Keep original"
+                            title={t('settings.storage.row.keepOriginal')}
                             disabled={busy}
                             onPress={() => setConfirm(false)}
                           />
@@ -198,7 +212,7 @@ export function StorageFileRow({
                     ) : (
                       <View className="-ml-3 items-start">
                         <StorageAction
-                          title="Remove original"
+                          title={t('settings.storage.row.removeOriginal')}
                           tone="danger"
                           disabled={busy}
                           onPress={() => setConfirm(true)}
@@ -209,15 +223,7 @@ export function StorageFileRow({
                 </>
               ) : (
                 <Text className="font-sans text-sm leading-5 text-muted">
-                  {file.removalPending
-                    ? 'This original is awaiting cleanup. The extracted text stays available.'
-                    : file.originalAvailable === false
-                      ? 'The original is no longer available. You can still read the extracted text.'
-                      : file.analysis.state === 'unsupported'
-                        ? 'This file is stored without extracted text. Keep its original, or delete the saved item to remove the file.'
-                        : file.analysis.state === 'error'
-                          ? 'Analysis did not finish. Retry it from the saved item before removing this original.'
-                          : 'Keep this original while its text is being extracted. You can remove it here when the document is ready.'}
+                  {tKey(lockedKey(file))}
                 </Text>
               )}
             </>

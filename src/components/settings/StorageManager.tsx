@@ -3,6 +3,7 @@ import { Linking, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { api } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 import { pb } from '@/lib/pb';
 import { useResolvedColors } from '@/lib/theme';
 import { formatFileBytes, type StorageFiles } from '@/types/files';
@@ -11,17 +12,19 @@ import { FileRetentionPicker } from './FileRetentionPicker';
 import { StorageAction } from './StorageAction';
 import { StorageFileRow } from './StorageFileRow';
 
+/** `value` is the API's sort parameter; only the menu label is translated. */
 const SORT_OPTIONS = [
-  { value: 'largest', label: 'Largest first' },
-  { value: 'oldest', label: 'Oldest first' },
-  { value: 'newest', label: 'Newest first' },
+  { value: 'largest', labelKey: 'settings.storage.sortLargest' },
+  { value: 'oldest', labelKey: 'settings.storage.sortOldest' },
+  { value: 'newest', labelKey: 'settings.storage.sortNewest' },
 ];
 export function StorageManager({ onChanged }: { onChanged: () => void }) {
   const colors = useResolvedColors(),
     router = useRouter();
+  const { t, tKey, locale } = useI18n();
   const [data, setData] = useState<StorageFiles | null>(null),
-    [error, setError] = useState(''),
-    [notice, setNotice] = useState('');
+    [errorKey, setErrorKey] = useState(''),
+    [noticeKey, setNoticeKey] = useState('');
   const [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true),
     [version, setVersion] = useState(0);
@@ -42,12 +45,12 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
     let cancelled = false;
     const token = pb.authStore.token;
     setLoading(true);
-    setError('');
+    setErrorKey('');
     void api
       .storageFiles({ page, search: query, sort, duplicates })
       .then((r) => {
         if (cancelled || token !== pb.authStore.token) return;
-        if (r.error) setError('Could not load stored files. Please try again.');
+        if (r.error) setErrorKey('settings.storage.filesLoadFailed');
         else {
           setData(r.data);
           if (page > r.data.totalPages && page > 1)
@@ -56,7 +59,7 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
       })
       .catch(() => {
         if (!cancelled && token === pb.authStore.token)
-          setError('Could not load stored files. Please try again.');
+          setErrorKey('settings.storage.filesLoadFailed');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -71,29 +74,29 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
   ): Promise<boolean> {
     const token = pb.authStore.token;
     setBusy(true);
-    setError('');
-    setNotice('');
+    setErrorKey('');
+    setNoticeKey('');
     try {
       const r = await action();
       if (token !== pb.authStore.token) return false;
       if (r.error) {
-        setError(
+        setErrorKey(
           r.error.code === 'ORIGINAL_REQUIRED'
-            ? 'Keep this original until extraction finishes and the item is ready.'
-            : 'Could not update files. Please try again.',
+            ? 'settings.storage.originalRequired'
+            : 'settings.storage.updateFailed',
         );
         return false;
       }
       setVersion((v) => v + 1);
       onChanged();
-      setNotice(
+      setNoticeKey(
         removed
-          ? 'Original scheduled for removal. Your extracted text is kept.'
-          : 'Retention preference saved.',
+          ? 'settings.storage.removalScheduled'
+          : 'settings.storage.retentionSaved',
       );
       return true;
     } catch {
-      setError('Could not update files. Please try again.');
+      setErrorKey('settings.storage.updateFailed');
       return false;
     } finally {
       setBusy(false);
@@ -102,14 +105,14 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
   async function download(id: string) {
     const token = pb.authStore.token;
     setBusy(true);
-    setError('');
+    setErrorKey('');
     try {
       const r = await api.downloadOriginal(id);
       if (token !== pb.authStore.token) return;
-      if (r.error) setError('Could not download original.');
+      if (r.error) setErrorKey('settings.storage.downloadFailed');
       else await Linking.openURL(r.data.url);
     } catch {
-      if (token === pb.authStore.token) setError('Could not open original.');
+      if (token === pb.authStore.token) setErrorKey('settings.storage.openFailed');
     } finally {
       setBusy(false);
     }
@@ -128,13 +131,13 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
           accessibilityRole="header"
           className="font-sans text-base font-semibold text-fg"
         >
-          Your files
+          {t('settings.storage.yourFiles')}
           {data ? (
             <Text className="font-normal text-muted"> {data.totalFiles}</Text>
           ) : null}
         </Text>
         <StorageAction
-          label="Refresh files"
+          label={t('settings.storage.refreshFiles')}
           icon="refresh-cw"
           disabled={loading}
           onPress={() => setVersion((v) => v + 1)}
@@ -143,7 +146,7 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
       <View className="flex-row flex-wrap items-center justify-between gap-2">
         <View className="flex-row rounded-lg bg-surface p-1">
           <StorageAction
-            title="All files"
+            title={t('settings.storage.allFiles')}
             selected={!duplicates}
             onPress={() => {
               setDuplicates(false);
@@ -151,7 +154,7 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
             }}
           />
           <StorageAction
-            title="Duplicates"
+            title={t('settings.storage.duplicates')}
             selected={duplicates}
             onPress={() => {
               setDuplicates(true);
@@ -160,8 +163,11 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
           />
         </View>
         <StorageAction
-          title={SORT_OPTIONS.find((o) => o.value === sort)?.label}
-          label="Sort files"
+          title={(() => {
+            const active = SORT_OPTIONS.find((o) => o.value === sort);
+            return active ? tKey(active.labelKey) : undefined;
+          })()}
+          label={t('settings.storage.sortFiles')}
           icon="chevron-down"
           expanded={sorting}
           onPress={() => setSorting((v) => !v)}
@@ -172,7 +178,7 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
           {SORT_OPTIONS.map((o) => (
             <StorageAction
               key={o.value}
-              title={o.label}
+              title={tKey(o.labelKey)}
               selected={sort === o.value}
               onPress={() => {
                 setSort(o.value);
@@ -191,8 +197,8 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
           color={colors.muted}
         />
         <TextInput
-          accessibilityLabel="Search files"
-          placeholder="Search by filename"
+          accessibilityLabel={t('settings.storage.searchFiles')}
+          placeholder={t('settings.storage.searchPlaceholder')}
           placeholderTextColor={colors.muted}
           value={search}
           onChangeText={setSearch}
@@ -204,7 +210,7 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
         />
         {search ? (
           <StorageAction
-            label="Clear file search"
+            label={t('settings.storage.clearFileSearch')}
             icon="x"
             onPress={() => setSearch('')}
           />
@@ -213,41 +219,42 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
       {duplicates ? (
         <Text className="mb-4 font-sans text-[13px] leading-5 text-muted">
           {data && data.duplicateBytes > 0
-            ? `${formatFileBytes(data.duplicateBytes)} in extra identical copies. `
+            ? t('settings.storage.duplicateBytes', {
+                size: formatFileBytes(data.duplicateBytes, locale),
+              })
             : ''}
-          Same contents, even with different names. Each copy counts until you
-          remove its original.
+          {t('settings.storage.duplicateHint')}
         </Text>
       ) : null}
-      {error ? (
+      {errorKey ? (
         <View className="mb-3 rounded-lg border border-border p-3">
           <Text accessibilityRole="alert" className="font-sans text-sm text-fg">
-            {error}
+            {tKey(errorKey)}
           </Text>
           <StorageAction
-            title="Retry"
+            title={t('settings.storage.retry')}
             tone="action"
             onPress={() => setVersion((v) => v + 1)}
           />
         </View>
       ) : null}
-      {notice ? (
+      {noticeKey ? (
         <View className="mb-3 flex-row items-center rounded-lg bg-surface pl-3">
           <Text
             accessibilityLiveRegion="polite"
             className="flex-1 font-sans text-sm text-fg"
           >
-            {notice}
+            {tKey(noticeKey)}
           </Text>
           <StorageAction
-            label="Dismiss file update"
+            label={t('settings.storage.dismissUpdate')}
             icon="x"
-            onPress={() => setNotice('')}
+            onPress={() => setNoticeKey('')}
           />
         </View>
       ) : null}
       {!data && loading ? (
-        <View accessibilityLabel="Loading files" className="gap-5 py-4">
+        <View accessibilityLabel={t('settings.storage.loadingFiles')} className="gap-5 py-4">
           {[1, 2, 3].map((n) => (
             <View key={n} className="flex-row gap-3">
               <View className="h-11 w-10 rounded bg-surface" />
@@ -285,27 +292,27 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
               <Feather name="file-text" size={28} color={colors.muted} />
               <Text className="mt-4 text-center font-sans text-sm font-semibold text-fg">
                 {query
-                  ? 'No matching files'
+                  ? t('settings.storage.emptySearch')
                   : duplicates
-                    ? 'No duplicate originals'
-                    : 'Your originals will appear here'}
+                    ? t('settings.storage.emptyDuplicates')
+                    : t('settings.storage.emptyFiles')}
               </Text>
               <Text className="mt-2 text-center font-sans text-sm leading-5 text-muted">
                 {query
-                  ? 'Try another filename or clear your search.'
+                  ? t('settings.storage.emptySearchHint')
                   : duplicates
-                    ? 'New files are checked after upload. There is nothing to remove here.'
-                    : 'Save a document from your inbox or share it to Flowy.'}
+                    ? t('settings.storage.emptyDuplicatesHint')
+                    : t('settings.storage.emptyFilesHint')}
               </Text>
               {query ? (
                 <StorageAction
-                  title="Clear search"
+                  title={t('settings.storage.clearSearch')}
                   tone="action"
                   onPress={() => setSearch('')}
                 />
               ) : !duplicates ? (
                 <StorageAction
-                  title="Go to inbox"
+                  title={t('settings.storage.goToInbox')}
                   tone="action"
                   onPress={() => router.push('/inbox')}
                 />
@@ -315,15 +322,15 @@ export function StorageManager({ onChanged }: { onChanged: () => void }) {
           {data.totalPages > 1 ? (
             <View className="mt-3 flex-row items-center justify-between">
               <StorageAction
-                title="Previous"
+                title={t('settings.storage.previous')}
                 disabled={page <= 1 || loading}
                 onPress={() => setPage((v) => v - 1)}
               />
               <Text className="font-sans text-[13px] text-muted">
-                Page {page} of {data.totalPages}
+                {t('settings.storage.pageOf', { page, total: data.totalPages })}
               </Text>
               <StorageAction
-                title="Next"
+                title={t('settings.storage.next')}
                 disabled={page >= data.totalPages || loading}
                 onPress={() => setPage((v) => v + 1)}
               />

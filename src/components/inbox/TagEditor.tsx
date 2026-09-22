@@ -3,6 +3,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { usePatchItem } from '@/hooks/useItems';
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
 import type { Item } from '@/types';
 
@@ -13,6 +14,7 @@ import type { Item } from '@/types';
  * Mirrors apps/web/components/inbox/ItemDrawer.tsx tag-add/remove flow.
  */
 export const TagEditor: React.FC<{ item: Item }> = ({ item }) => {
+  const { t } = useI18n();
   const colors = useResolvedColors();
   const patch = usePatchItem();
   const [draft, setDraft] = useState('');
@@ -74,7 +76,7 @@ export const TagEditor: React.FC<{ item: Item }> = ({ item }) => {
 
   return (
     <View style={{ gap: 8 }}>
-      {patch.isError ? <Text accessibilityRole="alert" className="text-danger text-sm">The tag could not be saved. Please try again.</Text> : null}
+      {patch.isError ? <Text accessibilityRole="alert" className="text-danger text-sm">{t('inbox.tags.saveFailed')}</Text> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
         {tags.map((tag) => (
           <View
@@ -104,7 +106,8 @@ export const TagEditor: React.FC<{ item: Item }> = ({ item }) => {
             <Pressable
               onPress={() => remove(tag)}
               disabled={busy}
-              accessibilityLabel={`Remove tag ${tag}`}
+              accessibilityRole="button"
+              accessibilityLabel={t('inbox.tags.remove', { tag })}
               accessibilityState={{ disabled: busy }}
               hitSlop={6}
               style={({ pressed }) => [
@@ -143,7 +146,7 @@ export const TagEditor: React.FC<{ item: Item }> = ({ item }) => {
           onSubmitEditing={add}
           editable={!busy}
           returnKeyType="done"
-          placeholder="Add a tag"
+          placeholder={t('inbox.tags.addPlaceholder')}
           placeholderTextColor={colors.muted}
           autoCapitalize="none"
           autoCorrect={false}
@@ -158,7 +161,8 @@ export const TagEditor: React.FC<{ item: Item }> = ({ item }) => {
         {draft.trim() ? (
           <Pressable
             onPress={add}
-            accessibilityLabel="Add tag"
+            accessibilityRole="button"
+            accessibilityLabel={t('inbox.tags.addLabel')}
             hitSlop={6}
             style={({ pressed }) => [
               {
@@ -177,7 +181,7 @@ export const TagEditor: React.FC<{ item: Item }> = ({ item }) => {
                 color: '#fff',
               }}
             >
-              Add
+              {t('inbox.tags.add')}
             </Text>
           </Pressable>
         ) : null}

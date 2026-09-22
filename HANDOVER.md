@@ -1,5 +1,74 @@
 # FlowyApp — Parity Red-Priority Handover
 
+## Spanish interface — 2026-09-17 (branch `codex/i18n-es`, not merged)
+
+The native client now ships English and Spanish. Operating guide, glossary and
+the full "what is and is not translated" policy live in `docs/I18N.md`; this
+entry records rollout state and what a reviewer still owes the release.
+
+**Capability.** Every native screen, alert and accessibility label is
+translated: auth, tabs, inbox (filters, labels, cards, item actions, bulk
+selection, empty/error states), the reader and its semantic/recipe/receipt/
+carousel/YouTube/Reel renderers, original files and text previews, chat and its
+history drawer, digests and digest settings, personalization, storage, and the
+inbox email alias. Dates, numbers, byte sizes and relative times are formatted
+through the active locale.
+
+**Not translated, on purpose.** Item titles, notes, tags and categories (the
+user's words); summaries, transcripts, digest bullets and chat answers (AI
+output, in the language it was generated in); API error *codes*, `item.type`
+values and URLs (contracts). `ApiError.message` is the server's code, so alerts
+now render it through `src/lib/apiErrors.ts` instead of showing the raw value.
+
+**Two literals stay English because a server compares them byte-for-byte:**
+the `delete my account` confirmation phrase, and `DEFAULT_CONVERSATION_TITLE`
+(`New conversation`), which is persisted and synced — its *display* is localized
+via `chat.history.newConversation`, the stored value is not.
+
+**Locale policy.** Explicit choice (persisted under `flowy.locale` in the
+device-local secure store) → device language (any Spanish variant resolves to
+one neutral Spanish) → English. Detection is never persisted. Choosing
+**Automatic** deletes the stored row, so the next launch detects again. A
+keychain that cannot be read degrades to the detected language and never blocks
+startup. The selector is reachable from login, signup and Settings — someone
+whose phone put them in a language they cannot read needs a way out *before*
+signing in.
+
+**D-041 holds:** `DigestPreferences.locale` (the language Flowy *writes reports
+in*) remains an independent server-side setting. The interface language never
+changes it; `test:i18n-parity` asserts both directions.
+
+**Cross-platform contracts.** `src/types/inbox-presentation.ts`,
+`src/types/reader.ts`, the "Localisable variants" block in
+`src/types/semantic.ts`, and `chatErrorKey` in `src/hooks/useChatEngine.ts` are
+mirrored byte-for-byte with the web client and now return translation *keys*.
+Renaming a key on either side breaks the other; `test:i18n-parity` renders every
+key those contracts can emit, in both locales, with no English fallback.
+`semanticCoverageMessage` / `semanticEvidenceLabel` are untouched — the worker
+uses them to write `exploration.notes`, which is stored content.
+
+**No native change.** No dependency, entitlement, capability or native project
+configuration was added; `expo-localization` is deliberately absent. Detection
+reads the platform's existing locale modules (through `getConstants()` *and* the
+legacy own-property, because React Native 0.81 moved both behind TurboModule
+getters) and falls back to `Intl`. This ships as a JavaScript change; no new
+binary is required for the i18n work itself.
+
+**Validation performed.** `npm run typecheck` (also the EN/ES parity gate),
+`npm run test:i18n`, `npm run test:reader-navigation` (10 scenarios),
+`npm run test:digest-monthly`, an iOS Metro/Hermes export, and a Spanish/English
+switch confirmed in the installed development client on an iPhone 16e.
+`npm run test:ui-models` still stops at its **pre-existing** `chatSync.ts`
+transpilation failure in the custom loader; that is unrelated to this work and
+was deliberately not touched.
+
+**Still owed before release.** Native VoiceOver in Spanish; Dynamic Type at the
+largest sizes with the longer Spanish strings (Spanish runs ~15–25% longer than
+English and several toolbars are tight); a Spanish-language device cold start
+(as opposed to switching in-app); Android verification — every device-detection
+path is covered by tests against the real module shapes, but only iOS has been
+exercised on hardware. Translation review by a native speaker has not happened.
+
 ## Storage publication — 2026-09-15
 
 Native Storage P0–P3 and UI refinements are integrated into main at `6c28839`,

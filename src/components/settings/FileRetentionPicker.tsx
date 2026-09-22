@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
 import { RETENTION_OPTIONS, type FileRetention } from '@/types/files';
 import { StorageAction } from './StorageAction';
@@ -20,6 +21,7 @@ export function FileRetentionPicker({
     [draft, setDraft] = useState(value),
     [saveError, setSaveError] = useState(false);
   const colors = useResolvedColors();
+  const { t, tKey } = useI18n();
   useEffect(() => setDraft(value), [value]);
   async function save() {
     setSaveError(false);
@@ -35,14 +37,21 @@ export function FileRetentionPicker({
       <View className="flex-row items-center justify-between gap-2">
         <View className="flex-1">
           <Text className="font-sans text-sm font-medium text-fg">
-            {compact ? 'Original retention' : 'Default for new documents'}
+            {compact
+              ? t('settings.storage.retention.titleCompact')
+              : t('settings.storage.retention.titleDefault')}
           </Text>
           <Text className="mt-1 font-sans text-sm text-muted">
-            {RETENTION_OPTIONS.find((o) => o.value === value)?.label}
+            {(() => {
+              const active = RETENTION_OPTIONS.find((o) => o.value === value);
+              return active ? tKey(active.labelKey) : '';
+            })()}
           </Text>
         </View>
         <StorageAction
-          title={open ? 'Close' : 'Change'}
+          title={open
+            ? t('settings.storage.retention.close')
+            : t('settings.storage.retention.change')}
           tone="action"
           expanded={open}
           disabled={disabled}
@@ -58,15 +67,15 @@ export function FileRetentionPicker({
           <View
             accessibilityLabel={
               compact
-                ? 'Original retention options'
-                : 'Default retention options'
+                ? t('settings.storage.retention.optionsCompact')
+                : t('settings.storage.retention.optionsDefault')
             }
           >
             {RETENTION_OPTIONS.map((o) => (
               <Pressable
                 key={o.value}
                 accessibilityRole="radio"
-                accessibilityLabel={o.label}
+                accessibilityLabel={tKey(o.labelKey)}
                 accessibilityState={{ checked: draft === o.value, disabled }}
                 disabled={disabled}
                 onPress={() => {
@@ -84,32 +93,35 @@ export function FileRetentionPicker({
                   size={18}
                 />
                 <Text className="flex-1 font-sans text-sm text-fg">
-                  {o.label}
+                  {tKey(o.labelKey)}
                 </Text>
               </Pressable>
             ))}
           </View>
           <Text className="my-3 font-sans text-[13px] leading-5 text-muted">
             {compact
-              ? 'This original only. '
-              : 'New PDF, Word and PowerPoint uploads on all your devices. Existing files keep their policy. '}
+              ? t('settings.storage.retention.scopeCompact')
+              : t('settings.storage.retention.scopeDefault')}
             {draft === 'keep'
-              ? 'Keep the original until you choose to remove it.'
-              : 'Removed originals cannot be recovered. Extracted text stays. Partial or failed documents keep their originals until analysis is complete.'}
+              ? t('settings.storage.retention.keepHint')
+              : t('settings.storage.retention.removeHint')}
           </Text>
           {saveError ? (
             <Text
               accessibilityRole="alert"
               className="mb-3 font-sans text-sm leading-5 text-fg"
             >
-              Could not confirm the save. Your selection is still here. Try
-              again.
+              {t('settings.storage.retention.saveFailed')}
             </Text>
           ) : null}
           <View className="items-start">
             <StorageAction
               title={
-                disabled ? 'Saving…' : compact ? 'Apply' : 'Save preference'
+                disabled
+                  ? t('settings.storage.retention.saving')
+                  : compact
+                    ? t('settings.storage.retention.apply')
+                    : t('settings.storage.retention.savePreference')
               }
               tone="primary"
               disabled={disabled || draft === value}
@@ -119,7 +131,7 @@ export function FileRetentionPicker({
         </View>
       ) : !compact ? (
         <Text className="mt-2 font-sans text-[13px] leading-5 text-muted">
-          Your extracted text stays available when an original is removed.
+          {t('settings.storage.retention.footer')}
         </Text>
       ) : null}
     </View>

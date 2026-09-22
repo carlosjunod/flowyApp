@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import { ENV } from '@/lib/env';
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
 import type { MediaSlide } from '@/types';
 
@@ -21,6 +22,7 @@ type Props = {
 
 export const MediaCarousel: React.FC<Props> = ({ slides, width, height = 240 }) => {
   const [index, setIndex] = useState(0);
+  const { t, formatNumber } = useI18n();
   const colors = useResolvedColors();
 
   const onScroll = useCallback(
@@ -50,7 +52,7 @@ export const MediaCarousel: React.FC<Props> = ({ slides, width, height = 240 }) 
           scrollEventThrottle={16}
           renderItem={({ item }) => (
             <View style={{ width, height }} className="bg-surface">
-              <ReaderImage uri={`${ENV.R2_PUBLIC_URL}/${item.r2_key}`} label={item.summary ?? `Image ${item.index + 1}`} />
+              <ReaderImage uri={`${ENV.R2_PUBLIC_URL}/${item.r2_key}`} label={item.summary ?? t('inbox.content.image', { index: item.index + 1 })} />
             </View>
           )}
         />
@@ -59,7 +61,7 @@ export const MediaCarousel: React.FC<Props> = ({ slides, width, height = 240 }) 
             className="text-white"
             style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11 }}
           >
-            {index + 1} / {slides.length}
+            {formatNumber(index + 1)} / {formatNumber(slides.length)}
           </Text>
         </View>
       </View>
@@ -88,18 +90,19 @@ export const MediaCarousel: React.FC<Props> = ({ slides, width, height = 240 }) 
 
 const TranscriptBlock: React.FC<{ transcript: string }> = ({ transcript }) => {
   const [expanded, setExpanded] = useState(false);
+  const { t } = useI18n();
   return (
     <View className="px-1 gap-1">
-      <Text className="text-xs uppercase text-muted tracking-wide">Spoken audio</Text>
+      <Text className="text-xs uppercase text-muted tracking-wide">{t('inbox.content.spokenAudio')}</Text>
       <Text
         className="text-sm text-fg"
         numberOfLines={expanded ? undefined : 2}
       >
         {transcript}
       </Text>
-      <Pressable onPress={() => setExpanded((v) => !v)} hitSlop={6}>
+      <Pressable onPress={() => setExpanded((v) => !v)} accessibilityRole="button" hitSlop={6}>
         <Text className="text-xs text-accent font-medium">
-          {expanded ? 'Show less' : 'Show more'}
+          {expanded ? t('common.actions.showLess') : t('common.actions.showMore')}
         </Text>
       </Pressable>
     </View>

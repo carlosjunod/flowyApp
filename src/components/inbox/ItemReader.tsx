@@ -25,7 +25,7 @@ import { EnrichedSections } from '@/components/inbox/EnrichedSections';
 import { ExploreCTA } from '@/components/inbox/ExploreCTA';
 import { ReaderImage } from '@/components/inbox/ReaderImage';
 import { ReaderSwipe } from '@/components/inbox/ReaderSwipe';
-import { SourceChip } from '@/components/inbox/SourceChip';
+import { SourceChip, useSourceChipLabel } from '@/components/inbox/SourceChip';
 import { TagEditor } from '@/components/inbox/TagEditor';
 import { READER_COPY, readerAction, readerSummary, readerDate } from '@/types/reader';
 import { SourceIdentity } from '@/components/inbox/content/SourceIdentity';
@@ -40,8 +40,10 @@ import { Spinner } from '@/components/ui/Spinner';
 import { useItemActions } from '@/hooks/useItemActions';
 import { useDeleteItem, useItemById, usePatchItem, useRelatedItems } from '@/hooks/useItems';
 import { useItemStatus } from '@/hooks/useItemStatus';
+import { apiErrorKey, caughtErrorKey } from '@/lib/apiErrors';
 import { getContentType } from '@/lib/contentType';
 import { ENV } from '@/lib/env';
+import { useI18n } from '@/lib/i18n';
 import { sourceChip } from '@/lib/sourceChip';
 import { hostOf, thumbnailFor } from '@/lib/thumbnails';
 import { useResolvedColors } from '@/lib/theme';
@@ -68,8 +70,14 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
   const { data: relatedItems = [] } = useRelatedItems(item);
   const { width: windowWidth } = useWindowDimensions();
   const width = paneWidth ?? windowWidth;
+  const { t, tKey, locale } = useI18n();
   const colors = useResolvedColors();
   const actions = useItemActions();
+  // `sourceChip` returns a key + optional source text; resolve once so the
+  // header chip and the "Tags and details" line cannot drift apart.
+  const contentTypeForChip = item ? getContentType(item) : 'generic';
+  const chip = item ? sourceChip(item, contentTypeForChip) : null;
+  const chipLabel = useSourceChipLabel(chip ?? { icon: 'paperclip', labelKey: 'inbox.sourceChip.item' });
 
   const [startingResearch, setStartingResearch] = useState(false);
   const researchLock = useRef(false);
@@ -84,8 +92,8 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
     setStartingResearch(true);
     try {
       const result = await actions.exploreMany([item.id], { deep: !readerAction(item).resume });
-      if (!result.ok && 'error' in result) Alert.alert('Could not start', result.error.message);
-      else if (result.ok && result.data.failed.length) Alert.alert('Could not start', 'Please try again. Completed work is kept.');
+      if (!result.ok && 'error' in result) Alert.alert(t('inbox.detail.exploreFailedTitle'), tKey(apiErrorKey(result.error)));
+      else if (result.ok && result.data.failed.length) Alert.alert(t('inbox.detail.exploreFailedTitle'), t('inbox.detail.exploreFailedBody'));
     } finally { researchLock.current = false; setStartingResearch(false); }
   };
 
@@ -94,7 +102,7 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
       <ReaderSwipe onClose={onClose} scrollGesture={scrollGesture} disabled={embedded}>
       <SafeAreaView className="flex-1 bg-bg">
         <Spinner className="mt-12" size="large" />
-        <Button title={embedded ? "Close reader" : "Back"} variant="secondary" onPress={onClose} />
+        <Button title={embedded ? t('inbox.detail.closeReader') : t('inbox.detail.back')} variant="secondary" onPress={onClose} />
       </SafeAreaView>
       </ReaderSwipe>
     );
@@ -103,10 +111,10 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
     return (
       <ReaderSwipe onClose={onClose} scrollGesture={scrollGesture} disabled={embedded}>
       <SafeAreaView className="flex-1 bg-bg items-center justify-center px-6">
-        <Text className="text-base text-danger mb-4">
-          This item could not be loaded. Check your connection or return to your inbox.
+        <Text accessibilityRole="alert" className="text-base text-danger mb-4">
+          {t('inbox.detail.loadFailed')}
         </Text>
-        <Button title={embedded ? "Close reader" : "Back"} variant="secondary" onPress={onClose} />
+        <Button title={embedded ? t('inbox.detail.closeReader') : t('inbox.detail.back')} variant="secondary" onPress={onClose} />
       </SafeAreaView>
       </ReaderSwipe>
     );
@@ -142,7 +150,7 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
         <Pressable
           onPress={onClose}
           hitSlop={8}
-          accessibilityLabel={embedded ? "Close reader" : "Back"}
+          accessibilityLabel={embedded ? t('inbox.detail.closeReader') : t('inbox.detail.back')}
           accessibilityRole="button"
           className="flex-row min-h-[44px] items-center gap-1.5"
         >
@@ -151,17 +159,17 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
             className="text-fg"
             style={{ fontFamily: 'Inter_500Medium', fontSize: 14 }}
           >
-            {embedded ? 'Close' : 'Back'}
+            {embedded ? t('inbox.detail.close') : t('inbox.detail.back')}
           </Text>
         </Pressable>
         <View className="flex-row items-center gap-2">
           <ShareButton item={item} />
-          <Pressable onPress={() => setActionsOpen(v => !v)} accessibilityRole="button" accessibilityLabel="Item actions" accessibilityState={{ expanded: actionsOpen }} className="w-11 h-11 items-center justify-center"><Feather name="more-horizontal" size={22} color={colors.fg} /></Pressable>
+          <Pressable onPress={() => setActionsOpen(v => !v)} accessibilityRole="button" accessibilityLabel={t('inbox.detail.actions')} accessibilityState={{ expanded: actionsOpen }} className="w-11 h-11 items-center justify-center"><Feather name="more-horizontal" size={22} color={colors.fg} /></Pressable>
         </View>
       </View>
       {actionsOpen ? <View className="flex-row flex-wrap items-center justify-around px-4 border-b border-border bg-card">
         <ReloadButton item={item} />
-        <Pressable onPress={() => { setEditing(true); setActionsOpen(false); }} accessibilityRole="button" className="min-h-[44px] justify-center px-3"><Text className="text-fg">Edit details</Text></Pressable>
+        <Pressable onPress={() => { setEditing(true); setActionsOpen(false); }} accessibilityRole="button" className="min-h-[44px] justify-center px-3"><Text className="text-fg">{t('inbox.detail.editDetails')}</Text></Pressable>
         <DeleteButton id={item.id} onDeleted={onClose} />
       </View> : null}
       <GestureDetector gesture={scrollGesture}>
@@ -178,20 +186,21 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
               letterSpacing: -0.5,
             }}
           >
-            {item.title ?? item.raw_url ?? 'Saved item'}
+            {item.title ?? item.raw_url ?? t('inbox.card.savedItem')}
           </Text>
           <View className="flex-row flex-wrap items-center gap-2">
             <SourceChip chip={sourceChip(item, contentType)} />
+            {/* The category is the user's own word. */}
             {item.category ? <Badge label={item.category} tone="accent" /> : null}
             <Text
               className="text-muted"
               style={{ fontFamily: 'Inter_400Regular', fontSize: 13 }}
             >
-              {readerDate(item.created)}
+              {readerDate(item.created, locale)}
             </Text>
             {item.status !== 'ready' ? (
               <Badge
-                label={itemPresentation(item).label}
+                label={tKey(itemPresentation(item).labelKey)}
                 tone="neutral"
               />
             ) : null}
@@ -215,7 +224,7 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
                 className="text-on-accent"
                 style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15 }}
               >
-                Open original
+                {t('inbox.detail.openOriginal')}
               </Text>
             </View>
           </Pressable>
@@ -224,16 +233,16 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
 
         <View style={{ flex: 1, minWidth: 145 }}>
           <Pressable onPress={() => { void engagement.toggleRead(); }} disabled={engagement.busy}
-            accessibilityRole="button" accessibilityLabel={item.read_at ? READER_COPY.markUnread : READER_COPY.markRead}
+            accessibilityRole="button" accessibilityLabel={tKey(item.read_at ? READER_COPY.markUnread : READER_COPY.markRead)}
             accessibilityState={{ disabled: engagement.busy }} className="min-h-[44px] flex-row items-center justify-center gap-2 px-3 rounded-full border border-border">
             <Feather name={item.read_at ? 'check' : 'circle'} size={17} color={colors.muted} />
-            <Text className="text-fg text-sm">{engagement.busy ? 'Saving…' : item.read_at ? READER_COPY.markUnread : READER_COPY.markRead}</Text>
+            <Text className="text-fg text-sm">{engagement.busy ? t('inbox.read.saving') : tKey(item.read_at ? READER_COPY.markUnread : READER_COPY.markRead)}</Text>
           </Pressable>
-          {engagement.error ? <Text accessibilityRole="alert" className="text-danger text-sm">{engagement.error}</Text> : null}
+          {engagement.errorKey ? <Text accessibilityRole="alert" className="text-danger text-sm">{tKey(engagement.errorKey)}</Text> : null}
         </View>
 
           </View>
-          <Text className="text-muted" style={{ fontSize: 12, lineHeight: 18 }}>{READER_COPY.readingHint}</Text>
+          <Text className="text-muted" style={{ fontSize: 12, lineHeight: 18 }}>{tKey(READER_COPY.readingHint)}</Text>
         </View>
         {(
           <View style={{ position: 'relative' }}>
@@ -255,14 +264,19 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
                   className="text-muted"
                   style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11, letterSpacing: 1 }}
                 >
-                  {READER_COPY.takeaways}
+                  {tKey(READER_COPY.takeaways)}
                 </Text>
               </View>
+              {/* Either the AI's own summary, rendered as written, or a
+                  translated placeholder — `readerSummary` says which. */}
               <Text
                 className="text-fg"
                 style={{ fontFamily: 'Inter_400Regular', fontSize: 16, lineHeight: 25 }}
               >
-                {readerSummary(item)}
+                {(() => {
+                  const summary = readerSummary(item);
+                  return 'text' in summary ? summary.text : tKey(summary.key);
+                })()}
               </Text>
             </View>
           </View>
@@ -271,17 +285,20 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
 
         {item.status === 'error' ? (
           <View className="rounded-xl border border-border bg-surface p-3">
-            <Text className="text-fg font-medium mb-1">{itemPresentation(item).label}</Text>
-            <Text className="text-muted">{itemPresentation(item).notice}</Text>
+            <Text className="text-fg font-medium mb-1">{tKey(itemPresentation(item).labelKey)}</Text>
+            <Text className="text-muted">{(() => {
+              const noticeKey = itemPresentation(item).noticeKey;
+              return noticeKey ? tKey(noticeKey) : '';
+            })()}</Text>
             <ReloadButton item={item} />
           </View>
         ) : null}
 
         <SemanticContent item={item} action={readerAction(item).resume ? <ExploreCTA item={item} starting={startingResearch} onPress={startResearch} /> : undefined} />
         <View style={{ gap: 12 }}>
-          <Text accessibilityRole="header" className="text-fg" style={{ fontFamily: 'Inter_600SemiBold', fontSize: 18 }}>{READER_COPY.original}</Text>
+          <Text accessibilityRole="header" className="text-fg" style={{ fontFamily: 'Inter_600SemiBold', fontSize: 18 }}>{tKey(READER_COPY.original)}</Text>
         {showHero && heroUri ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={photoOpen ? "Collapse image" : "Expand image"} accessibilityState={{ expanded: photoOpen }} onPress={() => setPhotoOpen(v => !v)} className="relative">
+          <Pressable accessibilityRole="button" accessibilityLabel={photoOpen ? t('inbox.detail.collapseImage') : t('inbox.detail.expandImage')} accessibilityState={{ expanded: photoOpen }} onPress={() => setPhotoOpen(v => !v)} className="relative">
             <View
               className="bg-surface"
               style={{
@@ -292,7 +309,7 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
               }}
             >
               {heroUri ? (
-                <ReaderImage uri={heroUri} label={item.title ?? 'Saved image'} />
+                <ReaderImage uri={heroUri} label={item.title ?? t('inbox.detail.savedImage')} />
               ) : (
                 <View className="flex-1 items-center justify-center">
                   <AppIcon type={item.type} size={48} />
@@ -326,17 +343,17 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
         </View>
         {item.status === 'ready' && !readerAction(item).resume ? <ExploreCTA item={item} starting={startingResearch} onPress={startResearch} /> : null}
         {item.exploration && ['enriched', 'no_match', 'error'].includes(item.exploration.status) ? <EnrichedSections exploration={item.exploration} /> : null}
-        {item.notes?.trim() ? <CollapsibleSection label="Your notes" defaultOpen>
+        {item.notes?.trim() ? <CollapsibleSection label={t('inbox.detail.yourNotes')} defaultOpen>
           <SourceText text={item.notes} />
-          <Pressable accessibilityRole="button" onPress={() => setEditing(true)} className="min-h-[44px] justify-center"><Text className="text-accent">Edit notes</Text></Pressable>
+          <Pressable accessibilityRole="button" onPress={() => setEditing(true)} className="min-h-[44px] justify-center"><Text className="text-accent">{t('inbox.detail.editNotes')}</Text></Pressable>
         </CollapsibleSection> : null}
 
 
 
-        <CollapsibleSection label="Tags and details" defaultOpen={false}>
-          <Text className="text-muted text-sm mb-3">{sourceChip(item, contentType).label}{item.category ? ` · ${item.category}` : ''}</Text>
+        <CollapsibleSection label={t('inbox.detail.tagsAndDetails')} defaultOpen={false}>
+          <Text className="text-muted text-sm mb-3">{chipLabel}{item.category ? ` · ${item.category}` : ''}</Text>
           <TagEditor item={item} />
-          <Text className="text-muted text-xs mt-4">Saved {readerDate(item.created)}</Text>
+          <Text className="text-muted text-xs mt-4">{t('inbox.detail.savedOn', { date: readerDate(item.created, locale) })}</Text>
         </CollapsibleSection>
 
         {relatedItems.length > 0 ? (
@@ -349,7 +366,7 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
                 letterSpacing: -0.3,
               }}
             >
-              Related
+              {t('inbox.detail.related')}
             </Text>
             <ScrollView
               horizontal
@@ -376,6 +393,7 @@ export function ItemReader({ id, onClose, onOpenItem, paneWidth, embedded = fals
 }
 
 const RelatedCard: React.FC<{ item: Item; onOpenItem: (id: string) => void }> = ({ item, onOpenItem }) => {
+  const { t } = useI18n();
   const thumb = thumbnailFor(item);
   const url = item.source_url ?? item.raw_url;
   const host = url ? hostOf(url) : null;
@@ -434,7 +452,7 @@ const RelatedCard: React.FC<{ item: Item; onOpenItem: (id: string) => void }> = 
             className="text-fg"
             style={{ fontFamily: 'Inter_600SemiBold', fontSize: 13, lineHeight: 16 }}
           >
-            {item.title ?? item.raw_url ?? 'Saved item'}
+            {item.title ?? item.raw_url ?? t('inbox.card.savedItem')}
           </Text>
         </View>
       </View>
@@ -444,9 +462,10 @@ const RelatedCard: React.FC<{ item: Item; onOpenItem: (id: string) => void }> = 
 
 const ShareButton: React.FC<{ item: Item }> = ({ item }) => {
   const colors = useResolvedColors();
+  const { t } = useI18n();
   const onPress = async () => {
     const url = item.source_url ?? item.raw_url;
-    const title = item.title ?? 'Flowy item';
+    const title = item.title ?? t('inbox.detail.shareFallbackTitle');
     try {
       await Share.share(
         url
@@ -459,7 +478,7 @@ const ShareButton: React.FC<{ item: Item }> = ({ item }) => {
     }
   };
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Share item" className="w-11 h-11 items-center justify-center">
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={t('inbox.detail.share')} className="w-11 h-11 items-center justify-center">
       <Feather name="share" size={20} color={colors.fg} />
     </Pressable>
   );
@@ -467,13 +486,14 @@ const ShareButton: React.FC<{ item: Item }> = ({ item }) => {
 
 const ReloadButton: React.FC<{ item: Item }> = ({ item }) => {
   const actions = useItemActions();
+  const { t, tKey } = useI18n();
   const disabled = item.status === 'pending' || item.status === 'processing';
   const busy = actions.pending.has(item.id);
   const onPress = async () => {
     if (disabled || busy) return;
     const res = await actions.reloadItem(item.id);
-    if (!res.ok && res.error.message !== 'Cancelled') {
-      Alert.alert('Reload failed', res.error.message);
+    if (!res.ok && 'error' in res) {
+      Alert.alert(t('inbox.detail.reloadFailedTitle'), tKey(apiErrorKey(res.error)));
     }
   };
   return (
@@ -482,7 +502,7 @@ const ReloadButton: React.FC<{ item: Item }> = ({ item }) => {
         className={disabled || busy ? 'text-muted' : 'text-fg'}
         style={{ fontFamily: 'Inter_500Medium', fontSize: 14 }}
       >
-        {busy ? 'Processing…' : item.status === 'error' ? 'Retry processing' : 'Reprocess'}
+        {busy ? t('inbox.detail.processing') : item.status === 'error' ? t('inbox.actionsMenu.retryProcessing') : t('inbox.detail.reprocess')}
       </Text>
     </Pressable>
   );
@@ -490,21 +510,23 @@ const ReloadButton: React.FC<{ item: Item }> = ({ item }) => {
 
 const DeleteButton: React.FC<{ id: string; onDeleted: () => void }> = ({ id, onDeleted }) => {
   const del = useDeleteItem();
+  const { t, tKey } = useI18n();
   return (
     <Pressable
       accessibilityRole="button" className="min-h-[44px] justify-center px-3"
       onPress={() => {
-        Alert.alert('Delete item?', 'This cannot be undone.', [
-          { text: 'Cancel', style: 'cancel' },
+        Alert.alert(t('inbox.detail.deleteTitle'), t('inbox.detail.deleteBody'), [
+          { text: t('inbox.selection.cancel'), style: 'cancel' },
           {
-            text: 'Delete',
+            text: t('inbox.detail.delete'),
             style: 'destructive',
             onPress: async () => {
               try {
                 await del.mutateAsync(id);
                 onDeleted();
               } catch (err) {
-                Alert.alert('Delete failed', err instanceof Error ? err.message : 'Unknown');
+                if (err instanceof Error) console.warn('[ItemReader] delete failed', err.message);
+                Alert.alert(t('inbox.detail.deleteFailedTitle'), tKey(caughtErrorKey(err, 'inbox.detail.unknownError')));
               }
             },
           },
@@ -515,7 +537,7 @@ const DeleteButton: React.FC<{ id: string; onDeleted: () => void }> = ({ id, onD
         className="text-danger"
         style={{ fontFamily: 'Inter_500Medium', fontSize: 14 }}
       >
-        Delete
+        {t('inbox.detail.delete')}
       </Text>
     </Pressable>
   );
@@ -533,7 +555,10 @@ const EditModal: React.FC<EditProps> = ({ item, onClose }) => {
   const [tags, setTags] = useState((item.tags ?? []).join(', '));
   const [notes, setNotes] = useState(item.notes ?? '');
   const patch = usePatchItem();
-  const [error, setError] = useState<string | null>(null);
+  const { t, tKey } = useI18n();
+  // A translation key: the mapped error code when there is one, a translated
+  // fallback otherwise. Never the server's raw message — see `caughtErrorKey`.
+  const [errorKey, setErrorKey] = useState<string | null>(null);
   const colors = useResolvedColors();
 
   useEffect(() => {
@@ -545,7 +570,7 @@ const EditModal: React.FC<EditProps> = ({ item, onClose }) => {
   }, [item.id]);
 
   const save = async () => {
-    setError(null);
+    setErrorKey(null);
     try {
       await patch.mutateAsync({
         id: item.id,
@@ -562,7 +587,8 @@ const EditModal: React.FC<EditProps> = ({ item, onClose }) => {
       });
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed');
+      if (err instanceof Error) console.warn('[ItemReader] save failed', err.message);
+      setErrorKey(caughtErrorKey(err, 'inbox.edit.saveFailed'));
     }
   };
 
@@ -570,50 +596,50 @@ const EditModal: React.FC<EditProps> = ({ item, onClose }) => {
     <Modal transparent animationType="slide" visible onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-black/40 justify-end">
         <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: '85%' }} className="bg-bg rounded-t-2xl" contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 40 }}>
-          <Text className="text-xl font-semibold text-fg">Edit item</Text>
-          <Text className="text-fg text-sm">Title</Text>
-          <TextInput accessibilityLabel="Title"
+          <Text className="text-xl font-semibold text-fg">{t('inbox.edit.title')}</Text>
+          <Text className="text-fg text-sm">{t('inbox.edit.fieldTitle')}</Text>
+          <TextInput accessibilityLabel={t('inbox.edit.fieldTitle')}
             value={title}
             onChangeText={setTitle}
-            placeholder="Title"
+            placeholder={t('inbox.edit.fieldTitle')}
             placeholderTextColor={colors.muted}
             className="h-11 rounded-xl border border-border bg-card px-3 text-fg"
           />
-          <Text className="text-fg text-sm">Summary</Text>
-          <TextInput accessibilityLabel="Summary"
+          <Text className="text-fg text-sm">{t('inbox.edit.fieldSummary')}</Text>
+          <TextInput accessibilityLabel={t('inbox.edit.fieldSummary')}
             value={summary}
             onChangeText={setSummary}
-            placeholder="Summary"
+            placeholder={t('inbox.edit.fieldSummary')}
             placeholderTextColor={colors.muted}
             multiline
             className="min-h-[88px] rounded-xl border border-border bg-card px-3 py-2 text-fg"
           />
-          <Text className="text-fg text-sm">Category</Text>
-          <TextInput accessibilityLabel="Category"
+          <Text className="text-fg text-sm">{t('inbox.edit.fieldCategory')}</Text>
+          <TextInput accessibilityLabel={t('inbox.edit.fieldCategory')}
             value={category}
             onChangeText={setCategory}
-            placeholder="Category"
+            placeholder={t('inbox.edit.fieldCategory')}
             placeholderTextColor={colors.muted}
             className="h-11 rounded-xl border border-border bg-card px-3 text-fg"
           />
-          <Text className="text-fg text-sm">Tags, separated by commas</Text>
-          <TextInput accessibilityLabel="Tags, separated by commas"
+          <Text className="text-fg text-sm">{t('inbox.edit.fieldTags')}</Text>
+          <TextInput accessibilityLabel={t('inbox.edit.fieldTags')}
             value={tags}
             onChangeText={setTags}
-            placeholder="Tags (comma separated)"
+            placeholder={t('inbox.edit.tagsPlaceholder')}
             placeholderTextColor={colors.muted}
             autoCapitalize="none"
             className="h-11 rounded-xl border border-border bg-card px-3 text-fg"
           />
-          <Text className="text-fg text-sm">Your notes</Text>
-          <TextInput accessibilityLabel="Your notes" multiline value={notes} onChangeText={setNotes} placeholder="Add notes…" placeholderTextColor={colors.muted} className="min-h-[120px] rounded-xl border border-border bg-card p-3 text-fg" textAlignVertical="top" />
-          {error ? <Text className="text-danger">{error}</Text> : null}
+          <Text className="text-fg text-sm">{t('inbox.edit.fieldNotes')}</Text>
+          <TextInput accessibilityLabel={t('inbox.edit.fieldNotes')} multiline value={notes} onChangeText={setNotes} placeholder={t('inbox.edit.notesPlaceholder')} placeholderTextColor={colors.muted} className="min-h-[120px] rounded-xl border border-border bg-card p-3 text-fg" textAlignVertical="top" />
+          {errorKey ? <Text accessibilityRole="alert" className="text-danger">{tKey(errorKey)}</Text> : null}
           <View className="flex-row gap-2 pt-2">
             <View className="flex-1">
-              <Button title="Cancel" variant="secondary" onPress={onClose} />
+              <Button title={t('common.actions.cancel')} variant="secondary" onPress={onClose} />
             </View>
             <View className="flex-1">
-              <Button title="Save" loading={patch.isPending} onPress={save} />
+              <Button title={t('common.actions.save')} loading={patch.isPending} onPress={save} />
             </View>
           </View>
         </ScrollView>

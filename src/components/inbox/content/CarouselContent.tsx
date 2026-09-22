@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { ENV } from '@/lib/env';
+import { useI18n } from '@/lib/i18n';
 import { useResolvedColors } from '@/lib/theme';
 import type { Item, MediaSlide } from '@/types';
 
@@ -38,6 +39,7 @@ function placeholderColor(idx: number): string {
  * Mirrors apps/web/components/inbox/content/CarouselContent.tsx.
  */
 export const CarouselContent: React.FC<{ item: Item }> = ({ item }) => {
+  const { t, formatNumber } = useI18n();
   const colors = useResolvedColors();
   const slides = (item.media ?? []).slice().sort((a, b) => a.index - b.index);
   const [idx, setIdx] = useState(0);
@@ -58,7 +60,7 @@ export const CarouselContent: React.FC<{ item: Item }> = ({ item }) => {
             opacity: 0.7,
           }}
         >
-          No slides found for this carousel.
+          {t('inbox.content.noSlides')}
         </Text>
       </View>
     );
@@ -91,7 +93,7 @@ export const CarouselContent: React.FC<{ item: Item }> = ({ item }) => {
               onPress={() => setIdx(i)}
               hitSlop={4}
               accessibilityRole="button"
-              accessibilityLabel={`Go to slide ${i + 1}`}
+              accessibilityLabel={t('inbox.content.goToSlide', { index: i + 1 })}
             >
               <View
                 style={{
@@ -109,7 +111,7 @@ export const CarouselContent: React.FC<{ item: Item }> = ({ item }) => {
       {/* Thumbnail strip */}
       <ThumbnailStrip slides={slides} activeIdx={idx} onSelect={setIdx} />
 
-      {item.content ? <View className="my-4"><Text className="text-fg font-semibold">Saved text</Text><SourceText text={item.content} /></View> : null}
+      {item.content ? <View className="my-4"><Text className="text-fg font-semibold">{t('inbox.content.savedText')}</Text><SourceText text={item.content} /></View> : null}
       {/* AI Vision toggle + panel */}
       <Pressable
         onPress={() => setShowAI((v) => !v)}
@@ -142,7 +144,7 @@ export const CarouselContent: React.FC<{ item: Item }> = ({ item }) => {
             color: showAI ? colors.accent : colors.muted,
           }}
         >
-          AI Vision — Slide {idx + 1}
+          {t('inbox.content.aiVision', { index: idx + 1 })}
         </Text>
         <View style={{ marginLeft: 'auto' }}>
           <Feather
@@ -175,7 +177,8 @@ export const CarouselContent: React.FC<{ item: Item }> = ({ item }) => {
               opacity: active.summary ? 1 : 0.7,
             }}
           >
-            {active.summary || 'No vision description yet for this slide.'}
+            {/* The AI's own description of the slide, or a placeholder. */}
+            {active.summary || t('inbox.content.noVision')}
           </Text>
         </View>
       ) : null}
@@ -194,6 +197,7 @@ const MainSlide: React.FC<{
   onPrev: (() => void) | null;
   onNext: (() => void) | null;
 }> = ({ slide, idx, count, onPrev, onNext }) => {
+  const { t, formatNumber } = useI18n();
   const [containerSize, setContainerSize] = useState(0);
   const url = r2UrlForKey(slide.r2_key);
 
@@ -216,7 +220,7 @@ const MainSlide: React.FC<{
           (slide.kind === 'video' && savedMediaKind(slide.r2_key) !== 'image') ? (
             <SlideVideo uri={url} keyId={slide.r2_key} size={containerSize} />
           ) : (
-            <ReaderImage uri={url} label={slide.summary ?? `Slide ${idx + 1} of ${count}`} />
+            <ReaderImage uri={url} label={slide.summary ?? t('inbox.content.slideOf', { index: idx + 1, total: count })} />
           )
         ) : (
           <PlaceholderSlide idx={idx} />
@@ -242,7 +246,7 @@ const MainSlide: React.FC<{
               color: '#fff',
             }}
           >
-            {idx + 1}/{count}
+            {formatNumber(idx + 1)}/{formatNumber(count)}
           </Text>
         </View>
 
@@ -250,7 +254,7 @@ const MainSlide: React.FC<{
         {(slide.kind !== 'video' || savedMediaKind(slide.r2_key) === 'image') && onPrev ? (
           <Pressable
             onPress={onPrev}
-            accessibilityLabel="Previous slide"
+            accessibilityLabel={t('inbox.content.previousSlide')}
             hitSlop={6}
             className="active:opacity-70"
             style={[
@@ -275,7 +279,7 @@ const MainSlide: React.FC<{
         {(slide.kind !== 'video' || savedMediaKind(slide.r2_key) === 'image') && onNext ? (
           <Pressable
             onPress={onNext}
-            accessibilityLabel="Next slide"
+            accessibilityLabel={t('inbox.content.nextSlide')}
             hitSlop={6}
             className="active:opacity-70"
             style={[
@@ -318,7 +322,9 @@ const SlideVideo: React.FC<{ uri: string; keyId?: string; size: number }> = ({ u
   );
 };
 
-const PlaceholderSlide: React.FC<{ idx: number }> = ({ idx }) => (
+const PlaceholderSlide: React.FC<{ idx: number }> = ({ idx }) => {
+  const { t } = useI18n();
+  return (
   <View style={{ alignItems: 'center', gap: 8 }}>
     <Feather name="image" size={40} color="#FFFFFF" />
     <Text
@@ -330,10 +336,11 @@ const PlaceholderSlide: React.FC<{ idx: number }> = ({ idx }) => (
         color: 'rgba(255,255,255,0.75)',
       }}
     >
-      Slide {idx + 1}
+      {t('inbox.content.slide', { index: idx + 1 })}
     </Text>
   </View>
-);
+  );
+};
 
 // ─────────────────────────────────────────────────────────────
 // Thumbnail strip
@@ -344,6 +351,7 @@ const ThumbnailStrip: React.FC<{
   activeIdx: number;
   onSelect: (idx: number) => void;
 }> = ({ slides, activeIdx, onSelect }) => {
+  const { t } = useI18n();
   const colors = useResolvedColors();
   return (
     <ScrollView
@@ -358,7 +366,7 @@ const ThumbnailStrip: React.FC<{
           <Pressable
             key={`thumb-${s.index}-${s.r2_key ?? i}`}
             onPress={() => onSelect(i)}
-            accessibilityLabel={`Slide ${i + 1}`}
+            accessibilityLabel={t('inbox.content.slide', { index: i + 1 })}
             accessibilityState={{ selected: isActive }}
             className="active:opacity-70"
             style={[

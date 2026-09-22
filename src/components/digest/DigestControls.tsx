@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { useDigestColors, useDigestVars } from "@/lib/digestAppearance";
 import { digestTimezones } from "@/lib/digestSettings";
+import { useI18n } from "@/lib/i18n";
 
 export function DigestChip({
   label,
@@ -29,6 +30,7 @@ export function DigestChip({
   disabled?: boolean;
   role?: "checkbox" | "radio";
 }) {
+  const { t } = useI18n();
   const colors = useDigestColors();
   return (
     <Pressable
@@ -39,8 +41,8 @@ export function DigestChip({
       accessibilityHint={
         role === "checkbox"
           ? selected
-            ? "Included in digests. Tap to exclude."
-            : "Excluded from digests. Tap to include."
+            ? t('digest.settings.chipExclude')
+            : t('digest.settings.chipInclude')
           : undefined
       }
       disabled={disabled}
@@ -146,6 +148,7 @@ export function DigestTimezone({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const { t } = useI18n();
   const colors = useDigestColors();
   const vars = useDigestVars();
   const timezones = useMemo(() => digestTimezones(value), [value]);
@@ -164,7 +167,7 @@ export function DigestTimezone({
     <>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Timezone"
+        accessibilityLabel={t('digest.settings.timezoneTitle')}
         accessibilityValue={{ text: value }}
         disabled={disabled}
         onPress={() => {
@@ -196,16 +199,16 @@ export function DigestTimezone({
                 accessibilityRole="header"
                 className="text-2xl text-fg font-semibold"
               >
-                Timezone
+                {t('digest.settings.timezoneTitle')}
               </Text>
-              <DigestAction title="Done" onPress={() => setOpen(false)} />
+              <DigestAction title={t('digest.settings.timezoneDone')} onPress={() => setOpen(false)} />
             </View>
             <Text className="font-sans text-sm text-muted">
-              Choose the timezone for your publication schedule.
+              {t('digest.settings.timezoneIntro')}
             </Text>
             <TextInput
-              accessibilityLabel="Search timezones"
-              placeholder="Search a city or region"
+              accessibilityLabel={t('digest.settings.timezoneSearch')}
+              placeholder={t('digest.settings.timezoneSearchPlaceholder')}
               placeholderTextColor={colors.muted}
               value={search}
               onChangeText={setSearch}
@@ -215,7 +218,7 @@ export function DigestTimezone({
               className="min-h-12 px-4 py-3 rounded-lg bg-bg border border-border text-base text-fg"
             />
             <DigestAction
-              title="Use device timezone"
+              title={t('digest.settings.timezoneUseDevice')}
               onPress={() =>
                 choose(Intl.DateTimeFormat().resolvedOptions().timeZone)
               }
@@ -250,7 +253,7 @@ export function DigestTimezone({
             ))}
             {!options.length && (
               <Text className="font-sans py-5 text-muted">
-                No matching timezones. Try a nearby city or region.
+                {t('digest.settings.timezoneNoMatches')}
               </Text>
             )}
           </ScrollView>
