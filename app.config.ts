@@ -16,6 +16,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Flowy',
   slug: 'tryflowy',
+  owner: 'calcura-software',
   scheme: 'tryflowy',
   version: '1.0.0',
   orientation: 'portrait',
