@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import type {
   ChatTurn,
   HistoryConversation,
-  HistoryImport,
   HistoryDigest,
+  HistoryImport,
   HistoryList,
   HistoryMessage,
   HistoryOperation,
@@ -50,14 +50,13 @@ export type ChatAdapters = {
 };
 export const newChatId = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
-
 /**
  * Sentinel title for a conversation the user has not named by asking anything.
  *
- * Deliberately stored in English: it is persisted and synced across devices, so
- * translating it at creation time would write the creating device's language
- * into shared data. The UI compares against this constant and renders
- * `chat.history.newConversation` instead — see `ChatPanel`.
+ * Deliberately stored in English: it is persisted to the server and synced
+ * across devices, so translating it at creation time would write the creating
+ * device's language into shared data. The UI compares against this constant and
+ * renders `chat.history.newConversation` instead — see `ChatHistory`.
  */
 export const DEFAULT_CONVERSATION_TITLE = 'New conversation';
 
@@ -88,9 +87,9 @@ export function freshHistory(): LocalHistory {
 /**
  * Maps a thrown error's *code* to a translation key.
  *
- * The engine is shared with the web client, which has its own dictionary, so it
- * returns keys rather than sentences. Every key below exists under
- * `chat.errors.*` in both dictionaries.
+ * This engine is shared between the web app and the Expo app, which keep
+ * separate dictionaries, so it returns keys rather than sentences. Every key
+ * below must exist under `chat.errors.*` in both dictionaries.
  */
 export function chatErrorKey(error: unknown): string {
   const code = error instanceof Error ? error.message : '';
@@ -102,8 +101,7 @@ export function chatErrorKey(error: unknown): string {
   if (code === 'CHAT_HISTORY_UNAVAILABLE') return 'chat.errors.CHAT_HISTORY_UNAVAILABLE';
   if (code === 'CHAT_TIMEOUT') return 'chat.errors.CHAT_TIMEOUT';
   if (code === 'UNAUTHORIZED') return 'chat.errors.UNAUTHORIZED';
-  if (code === 'BODY_TOO_LARGE' || code === 'VALIDATION_FAILED')
-    return 'chat.errors.BODY_TOO_LARGE';
+  if (code === 'BODY_TOO_LARGE' || code === 'VALIDATION_FAILED') return 'chat.errors.BODY_TOO_LARGE';
   return 'chat.errors.DEFAULT';
 }
 export function useChatEngine(
@@ -459,7 +457,10 @@ export function useChatEngine(
         void refreshRef.current();
       })
       .catch(() => {
-        if (valid(s)) setStorageError('chat.errors.storageRead');
+        if (valid(s))
+          setStorageError(
+            'chat.errors.storageRead',
+          );
       });
     return () => {
       if (s.writable)

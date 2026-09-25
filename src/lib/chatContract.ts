@@ -12,6 +12,8 @@ export type HistoryItem = {
   og_image?: string | null;
   site_name?: string | null;
   media?: { r2_key?: string }[] | null;
+  groupItemId?: string;
+  contributorNames?: string[];
 };
 export type HistoryDigest = {
   digestId: string;
@@ -19,6 +21,8 @@ export type HistoryDigest = {
   itemIds?: string[];
   selectedText?: string;
 };
+export type GroupChatContext = { groupId: string; conversationId?: string };
+export type HistoryScope = { groupContext?: { groupId: string } };
 export type HistoryMessage = {
   id: string;
   role: 'user' | 'assistant';
@@ -54,7 +58,7 @@ export type HistoryImport = {
   digestContext?: HistoryDigest;
   messages: HistoryMessage[];
 };
-export type HistoryOperation =
+export type HistoryOperation = HistoryScope & (
   | { op: 'list'; after?: string }
   | { op: 'get'; id: string; before?: number }
   | { op: 'import'; conversation: HistoryImport }
@@ -65,7 +69,8 @@ export type HistoryOperation =
       requestId: string;
       content?: string;
       status?: 'stopped' | 'interrupted';
-    };
+    }
+);
 export type ChatTurn = {
   conversationId: string;
   revision: number;
